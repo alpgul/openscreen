@@ -28,8 +28,6 @@ class MockObserver final : public ServicePublisher::Observer {
   MOCK_METHOD0(OnSuspended, void());
 
   MOCK_METHOD1(OnError, void(const Error& error));
-
-  MOCK_METHOD1(OnMetrics, void(ServicePublisher::Metrics));
 };
 
 class MockMdnsDelegate : public ServicePublisherImpl::Delegate {

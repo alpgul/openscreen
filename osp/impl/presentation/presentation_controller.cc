@@ -701,7 +701,6 @@ void Controller::OnAllReceiversRemoved() {
 }
 
 void Controller::OnError(const Error&) {}
-void Controller::OnMetrics(ServiceListener::Metrics) {}
 
 void Controller::OnConnectSucceed(uint64_t request_id,
                                   std::string_view instance_name,

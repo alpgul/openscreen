@@ -99,7 +99,6 @@ class QuicClient final : public ProtocolConnectionClient,
   void OnReceiverRemoved(const ServiceInfo& info) override;
   void OnAllReceiversRemoved() override;
   void OnError(const Error& error) override;
-  void OnMetrics(ServiceListener::Metrics) override;
 
   // ProtocolConnectionClient overrides.
   void CancelConnectRequest(uint64_t request_id) override;

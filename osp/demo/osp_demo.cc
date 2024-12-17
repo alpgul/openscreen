@@ -157,7 +157,6 @@ class DemoListenerObserver final : public ServiceListener::Observer {
 
   void OnAllReceiversRemoved() override { OSP_LOG_INFO << "all removed!"; }
   void OnError(const Error&) override {}
-  void OnMetrics(ServiceListener::Metrics) override {}
 };
 
 class DemoPublisherObserver final : public ServicePublisher::Observer {
@@ -176,8 +175,6 @@ class DemoPublisherObserver final : public ServicePublisher::Observer {
   void OnError(const Error& error) override {
     OSP_LOG_ERROR << "publisher error: " << error;
   }
-
-  void OnMetrics(ServicePublisher::Metrics) override {}
 };
 
 class DemoConnectionServiceObserver final

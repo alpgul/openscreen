@@ -112,7 +112,6 @@ void QuicClient::OnAllReceiversRemoved() {
 }
 
 void QuicClient::OnError(const Error&) {}
-void QuicClient::OnMetrics(ServiceListener::Metrics) {}
 
 bool QuicClient::StartConnectionRequest(
     std::string_view instance_name,

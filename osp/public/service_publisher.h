@@ -9,7 +9,6 @@
 #include <string>
 #include <vector>
 
-#include "osp/public/timestamp.h"
 #include "platform/base/error.h"
 #include "platform/base/interface_info.h"
 
@@ -23,21 +22,6 @@ class ServicePublisher {
     kRunning,
     kStopping,
     kSuspended,
-  };
-
-  struct Metrics {
-    // The range of time over which the metrics were collected; end_timestamp >
-    // start_timestamp
-    timestamp_t start_timestamp = 0;
-    timestamp_t end_timestamp = 0;
-
-    // The number of packets and bytes sent since the service started.
-    uint64_t num_packets_sent = 0;
-    uint64_t num_bytes_sent = 0;
-
-    // The number of packets and bytes received since the service started.
-    uint64_t num_packets_received = 0;
-    uint64_t num_bytes_received = 0;
   };
 
   class Observer {
@@ -58,9 +42,6 @@ class ServicePublisher {
 
     // Reports an error.
     virtual void OnError(const Error&) = 0;
-
-    // Reports metrics.
-    virtual void OnMetrics(Metrics) = 0;
   };
 
   struct Config {

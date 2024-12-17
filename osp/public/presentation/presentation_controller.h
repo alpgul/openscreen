@@ -203,7 +203,6 @@ class Controller final : public ServiceListener::Observer,
   void OnReceiverRemoved(const ServiceInfo& info) override;
   void OnAllReceiversRemoved() override;
   void OnError(const Error& error) override;
-  void OnMetrics(ServiceListener::Metrics) override;
 
   // ConnectRequestCallback overrides.
   void OnConnectSucceed(uint64_t request_id,
