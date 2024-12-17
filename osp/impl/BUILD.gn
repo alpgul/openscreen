@@ -27,7 +27,6 @@ if (!is_win) {
       "dns_sd_service_publisher_factory.cc",
       "dns_sd_watcher_client.cc",
       "dns_sd_watcher_client.h",
-      "message_demuxer.cc",
       "network_service_manager.cc",
       "presentation/presentation_connection.cc",
       "presentation/presentation_controller.cc",

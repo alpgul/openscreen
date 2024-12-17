@@ -47,6 +47,7 @@ if (!is_win) {
       "authentication_bob.cc",
       "connect_request.cc",
       "instance_request_ids.cc",
+      "message_demuxer.cc",
       "protocol_connection.cc",
       "protocol_connection_client.cc",
       "protocol_connection_endpoint.cc",
