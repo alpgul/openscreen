@@ -13,9 +13,9 @@
 #include "osp/impl/presentation/testing/mock_connection_delegate.h"
 #include "osp/impl/presentation/url_availability_requester.h"
 #include "osp/impl/quic/testing/quic_test_support.h"
-#include "osp/impl/service_listener_impl.h"
 #include "osp/public/message_demuxer.h"
 #include "osp/public/network_service_manager.h"
+#include "osp/public/service_listener.h"
 #include "osp/public/testing/message_demuxer_test_support.h"
 #include "platform/test/fake_clock.h"
 #include "platform/test/fake_task_runner.h"
@@ -31,11 +31,11 @@ namespace {
 constexpr char kTestUrl1[] = "https://example.foo";
 constexpr char kTestUrl2[] = "https://example.bar";
 
-class MockServiceListenerDelegate final : public ServiceListenerImpl::Delegate {
+class MockServiceListenerDelegate final : public ServiceListener::Delegate {
  public:
   ~MockServiceListenerDelegate() override = default;
 
-  ServiceListenerImpl* listener() { return listener_; }
+  ServiceListener* listener() { return listener_; }
 
   MOCK_METHOD1(StartListener, void(const ServiceListener::Config& config));
   MOCK_METHOD1(StartAndSuspendListener,
@@ -95,8 +95,8 @@ class ControllerTest : public ::testing::Test {
     auto mock_listener_delegate =
         std::make_unique<MockServiceListenerDelegate>();
     mock_listener_delegate_ = mock_listener_delegate.get();
-    auto service_listener = std::make_unique<ServiceListenerImpl>(
-        std::move(mock_listener_delegate));
+    auto service_listener =
+        std::make_unique<ServiceListener>(std::move(mock_listener_delegate));
     service_listener->AddObserver(*quic_bridge_.GetQuicClient());
     quic_bridge_.CreateNetworkServiceManager(std::move(service_listener),
                                              nullptr);

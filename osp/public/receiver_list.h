@@ -1,9 +1,9 @@
-// Copyright 2018 The Chromium Authors
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef OSP_IMPL_RECEIVER_LIST_H_
-#define OSP_IMPL_RECEIVER_LIST_H_
+#ifndef OSP_PUBLIC_RECEIVER_LIST_H_
+#define OSP_PUBLIC_RECEIVER_LIST_H_
 
 #include <vector>
 
@@ -37,4 +37,4 @@ class ReceiverList {
 
 }  // namespace openscreen::osp
 
-#endif  // OSP_IMPL_RECEIVER_LIST_H_
+#endif  // OSP_PUBLIC_RECEIVER_LIST_H_

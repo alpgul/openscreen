@@ -12,9 +12,7 @@
 #include "osp/impl/service_publisher_impl.h"
 #include "platform/api/task_runner.h"
 
-namespace openscreen {
-
-namespace osp {
+namespace openscreen::osp {
 
 class DnsSdPublisherClient final : public ServicePublisherImpl::Delegate {
  public:
@@ -47,7 +45,6 @@ class DnsSdPublisherClient final : public ServicePublisherImpl::Delegate {
   std::unique_ptr<OspDnsSdPublisher> dns_sd_publisher_;
 };
 
-}  // namespace osp
-}  // namespace openscreen
+}  // namespace openscreen::osp
 
 #endif  // OSP_IMPL_DNS_SD_PUBLISHER_CLIENT_H_

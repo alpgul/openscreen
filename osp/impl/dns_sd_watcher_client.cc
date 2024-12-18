@@ -118,6 +118,14 @@ void DnsSdWatcherClient::SearchNow(State from) {
   SetState(State::kSearching);
 }
 
+void DnsSdWatcherClient::OnFatalError(const Error& error) {
+  listener_->OnError(error);
+}
+
+void DnsSdWatcherClient::OnRecoverableError(const Error& error) {
+  listener_->OnError(error);
+}
+
 void DnsSdWatcherClient::StartWatcherInternal(
     const ServiceListener::Config& config) {
   OSP_CHECK(!dns_sd_watcher_);
@@ -149,7 +157,7 @@ discovery::DnsSdServicePtr DnsSdWatcherClient::CreateDnsSdServiceInternal(
   // discovery::DnsSdService, e.g. through a ref-counting handle, so that the
   // OSP publisher and the OSP listener don't have to coordinate through an
   // additional object.
-  return CreateDnsSdService(task_runner_, *listener_, dns_sd_config);
+  return CreateDnsSdService(task_runner_, *this, dns_sd_config);
 }
 
 void DnsSdWatcherClient::OnDnsWatcherUpdated(

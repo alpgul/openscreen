@@ -1,8 +1,8 @@
-// Copyright 2018 The Chromium Authors
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "osp/impl/service_listener_impl.h"
+#include "osp/public/service_listener.h"
 
 #include <memory>
 #include <utility>
@@ -11,6 +11,7 @@
 #include "gtest/gtest.h"
 
 namespace openscreen::osp {
+
 namespace {
 
 using ::testing::_;
@@ -20,8 +21,6 @@ using ::testing::Mock;
 using ::testing::NiceMock;
 
 using State = ServiceListener::State;
-
-namespace {
 
 class MockObserver final : public ServiceListener::Observer {
  public:
@@ -40,12 +39,12 @@ class MockObserver final : public ServiceListener::Observer {
   MOCK_METHOD1(OnError, void(const Error& error));
 };
 
-class MockMdnsDelegate : public ServiceListenerImpl::Delegate {
+class MockMdnsDelegate : public ServiceListener::Delegate {
  public:
   MockMdnsDelegate() = default;
   ~MockMdnsDelegate() override = default;
 
-  using ServiceListenerImpl::Delegate::SetState;
+  using ServiceListener::Delegate::SetState;
 
   MOCK_METHOD1(StartListener, void(const ServiceListener::Config& config));
   MOCK_METHOD1(StartAndSuspendListener,
@@ -57,26 +56,24 @@ class MockMdnsDelegate : public ServiceListenerImpl::Delegate {
   MOCK_METHOD0(RunTasksListener, void());
 };
 
-}  // namespace
-
-class ServiceListenerImplTest : public ::testing::Test {
+class ServiceListenerTest : public ::testing::Test {
  protected:
   void SetUp() override {
     auto mock_delegate = std::make_unique<NiceMock<MockMdnsDelegate>>();
     mock_delegate_ = mock_delegate.get();
     service_listener_ =
-        std::make_unique<ServiceListenerImpl>(std::move(mock_delegate));
+        std::make_unique<ServiceListener>(std::move(mock_delegate));
     service_listener_->SetConfig(config);
   }
 
   NiceMock<MockMdnsDelegate>* mock_delegate_ = nullptr;
-  std::unique_ptr<ServiceListenerImpl> service_listener_;
+  std::unique_ptr<ServiceListener> service_listener_;
   ServiceListener::Config config;
 };
 
 }  // namespace
 
-TEST_F(ServiceListenerImplTest, NormalStartStop) {
+TEST_F(ServiceListenerTest, NormalStartStop) {
   ASSERT_EQ(State::kStopped, service_listener_->state());
 
   EXPECT_CALL(*mock_delegate_, StartListener(_));
@@ -96,7 +93,7 @@ TEST_F(ServiceListenerImplTest, NormalStartStop) {
   EXPECT_EQ(State::kStopped, service_listener_->state());
 }
 
-TEST_F(ServiceListenerImplTest, StopBeforeRunning) {
+TEST_F(ServiceListenerTest, StopBeforeRunning) {
   EXPECT_CALL(*mock_delegate_, StartListener(_));
   EXPECT_TRUE(service_listener_->Start());
   EXPECT_EQ(State::kStarting, service_listener_->state());
@@ -110,7 +107,7 @@ TEST_F(ServiceListenerImplTest, StopBeforeRunning) {
   EXPECT_EQ(State::kStopped, service_listener_->state());
 }
 
-TEST_F(ServiceListenerImplTest, StartSuspended) {
+TEST_F(ServiceListenerTest, StartSuspended) {
   EXPECT_CALL(*mock_delegate_, StartAndSuspendListener(_));
   EXPECT_CALL(*mock_delegate_, StartListener(_)).Times(0);
   EXPECT_TRUE(service_listener_->StartAndSuspend());
@@ -121,7 +118,7 @@ TEST_F(ServiceListenerImplTest, StartSuspended) {
   EXPECT_EQ(State::kSuspended, service_listener_->state());
 }
 
-TEST_F(ServiceListenerImplTest, SuspendWhileStarting) {
+TEST_F(ServiceListenerTest, SuspendWhileStarting) {
   EXPECT_CALL(*mock_delegate_, StartListener(_)).Times(1);
   EXPECT_CALL(*mock_delegate_, SuspendListener()).Times(1);
   EXPECT_TRUE(service_listener_->Start());
@@ -132,7 +129,7 @@ TEST_F(ServiceListenerImplTest, SuspendWhileStarting) {
   EXPECT_EQ(State::kSuspended, service_listener_->state());
 }
 
-TEST_F(ServiceListenerImplTest, SuspendAndResume) {
+TEST_F(ServiceListenerTest, SuspendAndResume) {
   EXPECT_TRUE(service_listener_->Start());
   mock_delegate_->SetState(State::kRunning);
 
@@ -160,7 +157,7 @@ TEST_F(ServiceListenerImplTest, SuspendAndResume) {
   EXPECT_FALSE(service_listener_->Resume());
 }
 
-TEST_F(ServiceListenerImplTest, SearchWhileRunning) {
+TEST_F(ServiceListenerTest, SearchWhileRunning) {
   EXPECT_CALL(*mock_delegate_, SearchNow(_)).Times(0);
   EXPECT_FALSE(service_listener_->SearchNow());
   EXPECT_TRUE(service_listener_->Start());
@@ -180,7 +177,7 @@ TEST_F(ServiceListenerImplTest, SearchWhileRunning) {
   EXPECT_EQ(State::kRunning, service_listener_->state());
 }
 
-TEST_F(ServiceListenerImplTest, SearchWhileSuspended) {
+TEST_F(ServiceListenerTest, SearchWhileSuspended) {
   EXPECT_CALL(*mock_delegate_, SearchNow(_)).Times(0);
   EXPECT_FALSE(service_listener_->SearchNow());
   EXPECT_TRUE(service_listener_->Start());
@@ -199,7 +196,7 @@ TEST_F(ServiceListenerImplTest, SearchWhileSuspended) {
   EXPECT_EQ(State::kSuspended, service_listener_->state());
 }
 
-TEST_F(ServiceListenerImplTest, StopWhileSearching) {
+TEST_F(ServiceListenerTest, StopWhileSearching) {
   EXPECT_TRUE(service_listener_->Start());
   mock_delegate_->SetState(State::kRunning);
   EXPECT_TRUE(service_listener_->SearchNow());
@@ -214,7 +211,7 @@ TEST_F(ServiceListenerImplTest, StopWhileSearching) {
   EXPECT_EQ(State::kStopped, service_listener_->state());
 }
 
-TEST_F(ServiceListenerImplTest, ResumeWhileSearching) {
+TEST_F(ServiceListenerTest, ResumeWhileSearching) {
   EXPECT_TRUE(service_listener_->Start());
   mock_delegate_->SetState(State::kRunning);
   EXPECT_TRUE(service_listener_->Suspend());
@@ -230,7 +227,7 @@ TEST_F(ServiceListenerImplTest, ResumeWhileSearching) {
   EXPECT_EQ(State::kRunning, service_listener_->state());
 }
 
-TEST_F(ServiceListenerImplTest, SuspendWhileSearching) {
+TEST_F(ServiceListenerTest, SuspendWhileSearching) {
   EXPECT_TRUE(service_listener_->Start());
   mock_delegate_->SetState(State::kRunning);
   EXPECT_TRUE(service_listener_->SearchNow());
@@ -244,7 +241,7 @@ TEST_F(ServiceListenerImplTest, SuspendWhileSearching) {
   EXPECT_EQ(State::kSuspended, service_listener_->state());
 }
 
-TEST_F(ServiceListenerImplTest, ObserveTransitions) {
+TEST_F(ServiceListenerTest, ObserveTransitions) {
   MockObserver observer;
   service_listener_->AddObserver(observer);
 
@@ -287,7 +284,7 @@ TEST_F(ServiceListenerImplTest, ObserveTransitions) {
   service_listener_->RemoveObserver(observer);
 }
 
-TEST_F(ServiceListenerImplTest, ObserveFromSearching) {
+TEST_F(ServiceListenerTest, ObserveFromSearching) {
   MockObserver observer;
   service_listener_->AddObserver(observer);
 
@@ -318,7 +315,7 @@ TEST_F(ServiceListenerImplTest, ObserveFromSearching) {
   Mock::VerifyAndClearExpectations(&observer);
 }
 
-TEST_F(ServiceListenerImplTest, ReceiverObserverPassThrough) {
+TEST_F(ServiceListenerTest, ReceiverObserverPassThrough) {
   const ServiceInfo receiver1 = {
       "id1", "fingerprint1", "token1", 1, {{192, 168, 1, 10}, 12345}, {}};
   const ServiceInfo receiver2 = {
@@ -374,7 +371,7 @@ TEST_F(ServiceListenerImplTest, ReceiverObserverPassThrough) {
   service_listener_->RemoveObserver(observer);
 }
 
-TEST_F(ServiceListenerImplTest, MultipleObservers) {
+TEST_F(ServiceListenerTest, MultipleObservers) {
   MockObserver observer1;
   MockObserver observer2;
   service_listener_->AddObserver(observer1);
