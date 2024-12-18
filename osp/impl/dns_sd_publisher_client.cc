@@ -78,6 +78,14 @@ void DnsSdPublisherClient::ResumePublisher(
   SetState(State::kRunning);
 }
 
+void DnsSdPublisherClient::OnFatalError(const Error& error) {
+  publisher_->OnError(error);
+}
+
+void DnsSdPublisherClient::OnRecoverableError(const Error& error) {
+  publisher_->OnError(error);
+}
+
 void DnsSdPublisherClient::StartPublisherInternal(
     const ServicePublisher::Config& config) {
   OSP_CHECK(!dns_sd_publisher_);
@@ -106,7 +114,7 @@ discovery::DnsSdServicePtr DnsSdPublisherClient::CreateDnsSdServiceInternal(
   // discovery::DnsSdService, e.g. through a ref-counting handle, so that the
   // OSP publisher and the OSP listener don't have to coordinate through an
   // additional object.
-  return CreateDnsSdService(task_runner_, *publisher_, dns_sd_config);
+  return CreateDnsSdService(task_runner_, *this, dns_sd_config);
 }
 
 }  // namespace openscreen::osp

@@ -40,8 +40,6 @@ if (!is_win) {
       "presentation/url_availability_requester.h",
       "protocol_connection_client_factory.cc",
       "protocol_connection_server_factory.cc",
-      "service_publisher_impl.cc",
-      "service_publisher_impl.h",
     ]
     configs = [ ":impl_internal_config" ]
     public_deps = [

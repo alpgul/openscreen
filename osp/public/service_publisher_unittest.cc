@@ -1,8 +1,8 @@
-// Copyright 2018 The Chromium Authors
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "osp/impl/service_publisher_impl.h"
+#include "osp/public/service_publisher.h"
 
 #include <memory>
 #include <utility>
@@ -11,6 +11,7 @@
 #include "gtest/gtest.h"
 
 namespace openscreen::osp {
+
 namespace {
 
 using ::testing::_;
@@ -30,12 +31,12 @@ class MockObserver final : public ServicePublisher::Observer {
   MOCK_METHOD1(OnError, void(const Error& error));
 };
 
-class MockMdnsDelegate : public ServicePublisherImpl::Delegate {
+class MockMdnsDelegate : public ServicePublisher::Delegate {
  public:
   MockMdnsDelegate() = default;
   ~MockMdnsDelegate() override = default;
 
-  using ServicePublisherImpl::Delegate::SetState;
+  using ServicePublisher::Delegate::SetState;
 
   MOCK_METHOD1(StartPublisher, void(const ServicePublisher::Config&));
   MOCK_METHOD1(StartAndSuspendPublisher, void(const ServicePublisher::Config&));
@@ -45,24 +46,24 @@ class MockMdnsDelegate : public ServicePublisherImpl::Delegate {
   MOCK_METHOD0(RunTasksPublisher, void());
 };
 
-class ServicePublisherImplTest : public ::testing::Test {
+class ServicePublisherTest : public ::testing::Test {
  protected:
   void SetUp() override {
     auto mock_delegate = std::make_unique<NiceMock<MockMdnsDelegate>>();
     mock_delegate_ = mock_delegate.get();
     service_publisher_ =
-        std::make_unique<ServicePublisherImpl>(std::move(mock_delegate));
+        std::make_unique<ServicePublisher>(std::move(mock_delegate));
     service_publisher_->SetConfig(config);
   }
 
   NiceMock<MockMdnsDelegate>* mock_delegate_ = nullptr;
-  std::unique_ptr<ServicePublisherImpl> service_publisher_;
+  std::unique_ptr<ServicePublisher> service_publisher_;
   ServicePublisher::Config config;
 };
 
 }  // namespace
 
-TEST_F(ServicePublisherImplTest, NormalStartStop) {
+TEST_F(ServicePublisherTest, NormalStartStop) {
   ASSERT_EQ(State::kStopped, service_publisher_->state());
 
   EXPECT_CALL(*mock_delegate_, StartPublisher(_));
@@ -82,7 +83,7 @@ TEST_F(ServicePublisherImplTest, NormalStartStop) {
   EXPECT_EQ(State::kStopped, service_publisher_->state());
 }
 
-TEST_F(ServicePublisherImplTest, StopBeforeRunning) {
+TEST_F(ServicePublisherTest, StopBeforeRunning) {
   EXPECT_CALL(*mock_delegate_, StartPublisher(_));
   EXPECT_TRUE(service_publisher_->Start());
   EXPECT_EQ(State::kStarting, service_publisher_->state());
@@ -96,7 +97,7 @@ TEST_F(ServicePublisherImplTest, StopBeforeRunning) {
   EXPECT_EQ(State::kStopped, service_publisher_->state());
 }
 
-TEST_F(ServicePublisherImplTest, StartSuspended) {
+TEST_F(ServicePublisherTest, StartSuspended) {
   EXPECT_CALL(*mock_delegate_, StartAndSuspendPublisher(_));
   EXPECT_CALL(*mock_delegate_, StartPublisher(_)).Times(0);
   EXPECT_TRUE(service_publisher_->StartAndSuspend());
@@ -107,7 +108,7 @@ TEST_F(ServicePublisherImplTest, StartSuspended) {
   EXPECT_EQ(State::kSuspended, service_publisher_->state());
 }
 
-TEST_F(ServicePublisherImplTest, SuspendAndResume) {
+TEST_F(ServicePublisherTest, SuspendAndResume) {
   EXPECT_TRUE(service_publisher_->Start());
   mock_delegate_->SetState(State::kRunning);
 
@@ -135,12 +136,12 @@ TEST_F(ServicePublisherImplTest, SuspendAndResume) {
   EXPECT_FALSE(service_publisher_->Resume());
 }
 
-TEST_F(ServicePublisherImplTest, ObserverTransitions) {
+TEST_F(ServicePublisherTest, ObserverTransitions) {
   MockObserver observer;
   auto mock_delegate_ptr = std::make_unique<NiceMock<MockMdnsDelegate>>();
   NiceMock<MockMdnsDelegate>& mock_delegate = *mock_delegate_ptr;
   auto service_publisher =
-      std::make_unique<ServicePublisherImpl>(std::move(mock_delegate_ptr));
+      std::make_unique<ServicePublisher>(std::move(mock_delegate_ptr));
   service_publisher->AddObserver(observer);
 
   service_publisher->Start();
