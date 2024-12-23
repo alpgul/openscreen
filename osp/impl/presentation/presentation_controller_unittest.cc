@@ -82,12 +82,9 @@ class ControllerTest : public ::testing::Test {
       : fake_clock_(Clock::time_point(std::chrono::milliseconds(11111))),
         task_runner_(fake_clock_),
         quic_bridge_(task_runner_, FakeClock::now) {
-    receiver_info1 = {quic_bridge_.kInstanceName,
-                      quic_bridge_.kFingerprint,
-                      quic_bridge_.kAuthToken,
-                      1,
-                      quic_bridge_.kReceiverEndpoint,
-                      {}};
+    receiver_info1 = {quic_bridge_.kInstanceName,     quic_bridge_.kFingerprint,
+                      quic_bridge_.kAuthToken,        1,
+                      quic_bridge_.kReceiverEndpoint, {}};
   }
 
  protected:
