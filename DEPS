@@ -66,14 +66,14 @@ deps = {
   # https://chromium.googlesource.com/chromium/src/buildtools/+/refs/heads/main
   'buildtools': {
     'url': Var('chromium_git') + '/chromium/src/buildtools' +
-      '@' + '56013b77b6c0a650d00bde40e750e7c3b7c6bc3d',
+      '@' + '00459762409cb29cecf398a23cdb0cae918b7515',
   },
 
   # and here:
   # https://chromium.googlesource.com/chromium/src/build/+/refs/heads/main
   'build': {
     'url': Var('chromium_git') + '/chromium/src/build' +
-      '@' + '4a2298be62524fd7f8d5a47eb82db333f0dd95de',
+      '@' + '043f0ac1c5fc7a29960fda36ce6689a96bdc11ee',
     'condition': 'not build_with_chromium',
   },
 
