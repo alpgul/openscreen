@@ -6,10 +6,7 @@ jopbha@chromium.org
 muyaoxu@google.com
 takumif@chromium.org
 
-# For LUCI configuration changes.
-cliffordcheng@chromium.org
-
-# Former COMMITTERs
+# Former OWNERS
 # btolsch@chromium.org
 # rwkeane@google.com
-
+# cliffordcheng@chromium.org
