@@ -9,7 +9,6 @@ MAC_VERSION = "Mac-13"
 WINDOWS_VERSION = "Windows-10"
 REF = "refs/heads/main"
 
-RECLIENT_PROPERTY = "$build/reclient"
 SISO_PROPERTY = "$build/siso"
 
 # Use LUCI Scheduler BBv2 names and add Scheduler realms configs.
@@ -181,11 +180,6 @@ def get_properties(
         properties["have_libvpx"] = True
     if chromium:
         properties["builder_group"] = "client.openscreen.chromium"
-        properties[RECLIENT_PROPERTY] = {
-            "instance": _siso.project.DEFAULT_UNTRUSTED,
-            "metrics_project": "chromium-reclient-metrics",
-            "scandeps_server": True,
-        }
         properties[SISO_PROPERTY] = {
             "configs": ["builder"],
             "enable_cloud_monitoring": True,
@@ -319,9 +313,7 @@ def try_and_ci_builders(name, properties, os = "Ubuntu-22.04", cpu = "x86-64"):
 
     ci_properties = dict(properties)
     ci_properties["is_ci"] = True
-    if RECLIENT_PROPERTY in ci_properties:
-        ci_properties[RECLIENT_PROPERTY] = dict(ci_properties[RECLIENT_PROPERTY])
-        ci_properties[RECLIENT_PROPERTY]["instance"] = _siso.project.DEFAULT_TRUSTED
+    if SISO_PROPERTY in ci_properties:
         ci_properties[SISO_PROPERTY] = dict(ci_properties[SISO_PROPERTY])
         ci_properties[SISO_PROPERTY]["project"] = _siso.project.DEFAULT_TRUSTED
     ci_builder(name, ci_properties, os, cpu)
