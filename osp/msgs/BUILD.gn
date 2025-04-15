@@ -22,7 +22,14 @@ openscreen_source_set("msgs") {
 }
 
 config("msgs_internal_config") {
-  cflags = [ "-Wall" ]
+  cflags = []
+
+  if (is_win) {
+    # /W4 on windows corresponds to gcc's -Wall; /Wall corresponds to -Weverything instead
+    cflags += [ "/W4" ]
+  } else {
+    cflags += [ "-Wall" ]
+  }
 
   if (is_clang) {
     cflags += [ "-Wno-shadow" ]
