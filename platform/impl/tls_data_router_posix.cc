@@ -30,7 +30,10 @@ void TlsDataRouterPosix::RegisterConnection(TlsConnectionPosix* connection) {
     connections_.push_back(connection);
   }
 
-  waiter_->Subscribe(this, connection->socket_handle());
+  // We care about both read and write events
+  waiter_->Subscribe(this, connection->socket_handle(),
+                     SocketHandleWaiter::Flags::kReadable |
+                         SocketHandleWaiter::Flags::kWriteable);
 }
 
 void TlsDataRouterPosix::DeregisterConnection(TlsConnectionPosix* connection) {
@@ -60,7 +63,10 @@ void TlsDataRouterPosix::RegisterAcceptObserver(
     accept_socket_mappings_[socket_ptr] = observer;
   }
 
-  waiter_->Subscribe(this, socket_ptr->socket_handle());
+  // We care about both read and write events
+  waiter_->Subscribe(this, socket_ptr->socket_handle(),
+                     SocketHandleWaiter::Flags::kReadable |
+                         SocketHandleWaiter::Flags::kWriteable);
 }
 
 void TlsDataRouterPosix::DeregisterAcceptObserver(SocketObserver* observer) {

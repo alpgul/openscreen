@@ -24,8 +24,8 @@ SocketHandleWaiterPosix::SocketHandleWaiterPosix(
 SocketHandleWaiterPosix::~SocketHandleWaiterPosix() = default;
 
 ErrorOr<std::vector<SocketHandleWaiterPosix::ReadyHandle>>
-SocketHandleWaiterPosix::AwaitSocketsReadable(
-    const std::vector<SocketHandleRef>& socket_handles,
+SocketHandleWaiterPosix::AwaitSocketsReady(
+    const std::vector<SocketHandleWaiterPosix::ReadyHandle>& sockets,
     const Clock::duration& timeout) {
   int max_fd = -1;
   fd_set read_handles{};
@@ -33,10 +33,14 @@ SocketHandleWaiterPosix::AwaitSocketsReadable(
 
   FD_ZERO(&read_handles);
   FD_ZERO(&write_handles);
-  for (const SocketHandle& handle : socket_handles) {
-    FD_SET(handle.fd, &read_handles);
-    FD_SET(handle.fd, &write_handles);
-    max_fd = std::max(max_fd, handle.fd);
+  for (const ReadyHandle& ready : sockets) {
+    if (ready.flags & Flags::kReadable) {
+      FD_SET(ready.handle.get().fd, &read_handles);
+    }
+    if (ready.flags & Flags::kWriteable) {
+      FD_SET(ready.handle.get().fd, &write_handles);
+    }
+    max_fd = std::max(max_fd, ready.handle.get().fd);
   }
   if (max_fd < 0) {
     return Error::Code::kIOFailure;
@@ -62,16 +66,16 @@ SocketHandleWaiterPosix::AwaitSocketsReadable(
   }
 
   std::vector<ReadyHandle> changed_handles;
-  for (const SocketHandleRef& handle : socket_handles) {
+  for (const ReadyHandle& ready : sockets) {
     uint32_t flags = 0;
-    if (FD_ISSET(handle.get().fd, &read_handles)) {
+    if (FD_ISSET(ready.handle.get().fd, &read_handles)) {
       flags |= Flags::kReadable;
     }
-    if (FD_ISSET(handle.get().fd, &write_handles)) {
+    if (FD_ISSET(ready.handle.get().fd, &write_handles)) {
       flags |= Flags::kWriteable;
     }
     if (flags) {
-      changed_handles.push_back({handle, flags});
+      changed_handles.push_back({ready.handle, flags});
     }
   }
 

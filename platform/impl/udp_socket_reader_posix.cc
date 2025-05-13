@@ -42,7 +42,9 @@ void UdpSocketReaderPosix::OnCreate(UdpSocket* socket) {
     std::lock_guard<std::mutex> lock(mutex_);
     sockets_.push_back(read_socket);
   }
-  waiter_.Subscribe(this, std::cref(read_socket->GetHandle()));
+  // We only care about read events.
+  waiter_.Subscribe(this, std::cref(read_socket->GetHandle()),
+                    SocketHandleWaiter::Flags::kReadable);
 }
 
 void UdpSocketReaderPosix::OnDestroy(UdpSocket* socket) {
