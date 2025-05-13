@@ -27,8 +27,8 @@ class SocketHandleWaiter {
   using SocketHandleRef = std::reference_wrapper<const SocketHandle>;
 
   enum Flags {
-    kReadable = 1,
-    kWriteable = 2,
+    kReadable = 1 << 0,
+    kWriteable = 1 << 1,
   };
 
   class Subscriber {
@@ -46,7 +46,9 @@ class SocketHandleWaiter {
   // Start notifying `subscriber` whenever `handle` has an event. May be called
   // multiple times, to be notified for multiple handles, but should not be
   // called multiple times for the same handle.
-  void Subscribe(Subscriber* subscriber, SocketHandleRef handle);
+  void Subscribe(Subscriber* subscriber,
+                 SocketHandleRef handle,
+                 uint32_t flags);
 
   // Stop receiving notifications for one of the handles currently subscribed
   // to.
@@ -77,13 +79,15 @@ class SocketHandleWaiter {
   // Waits until data is available in one of the provided sockets or the
   // provided timeout has passed - whichever is first. If any sockets have data
   // available, they are returned.
-  virtual ErrorOr<std::vector<ReadyHandle>> AwaitSocketsReadable(
-      const std::vector<SocketHandleRef>& socket_fds,
+  virtual ErrorOr<std::vector<ReadyHandle>> AwaitSocketsReady(
+      const std::vector<ReadyHandle>& sockets,
       const Clock::duration& timeout) = 0;
 
  private:
   struct SocketSubscription {
     Subscriber* subscriber = nullptr;
+    // Subscribers are only informed of flags that they are interested in.
+    uint32_t flags = 0;
     Clock::time_point last_updated = Clock::time_point::min();
   };
 

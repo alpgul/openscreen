@@ -8,9 +8,12 @@
 #include <utility>
 #include <vector>
 
+#include "platform/base/trivial_clock_traits.h"
 #include "platform/impl/udp_socket_reader_posix.h"
 
 namespace openscreen {
+
+using clock_operators::operator<<;
 
 // static
 PlatformClientPosix* PlatformClientPosix::instance_ = nullptr;
@@ -101,12 +104,16 @@ SocketHandleWaiterPosix* PlatformClientPosix::socket_handle_waiter() {
 }
 
 void PlatformClientPosix::RunNetworkLoopUntilStopped() {
+  auto last = Clock::now();
   while (networking_loop_running_.load()) {
     if (!waiter_created_.load()) {
       std::this_thread::sleep_for(networking_loop_timeout_);
       continue;
     }
     socket_handle_waiter()->ProcessHandles(networking_loop_timeout_);
+    auto now = Clock::now();
+    OSP_LOG_ERROR << __func__ << ": loop took " << (now - last);
+    last = now;
   }
 }
 

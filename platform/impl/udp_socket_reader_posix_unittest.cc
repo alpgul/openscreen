@@ -52,8 +52,8 @@ class MockNetworkWaiter final : public SocketHandleWaiter {
   ~MockNetworkWaiter() override = default;
 
   MOCK_METHOD2(
-      AwaitSocketsReadable,
-      ErrorOr<std::vector<ReadyHandle>>(const std::vector<SocketHandleRef>&,
+      AwaitSocketsReady,
+      ErrorOr<std::vector<ReadyHandle>>(const std::vector<ReadyHandle>&,
                                         const Clock::duration&));
 
   FakeClock fake_clock{Clock::time_point{Clock::duration{1234567}}};

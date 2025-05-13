@@ -32,8 +32,8 @@ class SocketHandleWaiterPosix : public SocketHandleWaiter {
  protected:
   using SocketHandleWaiter::ReadyHandle;
 
-  ErrorOr<std::vector<ReadyHandle>> AwaitSocketsReadable(
-      const std::vector<SocketHandleRef>& socket_fds,
+  ErrorOr<std::vector<ReadyHandle>> AwaitSocketsReady(
+      const std::vector<ReadyHandle>& sockets,
       const Clock::duration& timeout) override;
 
  private:
