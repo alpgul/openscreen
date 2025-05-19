@@ -23,9 +23,9 @@ SocketHandleWaiterPosix::SocketHandleWaiterPosix(
 
 SocketHandleWaiterPosix::~SocketHandleWaiterPosix() = default;
 
-ErrorOr<std::vector<SocketHandleWaiterPosix::ReadyHandle>>
+ErrorOr<std::vector<SocketHandleWaiterPosix::HandleWithFlags>>
 SocketHandleWaiterPosix::AwaitSocketsReady(
-    const std::vector<SocketHandleWaiterPosix::ReadyHandle>& sockets,
+    const std::vector<SocketHandleWaiterPosix::HandleWithFlags>& sockets,
     const Clock::duration& timeout) {
   int max_fd = -1;
   fd_set read_handles{};
@@ -33,14 +33,18 @@ SocketHandleWaiterPosix::AwaitSocketsReady(
 
   FD_ZERO(&read_handles);
   FD_ZERO(&write_handles);
-  for (const ReadyHandle& ready : sockets) {
-    if (ready.flags & Flags::kReadable) {
-      FD_SET(ready.handle.get().fd, &read_handles);
+  for (const HandleWithFlags& hwf : sockets) {
+    if (hwf.flags & Flags::kReadable) {
+      FD_SET(hwf.handle.get().fd, &read_handles);
     }
-    if (ready.flags & Flags::kWriteable) {
-      FD_SET(ready.handle.get().fd, &write_handles);
+
+    // Only add the socket to the write_handles list if it is configured for
+    // write events and also has a pending write. This keeps us from polling
+    // select every few nanoseconds.
+    if (hwf.flags & Flags::kWritable) {
+      FD_SET(hwf.handle.get().fd, &write_handles);
     }
-    max_fd = std::max(max_fd, ready.handle.get().fd);
+    max_fd = std::max(max_fd, hwf.handle.get().fd);
   }
   if (max_fd < 0) {
     return Error::Code::kIOFailure;
@@ -53,7 +57,7 @@ SocketHandleWaiterPosix::AwaitSocketsReady(
   // level-triggered so incomplete reads/writes by the caller are fine and will
   // be picked up again on the next select() call.  For more information, see:
   // http://man7.org/linux/man-pages/man2/select.2.html
-  int max_fd_to_watch = max_fd + 1;
+  const int max_fd_to_watch = max_fd + 1;
   const int rv =
       select(max_fd_to_watch, &read_handles, &write_handles, nullptr, &tv);
   if (rv == -1) {
@@ -65,20 +69,19 @@ SocketHandleWaiterPosix::AwaitSocketsReady(
     return Error::Code::kAgain;
   }
 
-  std::vector<ReadyHandle> changed_handles;
-  for (const ReadyHandle& ready : sockets) {
+  std::vector<HandleWithFlags> changed_handles;
+  for (const HandleWithFlags& hwf : sockets) {
     uint32_t flags = 0;
-    if (FD_ISSET(ready.handle.get().fd, &read_handles)) {
+    if (FD_ISSET(hwf.handle.get().fd, &read_handles)) {
       flags |= Flags::kReadable;
     }
-    if (FD_ISSET(ready.handle.get().fd, &write_handles)) {
-      flags |= Flags::kWriteable;
+    if (FD_ISSET(hwf.handle.get().fd, &write_handles)) {
+      flags |= Flags::kWritable;
     }
     if (flags) {
-      changed_handles.push_back({ready.handle, flags});
+      changed_handles.push_back({hwf.handle, flags});
     }
   }
-
   return changed_handles;
 }
 

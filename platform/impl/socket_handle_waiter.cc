@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <atomic>
 
+#include "platform/impl/socket_handle_posix.h"
 #include "util/osp_logging.h"
 #include "util/std_util.h"
 
@@ -106,20 +107,32 @@ void SocketHandleWaiter::ProcessReadyHandles(
 
 Error SocketHandleWaiter::ProcessHandles(Clock::duration timeout) {
   Clock::time_point start_time = now_function_();
-  std::vector<ReadyHandle> handles;
+  std::vector<HandleWithFlags> handles;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     handles_being_deleted_.clear();
     handle_deletion_block_.notify_all();
     handles.reserve(handle_mappings_.size());
-    for (const auto& pair : handle_mappings_) {
-      handles.push_back({.handle = pair.first, .flags = pair.second.flags});
+    for (auto& pair : handle_mappings_) {
+      uint32_t flags = pair.second.flags;
+      // Remove the write flag if there is no pending write.
+      if (flags & kWritable) {
+        const bool has_pending_write =
+            pair.second.subscriber->HasPendingWrite(pair.first);
+        if (!has_pending_write) {
+          flags &= ~kWritable;
+        }
+      }
+      handles.push_back(HandleWithFlags{.handle = pair.first, .flags = flags});
     }
+  }
+  if (handles.empty()) {
+    return Error::Code::kAgain;
   }
 
   Clock::time_point current_time = now_function_();
   Clock::duration remaining_timeout = timeout - (current_time - start_time);
-  ErrorOr<std::vector<ReadyHandle>> changed_handles =
+  ErrorOr<std::vector<HandleWithFlags>> changed_handles =
       AwaitSocketsReady(handles, remaining_timeout);
 
   std::vector<HandleWithSubscription> ready_handles;

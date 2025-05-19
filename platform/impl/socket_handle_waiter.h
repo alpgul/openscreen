@@ -26,10 +26,15 @@ class SocketHandleWaiter {
  public:
   using SocketHandleRef = std::reference_wrapper<const SocketHandle>;
 
+  // Used to manage what types of events subscribers are subscribed to.
   enum Flags {
     kReadable = 1 << 0,
-    kWriteable = 1 << 1,
+    kWritable = 1 << 1,
   };
+
+  // Common flag configurations.
+  static inline constexpr uint32_t kReadWriteFlags =
+      Flags::kReadable | Flags::kWritable;
 
   class Subscriber {
    public:
@@ -38,6 +43,15 @@ class SocketHandleWaiter {
     // Provides a socket handle to the subscriber which has data waiting to be
     // processed.
     virtual void ProcessReadyHandle(SocketHandleRef handle, uint32_t flags) = 0;
+
+    // Method used to optimize event notifications. Generally speaking,
+    // sockets are ready for writing very often, causing the network event
+    // loop to be really busy -- a select() call may complete as frequently as
+    // every few nanoseconds -- so we really only want to be notified that a
+    // socket is ready for writing when we actually have something to write.
+    //
+    // NOTE: this is only used if the subscriber is subscribed to write events.
+    virtual bool HasPendingWrite(SocketHandleRef handle) = 0;
   };
 
   explicit SocketHandleWaiter(ClockNowFunctionPtr now_function);
@@ -67,11 +81,11 @@ class SocketHandleWaiter {
   OSP_DISALLOW_COPY_AND_ASSIGN(SocketHandleWaiter);
 
   // Gets all socket handles to process, checks them for readable data, and
-  // handles any changes that have occured.
+  // handles any changes that have occurred.
   Error ProcessHandles(Clock::duration timeout);
 
  protected:
-  struct ReadyHandle {
+  struct HandleWithFlags {
     SocketHandleRef handle;
     uint32_t flags;
   };
@@ -79,8 +93,15 @@ class SocketHandleWaiter {
   // Waits until data is available in one of the provided sockets or the
   // provided timeout has passed - whichever is first. If any sockets have data
   // available, they are returned.
-  virtual ErrorOr<std::vector<ReadyHandle>> AwaitSocketsReady(
-      const std::vector<ReadyHandle>& sockets,
+  //
+  // NOTE: The handle `flags` are checked against the subscriber's
+  // HasPendingWrite() method to ensure that the kWritable flag is only passed
+  // if there is a pending write before this method is called. The subscriber
+  // may be deleted while this method is being invoked, however the handle
+  // itself is guaranteed to not be deleted until the invocation of this method
+  // has been completed.
+  virtual ErrorOr<std::vector<HandleWithFlags>> AwaitSocketsReady(
+      const std::vector<HandleWithFlags>& sockets,
       const Clock::duration& timeout) = 0;
 
  private:
@@ -92,7 +113,7 @@ class SocketHandleWaiter {
   };
 
   struct HandleWithSubscription {
-    ReadyHandle ready_handle;
+    HandleWithFlags ready_handle;
     // Reference to the original subscription in the unordered map, so
     // we can keep track of when we updated this socket handle.
     SocketSubscription* subscription;
