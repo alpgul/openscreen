@@ -108,6 +108,10 @@ class FakeClockOffsetEstimator : public ClockOffsetEstimator {
               GetEstimatedOffset,
               (),
               (const, override));
+  MOCK_METHOD(std::optional<Clock::duration>,
+              GetEstimatedLatency,
+              (),
+              (const, override));
 };
 
 }  // namespace
