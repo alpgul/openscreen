@@ -55,8 +55,8 @@ TEST_F(ClockOffsetEstimatorImplTest, EstimateOffset) {
 
   FrameEvent encode_event;
   encode_event.timestamp = sender_time_;
-  encode_event.type = StatisticsEventType::kFrameEncoded;
-  encode_event.media_type = StatisticsEventMediaType::kVideo;
+  encode_event.type = StatisticsEvent::Type::kFrameEncoded;
+  encode_event.media_type = StatisticsEvent::MediaType::kVideo;
   encode_event.rtp_timestamp = rtp_timestamp;
   encode_event.frame_id = frame_id;
   encode_event.size = 1234;
@@ -66,8 +66,8 @@ TEST_F(ClockOffsetEstimatorImplTest, EstimateOffset) {
 
   PacketEvent send_event;
   send_event.timestamp = sender_time_;
-  send_event.type = StatisticsEventType::kPacketSentToNetwork;
-  send_event.media_type = StatisticsEventMediaType::kVideo;
+  send_event.type = StatisticsEvent::Type::kPacketSentToNetwork;
+  send_event.media_type = StatisticsEvent::MediaType::kVideo;
   send_event.rtp_timestamp = rtp_timestamp;
   send_event.frame_id = frame_id;
   send_event.packet_id = 56;
@@ -80,16 +80,16 @@ TEST_F(ClockOffsetEstimatorImplTest, EstimateOffset) {
   AdvanceClocks(milliseconds(10));
   FrameEvent ack_sent_event;
   ack_sent_event.timestamp = receiver_clock_.now();
-  ack_sent_event.type = StatisticsEventType::kFrameAckSent;
-  ack_sent_event.media_type = StatisticsEventMediaType::kVideo;
+  ack_sent_event.type = StatisticsEvent::Type::kFrameAckSent;
+  ack_sent_event.media_type = StatisticsEvent::MediaType::kVideo;
   ack_sent_event.rtp_timestamp = rtp_timestamp;
   ack_sent_event.frame_id = frame_id;
   estimator_.OnFrameEvent(ack_sent_event);
 
   PacketEvent receive_event;
   receive_event.timestamp = receiver_clock_.now();
-  receive_event.type = StatisticsEventType::kPacketReceived;
-  receive_event.media_type = StatisticsEventMediaType::kVideo;
+  receive_event.type = StatisticsEvent::Type::kPacketReceived;
+  receive_event.media_type = StatisticsEvent::MediaType::kVideo;
   receive_event.rtp_timestamp = rtp_timestamp;
   receive_event.frame_id = frame_id;
   receive_event.packet_id = 56;
@@ -102,8 +102,8 @@ TEST_F(ClockOffsetEstimatorImplTest, EstimateOffset) {
   AdvanceClocks(milliseconds(30));
   FrameEvent ack_event;
   ack_event.timestamp = sender_time_;
-  ack_event.type = StatisticsEventType::kFrameAckReceived;
-  ack_event.media_type = StatisticsEventMediaType::kVideo;
+  ack_event.type = StatisticsEvent::Type::kFrameAckReceived;
+  ack_event.media_type = StatisticsEvent::MediaType::kVideo;
   ack_event.rtp_timestamp = rtp_timestamp;
   ack_event.frame_id = frame_id;
   estimator_.OnFrameEvent(ack_event);
@@ -134,8 +134,8 @@ TEST_F(ClockOffsetEstimatorImplTest, EventCArrivesBeforeEventB) {
 
   FrameEvent encode_event;
   encode_event.timestamp = sender_time_;
-  encode_event.type = StatisticsEventType::kFrameEncoded;
-  encode_event.media_type = StatisticsEventMediaType::kVideo;
+  encode_event.type = StatisticsEvent::Type::kFrameEncoded;
+  encode_event.media_type = StatisticsEvent::MediaType::kVideo;
   encode_event.rtp_timestamp = rtp_timestamp;
   encode_event.frame_id = frame_id;
   encode_event.size = 1234;
@@ -145,8 +145,8 @@ TEST_F(ClockOffsetEstimatorImplTest, EventCArrivesBeforeEventB) {
 
   PacketEvent send_event;
   send_event.timestamp = sender_time_;
-  send_event.type = StatisticsEventType::kPacketSentToNetwork;
-  send_event.media_type = StatisticsEventMediaType::kVideo;
+  send_event.type = StatisticsEvent::Type::kPacketSentToNetwork;
+  send_event.media_type = StatisticsEvent::MediaType::kVideo;
   send_event.rtp_timestamp = rtp_timestamp;
   send_event.frame_id = frame_id;
   send_event.packet_id = 56;
@@ -163,8 +163,8 @@ TEST_F(ClockOffsetEstimatorImplTest, EventCArrivesBeforeEventB) {
 
   FrameEvent ack_event;
   ack_event.timestamp = event_c_time;
-  ack_event.type = StatisticsEventType::kFrameAckReceived;
-  ack_event.media_type = StatisticsEventMediaType::kVideo;
+  ack_event.type = StatisticsEvent::Type::kFrameAckReceived;
+  ack_event.media_type = StatisticsEvent::MediaType::kVideo;
   ack_event.rtp_timestamp = rtp_timestamp;
   ack_event.frame_id = frame_id;
   estimator_.OnFrameEvent(ack_event);
@@ -173,8 +173,8 @@ TEST_F(ClockOffsetEstimatorImplTest, EventCArrivesBeforeEventB) {
 
   PacketEvent receive_event;
   receive_event.timestamp = event_b_time;
-  receive_event.type = StatisticsEventType::kPacketReceived;
-  receive_event.media_type = StatisticsEventMediaType::kVideo;
+  receive_event.type = StatisticsEvent::Type::kPacketReceived;
+  receive_event.media_type = StatisticsEvent::MediaType::kVideo;
   receive_event.rtp_timestamp = rtp_timestamp;
   receive_event.frame_id = frame_id;
   receive_event.packet_id = 56;
@@ -184,8 +184,8 @@ TEST_F(ClockOffsetEstimatorImplTest, EventCArrivesBeforeEventB) {
 
   FrameEvent ack_sent_event;
   ack_sent_event.timestamp = event_b_time;
-  ack_sent_event.type = StatisticsEventType::kFrameAckSent;
-  ack_sent_event.media_type = StatisticsEventMediaType::kVideo;
+  ack_sent_event.type = StatisticsEvent::Type::kFrameAckSent;
+  ack_sent_event.media_type = StatisticsEvent::MediaType::kVideo;
   ack_sent_event.rtp_timestamp = rtp_timestamp;
   ack_sent_event.frame_id = frame_id;
   estimator_.OnFrameEvent(ack_sent_event);
@@ -225,8 +225,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
   AdvanceClocks(milliseconds(20));
   FrameEvent encode_event;
   encode_event.timestamp = sender_time_;
-  encode_event.type = StatisticsEventType::kFrameEncoded;
-  encode_event.media_type = StatisticsEventMediaType::kVideo;
+  encode_event.type = StatisticsEvent::Type::kFrameEncoded;
+  encode_event.media_type = StatisticsEvent::MediaType::kVideo;
   encode_event.rtp_timestamp = rtp_timestamp_a;
   encode_event.frame_id = frame_id_a;
   encode_event.size = 1234;
@@ -236,8 +236,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
 
   PacketEvent send_event;
   send_event.timestamp = sender_time_;
-  send_event.type = StatisticsEventType::kPacketSentToNetwork;
-  send_event.media_type = StatisticsEventMediaType::kVideo;
+  send_event.type = StatisticsEvent::Type::kPacketSentToNetwork;
+  send_event.media_type = StatisticsEvent::MediaType::kVideo;
   send_event.rtp_timestamp = rtp_timestamp_a;
   send_event.frame_id = frame_id_a;
   send_event.packet_id = 56;
@@ -248,8 +248,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
   AdvanceClocks(milliseconds(10));
   FrameEvent second_encode_event;
   second_encode_event.timestamp = sender_time_;
-  second_encode_event.type = StatisticsEventType::kFrameEncoded;
-  second_encode_event.media_type = StatisticsEventMediaType::kVideo;
+  second_encode_event.type = StatisticsEvent::Type::kFrameEncoded;
+  second_encode_event.media_type = StatisticsEvent::MediaType::kVideo;
   second_encode_event.rtp_timestamp = rtp_timestamp_b;
   second_encode_event.frame_id = frame_id_b;
   second_encode_event.size = 1234;
@@ -259,8 +259,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
 
   PacketEvent second_send_event;
   second_send_event.timestamp = sender_time_;
-  second_send_event.type = StatisticsEventType::kPacketSentToNetwork;
-  second_send_event.media_type = StatisticsEventMediaType::kVideo;
+  second_send_event.type = StatisticsEvent::Type::kPacketSentToNetwork;
+  second_send_event.media_type = StatisticsEvent::MediaType::kVideo;
   second_send_event.rtp_timestamp = rtp_timestamp_b;
   second_send_event.frame_id = frame_id_b;
   second_send_event.packet_id = 56;
@@ -270,8 +270,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
 
   FrameEvent ack_sent_event;
   ack_sent_event.timestamp = receiver_clock_.now();
-  ack_sent_event.type = StatisticsEventType::kFrameAckSent;
-  ack_sent_event.media_type = StatisticsEventMediaType::kVideo;
+  ack_sent_event.type = StatisticsEvent::Type::kFrameAckSent;
+  ack_sent_event.media_type = StatisticsEvent::MediaType::kVideo;
   ack_sent_event.rtp_timestamp = rtp_timestamp_a;
   ack_sent_event.frame_id = frame_id_a;
   estimator_.OnFrameEvent(ack_sent_event);
@@ -280,8 +280,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
 
   PacketEvent receive_event;
   receive_event.timestamp = receiver_clock_.now();
-  receive_event.type = StatisticsEventType::kPacketReceived;
-  receive_event.media_type = StatisticsEventMediaType::kVideo;
+  receive_event.type = StatisticsEvent::Type::kPacketReceived;
+  receive_event.media_type = StatisticsEvent::MediaType::kVideo;
   receive_event.rtp_timestamp = rtp_timestamp_b;
   receive_event.frame_id = frame_id_b;
   receive_event.packet_id = 56;
@@ -291,8 +291,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
 
   FrameEvent second_ack_sent_event;
   second_ack_sent_event.timestamp = receiver_clock_.now();
-  second_ack_sent_event.type = StatisticsEventType::kFrameAckSent;
-  second_ack_sent_event.media_type = StatisticsEventMediaType::kVideo;
+  second_ack_sent_event.type = StatisticsEvent::Type::kFrameAckSent;
+  second_ack_sent_event.media_type = StatisticsEvent::MediaType::kVideo;
   second_ack_sent_event.rtp_timestamp = rtp_timestamp_b;
   second_ack_sent_event.frame_id = frame_id_b;
   estimator_.OnFrameEvent(second_ack_sent_event);
@@ -300,8 +300,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
   AdvanceClocks(milliseconds(5));
   FrameEvent ack_event;
   ack_event.timestamp = sender_time_;
-  ack_event.type = StatisticsEventType::kFrameAckReceived;
-  ack_event.media_type = StatisticsEventMediaType::kVideo;
+  ack_event.type = StatisticsEvent::Type::kFrameAckReceived;
+  ack_event.media_type = StatisticsEvent::MediaType::kVideo;
   ack_event.rtp_timestamp = rtp_timestamp_b;
   ack_event.frame_id = frame_id_b;
   estimator_.OnFrameEvent(ack_event);
@@ -309,8 +309,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
   AdvanceClocks(milliseconds(5));
   FrameEvent second_ack_event;
   second_ack_event.timestamp = sender_time_;
-  second_ack_event.type = StatisticsEventType::kFrameAckReceived;
-  second_ack_event.media_type = StatisticsEventMediaType::kVideo;
+  second_ack_event.type = StatisticsEvent::Type::kFrameAckReceived;
+  second_ack_event.media_type = StatisticsEvent::MediaType::kVideo;
   second_ack_event.rtp_timestamp = rtp_timestamp_a;
   second_ack_event.frame_id = frame_id_a;
   estimator_.OnFrameEvent(second_ack_event);
@@ -318,8 +318,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
   AdvanceClocks(milliseconds(17));
   FrameEvent third_encode_event;
   third_encode_event.timestamp = sender_time_;
-  third_encode_event.type = StatisticsEventType::kFrameEncoded;
-  third_encode_event.media_type = StatisticsEventMediaType::kVideo;
+  third_encode_event.type = StatisticsEvent::Type::kFrameEncoded;
+  third_encode_event.media_type = StatisticsEvent::MediaType::kVideo;
   third_encode_event.rtp_timestamp = rtp_timestamp_c;
   third_encode_event.frame_id = frame_id_c;
   third_encode_event.size = 1234;
@@ -329,8 +329,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
 
   PacketEvent third_send_event;
   third_send_event.timestamp = sender_time_;
-  third_send_event.type = StatisticsEventType::kPacketSentToNetwork;
-  third_send_event.media_type = StatisticsEventMediaType::kVideo;
+  third_send_event.type = StatisticsEvent::Type::kPacketSentToNetwork;
+  third_send_event.media_type = StatisticsEvent::MediaType::kVideo;
   third_send_event.rtp_timestamp = rtp_timestamp_c;
   third_send_event.frame_id = frame_id_c;
   third_send_event.packet_id = 56;
@@ -341,8 +341,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
   AdvanceClocks(milliseconds(3));
   PacketEvent second_receive_event;
   second_receive_event.timestamp = receiver_clock_.now();
-  second_receive_event.type = StatisticsEventType::kPacketReceived;
-  second_receive_event.media_type = StatisticsEventMediaType::kVideo;
+  second_receive_event.type = StatisticsEvent::Type::kPacketReceived;
+  second_receive_event.media_type = StatisticsEvent::MediaType::kVideo;
   second_receive_event.rtp_timestamp = rtp_timestamp_c;
   second_receive_event.frame_id = frame_id_c;
   second_receive_event.packet_id = 56;
@@ -352,8 +352,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
 
   FrameEvent third_ack_sent_event;
   third_ack_sent_event.timestamp = receiver_clock_.now();
-  third_ack_sent_event.type = StatisticsEventType::kFrameAckSent;
-  third_ack_sent_event.media_type = StatisticsEventMediaType::kVideo;
+  third_ack_sent_event.type = StatisticsEvent::Type::kFrameAckSent;
+  third_ack_sent_event.media_type = StatisticsEvent::MediaType::kVideo;
   third_ack_sent_event.rtp_timestamp = rtp_timestamp_c;
   third_ack_sent_event.frame_id = frame_id_c;
   estimator_.OnFrameEvent(third_ack_sent_event);
@@ -361,8 +361,8 @@ TEST_F(ClockOffsetEstimatorImplTest, MultipleIterations) {
   AdvanceClocks(milliseconds(30));
   FrameEvent third_ack_event;
   third_ack_event.timestamp = sender_time_;
-  third_ack_event.type = StatisticsEventType::kFrameAckReceived;
-  third_ack_event.media_type = StatisticsEventMediaType::kVideo;
+  third_ack_event.type = StatisticsEvent::Type::kFrameAckReceived;
+  third_ack_event.media_type = StatisticsEvent::MediaType::kVideo;
   third_ack_event.rtp_timestamp = rtp_timestamp_c;
   third_ack_event.frame_id = frame_id_c;
   estimator_.OnFrameEvent(third_ack_event);

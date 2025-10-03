@@ -25,11 +25,11 @@ double InMilliseconds(Clock::duration duration) {
   return static_cast<double>(to_milliseconds(duration).count());
 }
 
-bool IsReceiverEvent(StatisticsEventType event) {
-  return event == StatisticsEventType::kFrameAckSent ||
-         event == StatisticsEventType::kFrameDecoded ||
-         event == StatisticsEventType::kFramePlayedOut ||
-         event == StatisticsEventType::kPacketReceived;
+bool IsReceiverEvent(StatisticsEvent::Type event) {
+  return event == StatisticsEvent::Type::kFrameAckSent ||
+         event == StatisticsEvent::Type::kFrameDecoded ||
+         event == StatisticsEvent::Type::kFramePlayedOut ||
+         event == StatisticsEvent::Type::kPacketReceived;
 }
 
 }  // namespace
@@ -81,10 +81,10 @@ void StatisticsAnalyzer::SendStatistics() {
   const Clock::time_point end_time = now_();
   stats_client_->OnStatisticsUpdated(SenderStats{
       .audio_statistics =
-          ConstructStatisticsList(end_time, StatisticsEventMediaType::kAudio),
+          ConstructStatisticsList(end_time, StatisticsEvent::MediaType::kAudio),
       .audio_histograms = histograms_.audio,
       .video_statistics =
-          ConstructStatisticsList(end_time, StatisticsEventMediaType::kVideo),
+          ConstructStatisticsList(end_time, StatisticsEvent::MediaType::kVideo),
       .video_histograms = histograms_.video});
 }
 
@@ -131,10 +131,11 @@ void StatisticsAnalyzer::ProcessPacketEvents(
     }
 
     RecordEventTimes(packet_event);
-    if (packet_event.type == StatisticsEventType::kPacketSentToNetwork ||
-        packet_event.type == StatisticsEventType::kPacketReceived) {
+    if (packet_event.type == StatisticsEvent::Type::kPacketSentToNetwork ||
+        packet_event.type == StatisticsEvent::Type::kPacketReceived) {
       RecordPacketLatencies(packet_event);
-    } else if (packet_event.type == StatisticsEventType::kPacketRetransmitted) {
+    } else if (packet_event.type ==
+               StatisticsEvent::Type::kPacketRetransmitted) {
       // We only measure network latency for packets that are not retransmitted.
       ErasePacketInfo(packet_event);
     }
@@ -163,11 +164,11 @@ void StatisticsAnalyzer::RecordFrameLatencies(const FrameEvent& frame_event) {
   }
 
   switch (frame_event.type) {
-    case StatisticsEventType::kFrameCaptureBegin:
+    case StatisticsEvent::Type::kFrameCaptureBegin:
       it->second.capture_begin_time = frame_event.timestamp;
       break;
 
-    case StatisticsEventType::kFrameCaptureEnd: {
+    case StatisticsEvent::Type::kFrameCaptureEnd: {
       it->second.capture_end_time = frame_event.timestamp;
       if (it->second.capture_begin_time != Clock::time_point::min()) {
         const Clock::duration capture_latency =
@@ -179,7 +180,7 @@ void StatisticsAnalyzer::RecordFrameLatencies(const FrameEvent& frame_event) {
       }
     } break;
 
-    case StatisticsEventType::kFrameEncoded: {
+    case StatisticsEvent::Type::kFrameEncoded: {
       it->second.encode_end_time = frame_event.timestamp;
       if (it->second.capture_end_time != Clock::time_point::min()) {
         const Clock::duration encode_latency =
@@ -193,7 +194,7 @@ void StatisticsAnalyzer::RecordFrameLatencies(const FrameEvent& frame_event) {
 
     // Frame latency is the time from when the frame is encoded until the
     // receiver ack for the frame is sent.
-    case StatisticsEventType::kFrameAckSent: {
+    case StatisticsEvent::Type::kFrameAckSent: {
       const auto adjusted_timestamp =
           ToSenderTimestamp(frame_event.timestamp, frame_event.media_type);
       if (!adjusted_timestamp) {
@@ -208,7 +209,7 @@ void StatisticsAnalyzer::RecordFrameLatencies(const FrameEvent& frame_event) {
       }
     } break;
 
-    case StatisticsEventType::kFramePlayedOut: {
+    case StatisticsEvent::Type::kFramePlayedOut: {
       const auto adjusted_timestamp =
           ToSenderTimestamp(frame_event.timestamp, frame_event.media_type);
       if (!adjusted_timestamp) {
@@ -243,7 +244,7 @@ void StatisticsAnalyzer::RecordPacketLatencies(
 
   // Queueing latency is the time from when a frame is encoded to when the
   // packet is first sent.
-  if (packet_event.type == StatisticsEventType::kPacketSentToNetwork) {
+  if (packet_event.type == StatisticsEvent::Type::kPacketSentToNetwork) {
     const auto it = frame_infos.find(packet_event.rtp_timestamp);
 
     // We have an encode end time for a frame associated with this packet.
@@ -272,15 +273,16 @@ void StatisticsAnalyzer::RecordPacketLatencies(
     }
   } else {  // We know when this packet was sent, and when it arrived.
     PacketInfo value = it->second;
-    StatisticsEventType recorded_type = value.type;
+    StatisticsEvent::Type recorded_type = value.type;
     Clock::time_point packet_sent_time;
     Clock::time_point packet_received_time;
-    if (recorded_type == StatisticsEventType::kPacketSentToNetwork &&
-        packet_event.type == StatisticsEventType::kPacketReceived) {
+    if (recorded_type == StatisticsEvent::Type::kPacketSentToNetwork &&
+        packet_event.type == StatisticsEvent::Type::kPacketReceived) {
       packet_sent_time = value.timestamp;
       packet_received_time = packet_event.timestamp;
-    } else if (recorded_type == StatisticsEventType::kPacketReceived &&
-               packet_event.type == StatisticsEventType::kPacketSentToNetwork) {
+    } else if (recorded_type == StatisticsEvent::Type::kPacketReceived &&
+               packet_event.type ==
+                   StatisticsEvent::Type::kPacketSentToNetwork) {
       packet_sent_time = packet_event.timestamp;
       packet_received_time = value.timestamp;
     } else {
@@ -356,7 +358,7 @@ void StatisticsAnalyzer::ErasePacketInfo(const PacketEvent& packet_event) {
 void StatisticsAnalyzer::AddToLatencyAggregrate(
     StatisticType latency_stat,
     Clock::duration latency_delta,
-    StatisticsEventMediaType media_type) {
+    StatisticsEvent::MediaType media_type) {
   LatencyStatsMap& latency_stats = latency_stats_.Get(media_type);
 
   auto it = latency_stats.find(latency_stat);
@@ -371,23 +373,23 @@ void StatisticsAnalyzer::AddToLatencyAggregrate(
 }
 
 void StatisticsAnalyzer::AddToHistogram(HistogramType histogram,
-                                        StatisticsEventMediaType media_type,
+                                        StatisticsEvent::MediaType media_type,
                                         int64_t sample) {
   histograms_.Get(media_type)[static_cast<int>(histogram)].Add(sample);
 }
 
 SenderStats::StatisticsList StatisticsAnalyzer::ConstructStatisticsList(
     Clock::time_point end_time,
-    StatisticsEventMediaType media_type) {
+    StatisticsEvent::MediaType media_type) {
   SenderStats::StatisticsList stats_list;
 
   // TODO(b/298205111): Support kNumFramesDroppedByEncoder stat.
-  PopulateFrameCountStat(StatisticsEventType::kFrameCaptureEnd,
+  PopulateFrameCountStat(StatisticsEvent::Type::kFrameCaptureEnd,
                          StatisticType::kNumFramesCaptured, media_type,
                          stats_list);
 
   // kEnqueueFps
-  PopulateFpsStat(StatisticsEventType::kFrameEncoded,
+  PopulateFpsStat(StatisticsEvent::Type::kFrameEncoded,
                   StatisticType::kEnqueueFps, media_type, end_time, stats_list);
 
   constexpr StatisticType kSupportedLatencyStats[] = {
@@ -401,22 +403,22 @@ SenderStats::StatisticsList StatisticsAnalyzer::ConstructStatisticsList(
   }
 
   // kEncodeRateKbps
-  PopulateFrameBitrateStat(StatisticsEventType::kFrameEncoded,
+  PopulateFrameBitrateStat(StatisticsEvent::Type::kFrameEncoded,
                            StatisticType::kEncodeRateKbps, media_type, end_time,
                            stats_list);
 
   // kPacketTransmissionRateKbps
-  PopulatePacketBitrateStat(StatisticsEventType::kPacketSentToNetwork,
+  PopulatePacketBitrateStat(StatisticsEvent::Type::kPacketSentToNetwork,
                             StatisticType::kPacketTransmissionRateKbps,
                             media_type, end_time, stats_list);
 
   // kNumPacketsSent
-  PopulatePacketCountStat(StatisticsEventType::kPacketSentToNetwork,
+  PopulatePacketCountStat(StatisticsEvent::Type::kPacketSentToNetwork,
                           StatisticType::kNumPacketsSent, media_type,
                           stats_list);
 
   // kNumPacketsReceived
-  PopulatePacketCountStat(StatisticsEventType::kPacketReceived,
+  PopulatePacketCountStat(StatisticsEvent::Type::kPacketReceived,
                           StatisticType::kNumPacketsReceived, media_type,
                           stats_list);
 
@@ -430,9 +432,9 @@ SenderStats::StatisticsList StatisticsAnalyzer::ConstructStatisticsList(
 }
 
 void StatisticsAnalyzer::PopulatePacketCountStat(
-    StatisticsEventType event,
+    StatisticsEvent::Type event,
     StatisticType stat,
-    StatisticsEventMediaType media_type,
+    StatisticsEvent::MediaType media_type,
     SenderStats::StatisticsList& stats_list) {
   PacketStatsMap& stats_map = packet_stats_.Get(media_type);
 
@@ -443,9 +445,9 @@ void StatisticsAnalyzer::PopulatePacketCountStat(
 }
 
 void StatisticsAnalyzer::PopulateFrameCountStat(
-    StatisticsEventType event,
+    StatisticsEvent::Type event,
     StatisticType stat,
-    StatisticsEventMediaType media_type,
+    StatisticsEvent::MediaType media_type,
     SenderStats::StatisticsList& stats_list) {
   FrameStatsMap& stats_map = frame_stats_.Get(media_type);
 
@@ -456,9 +458,9 @@ void StatisticsAnalyzer::PopulateFrameCountStat(
 }
 
 void StatisticsAnalyzer::PopulateFpsStat(
-    StatisticsEventType event,
+    StatisticsEvent::Type event,
     StatisticType stat,
-    StatisticsEventMediaType media_type,
+    StatisticsEvent::MediaType media_type,
     Clock::time_point end_time,
     SenderStats::StatisticsList& stats_list) {
   FrameStatsMap& stats_map = frame_stats_.Get(media_type);
@@ -476,7 +478,7 @@ void StatisticsAnalyzer::PopulateFpsStat(
 
 void StatisticsAnalyzer::PopulateAvgLatencyStat(
     StatisticType stat,
-    StatisticsEventMediaType media_type,
+    StatisticsEvent::MediaType media_type,
     SenderStats::StatisticsList& stats_list
 
 ) {
@@ -491,9 +493,9 @@ void StatisticsAnalyzer::PopulateAvgLatencyStat(
 }
 
 void StatisticsAnalyzer::PopulateFrameBitrateStat(
-    StatisticsEventType event,
+    StatisticsEvent::Type event,
     StatisticType stat,
-    StatisticsEventMediaType media_type,
+    StatisticsEvent::MediaType media_type,
     Clock::time_point end_time,
     SenderStats::StatisticsList& stats_list) {
   FrameStatsMap& stats_map = frame_stats_.Get(media_type);
@@ -509,9 +511,9 @@ void StatisticsAnalyzer::PopulateFrameBitrateStat(
 }
 
 void StatisticsAnalyzer::PopulatePacketBitrateStat(
-    StatisticsEventType event,
+    StatisticsEvent::Type event,
     StatisticType stat,
-    StatisticsEventMediaType media_type,
+    StatisticsEvent::MediaType media_type,
     Clock::time_point end_time,
     SenderStats::StatisticsList& stats_list) {
   PacketStatsMap& stats_map = packet_stats_.Get(media_type);
@@ -527,7 +529,7 @@ void StatisticsAnalyzer::PopulatePacketBitrateStat(
 }
 
 void StatisticsAnalyzer::PopulateSessionStats(
-    StatisticsEventMediaType media_type,
+    StatisticsEvent::MediaType media_type,
     Clock::time_point end_time,
     SenderStats::StatisticsList& stats_list) {
   SessionStats& session_stats = session_stats_.Get(media_type);
@@ -554,7 +556,7 @@ void StatisticsAnalyzer::PopulateSessionStats(
 
 std::optional<Clock::time_point> StatisticsAnalyzer::ToSenderTimestamp(
     Clock::time_point receiver_timestamp,
-    StatisticsEventMediaType media_type) const {
+    StatisticsEvent::MediaType media_type) const {
   const std::optional<Clock::duration> receiver_offset =
       offset_estimator_->GetEstimatedOffset();
   if (!receiver_offset) {

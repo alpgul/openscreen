@@ -2,18 +2,79 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "cast/streaming/impl/statistics_defines.h"
+#include "cast/streaming/impl/statistics_common.h"
+
+#include "util/osp_logging.h"
 
 namespace openscreen::cast {
 
-StatisticsEventMediaType ToMediaType(StreamType type) {
+// static
+StatisticsEvent::Type StatisticsEvent::FromWireType(WireType wire_type) {
+  switch (wire_type) {
+    case WireType::kAudioAckSent:
+    case WireType::kVideoAckSent:
+    case WireType::kUnifiedAckSent:
+      return Type::kFrameAckSent;
+
+    case WireType::kAudioPlayoutDelay:
+    case WireType::kVideoRenderDelay:
+    case WireType::kUnifiedRenderDelay:
+      return Type::kFramePlayedOut;
+
+    case WireType::kAudioFrameDecoded:
+    case WireType::kVideoFrameDecoded:
+    case WireType::kUnifiedFrameDecoded:
+      return Type::kFrameDecoded;
+
+    case WireType::kAudioPacketReceived:
+    case WireType::kVideoPacketReceived:
+    case WireType::kUnifiedPacketReceived:
+      return Type::kPacketReceived;
+
+    default:
+      OSP_VLOG << "Unexpected RTCP log message received: "
+               << static_cast<int>(wire_type);
+      return Type::kUnknown;
+  }
+}
+
+// TODO(crbug.com/448199360): consume this method in the upcoming receiver side
+// statistics patch.
+// static
+[[maybe_unused]]
+StatisticsEvent::WireType StatisticsEvent::ToWireType(Type type) {
+  switch (type) {
+    case Type::kUnknown:
+      return WireType::kUnknown;
+
+    case Type::kFrameAckSent:
+      return WireType::kUnifiedAckSent;
+
+    case Type::kFramePlayedOut:
+      return WireType::kUnifiedRenderDelay;
+
+    case Type::kFrameDecoded:
+      return WireType::kUnifiedFrameDecoded;
+
+    case Type::kPacketReceived:
+      return WireType::kUnifiedPacketReceived;
+
+    default:
+      OSP_VLOG << "Unknown RTCP log message event type: "
+               << static_cast<int>(type);
+      return WireType::kUnknown;
+  }
+}
+
+// static
+StatisticsEvent::MediaType StatisticsEvent::ToMediaType(StreamType type) {
   switch (type) {
     case StreamType::kUnknown:
-      return StatisticsEventMediaType::kUnknown;
+      return MediaType::kUnknown;
     case StreamType::kAudio:
-      return StatisticsEventMediaType::kAudio;
+      return MediaType::kAudio;
     case StreamType::kVideo:
-      return StatisticsEventMediaType::kVideo;
+      return MediaType::kVideo;
   }
 
   OSP_NOTREACHED();

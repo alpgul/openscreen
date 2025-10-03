@@ -8,7 +8,7 @@
 #include <memory>
 #include <optional>
 
-#include "cast/streaming/impl/statistics_defines.h"
+#include "cast/streaming/impl/statistics_common.h"
 #include "cast/streaming/public/statistics.h"
 #include "platform/base/trivial_clock_traits.h"
 

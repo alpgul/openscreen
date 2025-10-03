@@ -53,16 +53,16 @@ ClockOffsetEstimatorImpl::~ClockOffsetEstimatorImpl() = default;
 
 void ClockOffsetEstimatorImpl::OnFrameEvent(const FrameEvent& frame_event) {
   switch (frame_event.type) {
-    case StatisticsEventType::kFrameAckSent:
+    case StatisticsEvent::Type::kFrameAckSent:
       frame_bound_.SetSent(
           frame_event.rtp_timestamp, 0,
-          frame_event.media_type == StatisticsEventMediaType::kAudio,
+          frame_event.media_type == StatisticsEvent::MediaType::kAudio,
           frame_event.timestamp);
       break;
-    case StatisticsEventType::kFrameAckReceived:
+    case StatisticsEvent::Type::kFrameAckReceived:
       frame_bound_.SetReceived(
           frame_event.rtp_timestamp, 0,
-          frame_event.media_type == StatisticsEventMediaType::kAudio,
+          frame_event.media_type == StatisticsEvent::MediaType::kAudio,
           frame_event.timestamp);
       break;
     default:
@@ -73,16 +73,16 @@ void ClockOffsetEstimatorImpl::OnFrameEvent(const FrameEvent& frame_event) {
 
 void ClockOffsetEstimatorImpl::OnPacketEvent(const PacketEvent& packet_event) {
   switch (packet_event.type) {
-    case StatisticsEventType::kPacketSentToNetwork:
+    case StatisticsEvent::Type::kPacketSentToNetwork:
       packet_bound_.SetSent(
           packet_event.rtp_timestamp, packet_event.packet_id,
-          packet_event.media_type == StatisticsEventMediaType::kAudio,
+          packet_event.media_type == StatisticsEvent::MediaType::kAudio,
           packet_event.timestamp);
       break;
-    case StatisticsEventType::kPacketReceived:
+    case StatisticsEvent::Type::kPacketReceived:
       packet_bound_.SetReceived(
           packet_event.rtp_timestamp, packet_event.packet_id,
-          packet_event.media_type == StatisticsEventMediaType::kAudio,
+          packet_event.media_type == StatisticsEvent::MediaType::kAudio,
           packet_event.timestamp);
       break;
     default:

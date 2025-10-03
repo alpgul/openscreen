@@ -43,8 +43,8 @@ constexpr int kDefaultSizeBytes = 10;
 constexpr int kDefaultStatIntervalMs = 5;
 
 constexpr FrameEvent kDefaultFrameEvent(FrameId::first(),
-                                        StatisticsEventType::kFrameEncoded,
-                                        StatisticsEventMediaType::kVideo,
+                                        StatisticsEvent::Type::kFrameEncoded,
+                                        StatisticsEvent::MediaType::kVideo,
                                         RtpTimeTicks(),
                                         kDefaultSizeBytes,
                                         Clock::time_point::min(),
@@ -57,8 +57,8 @@ constexpr FrameEvent kDefaultFrameEvent(FrameId::first(),
 
 constexpr PacketEvent kDefaultPacketEvent(
     FrameId::first(),
-    StatisticsEventType::kPacketSentToNetwork,
-    StatisticsEventMediaType::kVideo,
+    StatisticsEvent::Type::kPacketSentToNetwork,
+    StatisticsEvent::MediaType::kVideo,
     RtpTimeTicks(),
     kDefaultSizeBytes,
     Clock::time_point::min(),
@@ -218,7 +218,7 @@ TEST_F(StatisticsAnalyzerTest, FrameEncodedAndAckSent) {
     total_frame_latency += random_latency;
 
     FrameEvent event2 = MakeFrameEvent(i, rtp_timestamp);
-    event2.type = StatisticsEventType::kFrameAckSent;
+    event2.type = StatisticsEvent::Type::kFrameAckSent;
     event2.timestamp += random_latency;
     event2.received_timestamp += random_latency * 2;
 
@@ -258,7 +258,7 @@ TEST_F(StatisticsAnalyzerTest, FramePlayedOut) {
     auto delay_delta = milliseconds(60 - (20 * (i % 5)));
 
     FrameEvent event2 = MakeFrameEvent(i, rtp_timestamp);
-    event2.type = StatisticsEventType::kFramePlayedOut;
+    event2.type = StatisticsEvent::Type::kFramePlayedOut;
     event2.timestamp += random_latency;
     event2.received_timestamp += random_latency * 2;
     event2.delay_delta = delay_delta;
@@ -294,10 +294,12 @@ TEST_F(StatisticsAnalyzerTest, FramePlayedOut) {
 }
 
 TEST_F(StatisticsAnalyzerTest, AllFrameEvents) {
-  constexpr std::array<StatisticsEventType, 5> kEventsToReport{
-      StatisticsEventType::kFrameCaptureBegin,
-      StatisticsEventType::kFrameCaptureEnd, StatisticsEventType::kFrameEncoded,
-      StatisticsEventType::kFrameAckSent, StatisticsEventType::kFramePlayedOut};
+  constexpr std::array<StatisticsEvent::Type, 5> kEventsToReport{
+      StatisticsEvent::Type::kFrameCaptureBegin,
+      StatisticsEvent::Type::kFrameCaptureEnd,
+      StatisticsEvent::Type::kFrameEncoded,
+      StatisticsEvent::Type::kFrameAckSent,
+      StatisticsEvent::Type::kFramePlayedOut};
   constexpr int kNumFrames = 5;
   constexpr int kNumEvents = kNumFrames * kEventsToReport.size();
 
@@ -316,7 +318,7 @@ TEST_F(StatisticsAnalyzerTest, AllFrameEvents) {
   RtpTimeTicks rtp_timestamp;
   int current_event = 0;
   for (int frame_id = 0; frame_id < kNumFrames; frame_id++) {
-    for (StatisticsEventType event_type : kEventsToReport) {
+    for (StatisticsEvent::Type event_type : kEventsToReport) {
       FrameEvent event = MakeFrameEvent(frame_id, rtp_timestamp);
       event.type = event_type;
       event.timestamp += milliseconds(kTimestampOffsetsMs[current_event]);
@@ -437,7 +439,7 @@ TEST_F(StatisticsAnalyzerTest, PacketSentAndReceived) {
     event2.frame_id = FrameId(i);
     event2.timestamp += network_latency;
     event2.received_timestamp += network_latency * 2;
-    event2.type = StatisticsEventType::kPacketReceived;
+    event2.type = StatisticsEvent::Type::kPacketReceived;
 
     collector_->CollectPacketEvent(event1);
     collector_->CollectPacketEvent(event2);
@@ -493,7 +495,7 @@ TEST_F(StatisticsAnalyzerTest, FrameEncodedPacketSentAndReceived) {
     PacketEvent event3 = MakePacketEvent(i, rtp_timestamp);
     event3.timestamp += packet_latency;
     event3.received_timestamp += packet_latency * 2;
-    event3.type = StatisticsEventType::kPacketReceived;
+    event3.type = StatisticsEvent::Type::kPacketReceived;
 
     collector_->CollectFrameEvent(event1);
     collector_->CollectPacketEvent(event2);
@@ -554,9 +556,9 @@ TEST_F(StatisticsAnalyzerTest, AudioAndVideoFrameEncodedPacketSentAndReceived) {
   int total_video_events = 0;
 
   for (int i = 0; i < num_events; i++) {
-    StatisticsEventMediaType media_type = StatisticsEventMediaType::kVideo;
+    StatisticsEvent::MediaType media_type = StatisticsEvent::MediaType::kVideo;
     if (i % 2 == 0) {
-      media_type = StatisticsEventMediaType::kAudio;
+      media_type = StatisticsEvent::MediaType::kAudio;
     }
 
     FrameEvent event1 = MakeFrameEvent(i, rtp_timestamp);
@@ -568,17 +570,17 @@ TEST_F(StatisticsAnalyzerTest, AudioAndVideoFrameEncodedPacketSentAndReceived) {
 
     // Let packet latency be either 20, 40, 60, 80, or 100 ms.
     Clock::duration packet_latency = milliseconds(100 - (20 * (i % 5)));
-    if (media_type == StatisticsEventMediaType::kAudio) {
+    if (media_type == StatisticsEvent::MediaType::kAudio) {
       total_audio_events++;
       total_audio_packet_latency += packet_latency;
-    } else if (media_type == StatisticsEventMediaType::kVideo) {
+    } else if (media_type == StatisticsEvent::MediaType::kVideo) {
       total_video_events++;
       total_video_packet_latency += packet_latency;
     }
 
     PacketEvent event3 = MakePacketEvent(i, rtp_timestamp);
     event3.timestamp += packet_latency;
-    event3.type = StatisticsEventType::kPacketReceived;
+    event3.type = StatisticsEvent::Type::kPacketReceived;
     event3.media_type = media_type;
 
     collector_->CollectFrameEvent(event1);
@@ -618,10 +620,12 @@ TEST_F(StatisticsAnalyzerTest, AudioAndVideoFrameEncodedPacketSentAndReceived) {
 }
 
 TEST_F(StatisticsAnalyzerTest, LotsOfEventsStillWorksProperly) {
-  constexpr std::array<StatisticsEventType, 5> kEventsToReport{
-      StatisticsEventType::kFrameCaptureBegin,
-      StatisticsEventType::kFrameCaptureEnd, StatisticsEventType::kFrameEncoded,
-      StatisticsEventType::kFrameAckSent, StatisticsEventType::kFramePlayedOut};
+  constexpr std::array<StatisticsEvent::Type, 5> kEventsToReport{
+      StatisticsEvent::Type::kFrameCaptureBegin,
+      StatisticsEvent::Type::kFrameCaptureEnd,
+      StatisticsEvent::Type::kFrameEncoded,
+      StatisticsEvent::Type::kFrameAckSent,
+      StatisticsEvent::Type::kFramePlayedOut};
   constexpr int kNumFrames = 1000;
   constexpr int kNumEvents = kNumFrames * kEventsToReport.size();
 
@@ -678,7 +682,7 @@ TEST_F(StatisticsAnalyzerTest, LotsOfEventsStillWorksProperly) {
   RtpTimeTicks rtp_timestamp;
   int current_event = 0;
   for (int frame_id = 0; frame_id < kNumFrames; frame_id++) {
-    for (StatisticsEventType event_type : kEventsToReport) {
+    for (StatisticsEvent::Type event_type : kEventsToReport) {
       FrameEvent event = MakeFrameEvent(frame_id, rtp_timestamp);
       event.type = event_type;
       event.timestamp += milliseconds(

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef CAST_STREAMING_IMPL_STATISTICS_DEFINES_H_
-#define CAST_STREAMING_IMPL_STATISTICS_DEFINES_H_
+#ifndef CAST_STREAMING_IMPL_STATISTICS_COMMON_H_
+#define CAST_STREAMING_IMPL_STATISTICS_COMMON_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -15,43 +15,73 @@
 
 namespace openscreen::cast {
 
-enum class StatisticsEventType : int {
-  kUnknown = 0,
-
-  // Sender side frame events.
-  kFrameCaptureBegin = 1,
-  kFrameCaptureEnd = 2,
-  kFrameEncoded = 3,
-  kFrameAckReceived = 4,
-
-  // Receiver side frame events.
-  kFrameAckSent = 5,
-  kFrameDecoded = 6,
-  kFramePlayedOut = 7,
-
-  // Sender side packet events.
-  kPacketSentToNetwork = 8,
-  kPacketRetransmitted = 9,
-  kPacketRtxRejected = 10,
-
-  // Receiver side packet events.
-  kPacketReceived = 11,
-
-  kNumOfEvents = kPacketReceived + 1
-};
-
-enum class StatisticsEventMediaType : int {
-  kUnknown = 0,
-  kAudio = 1,
-  kVideo = 2
-};
-
-StatisticsEventMediaType ToMediaType(StreamType type);
-
 struct StatisticsEvent {
+  enum class Type : int {
+    kUnknown = 0,
+
+    // Sender side frame events.
+    kFrameCaptureBegin = 1,
+    kFrameCaptureEnd = 2,
+    kFrameEncoded = 3,
+    kFrameAckReceived = 4,
+
+    // Receiver side frame events.
+    kFrameAckSent = 5,
+    kFrameDecoded = 6,
+    kFramePlayedOut = 7,
+
+    // Sender side packet events.
+    kPacketSentToNetwork = 8,
+    kPacketRetransmitted = 9,
+    kPacketRtxRejected = 10,
+
+    // Receiver side packet events.
+    kPacketReceived = 11,
+
+    kNumOfEvents = kPacketReceived + 1
+  };
+
+  // Serialized values for the statistics events for use by the RTCP builder
+  // and parser logic. *Do not modify existing values* since they are shared by
+  // both libcast-based devices as well as a variety of legacy implementations.
+  //
+  // NOTE: Events 1 to 8 have been replaced with events 11 to 14 (e.g.
+  // kAudioAckSent and kVideoAckSent merged into a single event kAckSent).
+  // Events 9 and 10 (to log duplicated packets) have been fully removed. Future
+  // events may reuse those values.
+  enum class WireType : uint8_t {
+    kUnknown = 0,
+
+    // Legacy audio event types.
+    kAudioAckSent = 1,
+    kAudioPlayoutDelay = 2,
+    kAudioFrameDecoded = 3,
+    kAudioPacketReceived = 4,
+
+    // Legacy video event types.
+    kVideoAckSent = 5,
+    kVideoRenderDelay = 6,
+    kVideoFrameDecoded = 7,
+    kVideoPacketReceived = 8,
+
+    // New unified event types.
+    kUnifiedAckSent = 11,
+    kUnifiedRenderDelay = 12,
+    kUnifiedFrameDecoded = 13,
+    kUnifiedPacketReceived = 14,
+
+    kNumOfEvents = kUnifiedPacketReceived + 1
+  };
+
+  enum class MediaType : int { kUnknown = 0, kAudio = 1, kVideo = 2 };
+
+  static Type FromWireType(WireType wire_type);
+  static WireType ToWireType(Type type);
+  static MediaType ToMediaType(StreamType type);
+
   constexpr StatisticsEvent(FrameId frame_id,
-                            StatisticsEventType type,
-                            StatisticsEventMediaType media_type,
+                            Type type,
+                            MediaType media_type,
                             RtpTimeTicks rtp_timestamp,
                             uint32_t size,
                             Clock::time_point timestamp,
@@ -77,10 +107,10 @@ struct StatisticsEvent {
   FrameId frame_id;
 
   // The type of this frame event.
-  StatisticsEventType type = StatisticsEventType::kUnknown;
+  Type type = Type::kUnknown;
 
   // Whether this was audio or video (or unknown).
-  StatisticsEventMediaType media_type = StatisticsEventMediaType::kUnknown;
+  MediaType media_type = MediaType::kUnknown;
 
   // The RTP timestamp of the frame this event is associated with.
   RtpTimeTicks rtp_timestamp;
@@ -100,8 +130,8 @@ struct StatisticsEvent {
 
 struct FrameEvent : public StatisticsEvent {
   constexpr FrameEvent(FrameId frame_id_in,
-                       StatisticsEventType type_in,
-                       StatisticsEventMediaType media_type_in,
+                       Type type_in,
+                       MediaType media_type_in,
                        RtpTimeTicks rtp_timestamp_in,
                        uint32_t size_in,
                        Clock::time_point timestamp_in,
@@ -153,8 +183,8 @@ struct FrameEvent : public StatisticsEvent {
 
 struct PacketEvent : public StatisticsEvent {
   constexpr PacketEvent(FrameId frame_id_in,
-                        StatisticsEventType type_in,
-                        StatisticsEventMediaType media_type_in,
+                        Type type_in,
+                        MediaType media_type_in,
                         RtpTimeTicks rtp_timestamp_in,
                         uint32_t size_in,
                         Clock::time_point timestamp_in,
@@ -189,4 +219,4 @@ struct PacketEvent : public StatisticsEvent {
 
 }  // namespace openscreen::cast
 
-#endif  // CAST_STREAMING_IMPL_STATISTICS_DEFINES_H_
+#endif  // CAST_STREAMING_IMPL_STATISTICS_COMMON_H_
