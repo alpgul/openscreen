@@ -299,6 +299,7 @@ openscreen_source_set("unittests") {
     ":sender",
     ":testing",
     "../../platform:test",
+    "../../testing/util",
     "../../third_party/googletest:gmock",
     "../../third_party/googletest:gtest",
     "../../util",
