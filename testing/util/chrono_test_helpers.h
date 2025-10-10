@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef TESTING_UTIL_GMOCK_MATCHERS_H_
-#define TESTING_UTIL_GMOCK_MATCHERS_H_
+#ifndef TESTING_UTIL_CHRONO_TEST_HELPERS_H_
+#define TESTING_UTIL_CHRONO_TEST_HELPERS_H_
 
 #include <sstream>
 #include <string>
@@ -40,6 +40,15 @@ MATCHER_P(EqualsDuration, expected, ToString(expected)) {
   return false;
 }
 
+inline void ExpectDurationNear(Clock::duration actual,
+                               Clock::duration expected,
+                               Clock::duration tolerance) {
+  const auto diff = actual > expected ? actual - expected : expected - actual;
+  EXPECT_LE(diff, tolerance)
+      << "Actual: " << ToString(actual) << ", Expected: " << ToString(expected)
+      << ", Tolerance: " << ToString(tolerance);
+}
+
 }  // namespace openscreen
 
-#endif  // TESTING_UTIL_GMOCK_MATCHERS_H_
+#endif  // TESTING_UTIL_CHRONO_TEST_HELPERS_H_

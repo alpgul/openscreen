@@ -251,6 +251,11 @@ void Receiver::OnReceivedRtpPacket(Clock::time_point arrival_time,
   // but only once.
   if (part->packet_id == FramePacketId{0} &&
       !pending_frame.estimated_capture_time) {
+    // TODO(b/298085631): This estimation is inaccurate as it includes network
+    // latency. To fix this, the sender should calculate the RTT, report it back
+    // to the receiver, and the receiver should then subtract RTT/2 from the
+    // estimated capture time.
+    //
     // Estimate the original capture time of this frame (at the Sender), in
     // terms of the Receiver's clock: First, start with a reference time point
     // from the Sender's clock (the one from the last Sender Report). Then,
@@ -258,8 +263,12 @@ void Receiver::OnReceivedRtpPacket(Clock::time_point arrival_time,
     // Receiver's clock by applying the measured offset between the two clocks.
     // Finally, apply the RTP timestamp difference between the Sender Report and
     // this frame to determine what the original capture time of this frame was.
+    const auto smoothed_offset = smoothed_clock_offset_.Current();
+    if (!smoothed_offset) {
+      return;
+    }
     pending_frame.estimated_capture_time =
-        last_sender_report_->reference_time + smoothed_clock_offset_.Current() +
+        last_sender_report_->reference_time + *smoothed_offset +
         (part->rtp_timestamp - last_sender_report_->rtp_timestamp)
             .ToDuration<Clock::duration>(rtp_timebase_);
 
