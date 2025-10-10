@@ -261,6 +261,7 @@ openscreen_source_set("unittests") {
     "impl/answer_messages_unittest.cc",
     "impl/bandwidth_estimator_unittest.cc",
     "impl/capture_recommendations_unittest.cc",
+    "impl/clock_drift_smoother_unittest.cc",
     "impl/clock_offset_estimator_impl_unittest.cc",
     "impl/compound_rtcp_builder_unittest.cc",
     "impl/compound_rtcp_parser_unittest.cc",

@@ -14,7 +14,7 @@
 #include "gtest/gtest.h"
 #include "platform/base/trivial_clock_traits.h"
 #include "platform/test/fake_clock.h"
-#include "testing/util/gmock_matchers.h"
+#include "testing/util/chrono_test_helpers.h"
 #include "util/chrono_helpers.h"
 
 namespace openscreen::cast {
