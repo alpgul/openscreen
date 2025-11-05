@@ -22,6 +22,8 @@ config("protobuf_warnings") {
   cflags_cc = [
     "-Wno-sign-compare",
     "-Wno-unused-function",
+    "-Wno-deprecated-enum-enum-conversion",
+    "-Wno-deprecated-pragma",
   ]
   if (is_clang) {
     cflags_cc += [
@@ -35,9 +37,6 @@ config("protobuf_warnings") {
       "-Wno-deprecated-declarations",
       "-Wno-unused-const-variable",
     ]
-  } else {
-    # NOTE: This can be removed after rolling to a newer version of protobuf.
-    cflags_cc += [ "-Wno-deprecated-enum-enum-conversion" ]
   }
 }
 
