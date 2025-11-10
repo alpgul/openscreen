@@ -8,7 +8,7 @@ Open Screen's LUCI configuration for post-submit and pre-submit builders.
 
 REPO_URL = "https://chromium.googlesource.com/openscreen"
 CHROMIUM_REPO_URL = "https://chromium.googlesource.com/chromium/src"
-MAC_VERSION = "Mac-13"
+MAC_VERSION = "Mac-15"
 WINDOWS_VERSION = "Windows-10"
 REF = "refs/heads/main"
 
