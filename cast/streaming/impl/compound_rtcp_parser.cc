@@ -22,8 +22,6 @@ namespace {
 // time) to represent unset time_point values.
 constexpr auto kNullTimePoint = Clock::time_point::min();
 
-constexpr uint32_t kCastName = ('C' << 24) + ('A' << 16) + ('S' << 8) + 'T';
-
 // Some receivers send time sync requests (that we ignore).
 constexpr uint32_t kTimeSyncRequestName =
     ('T' << 24) + ('I' << 16) + ('M' << 8) + 'E';
