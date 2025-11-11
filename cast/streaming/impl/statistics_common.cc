@@ -38,10 +38,7 @@ StatisticsEvent::Type StatisticsEvent::FromWireType(WireType wire_type) {
   }
 }
 
-// TODO(crbug.com/448199360): consume this method in the upcoming receiver side
-// statistics patch.
 // static
-[[maybe_unused]]
 StatisticsEvent::WireType StatisticsEvent::ToWireType(Type type) {
   switch (type) {
     case Type::kUnknown:

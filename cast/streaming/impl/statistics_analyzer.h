@@ -169,10 +169,6 @@ class StatisticsAnalyzer {
       Clock::time_point receiver_timestamp,
       StatisticsEvent::MediaType media_type) const;
 
-  // Records the network latency estimate, which is then weighted and used as
-  // part of the moving network latency estimate.
-  void RecordEstimatedNetworkLatency(Clock::duration latency);
-
   // The statistics client to which we report analyzed statistics.
   SenderStatsClient* const stats_client_;
 
@@ -186,12 +182,6 @@ class StatisticsAnalyzer {
   ClockNowFunctionPtr now_;
   Alarm alarm_;
   Clock::time_point start_time_;
-
-  // Keep track of the currently estimated network latency.
-  //
-  // NOTE: though we currently record the average network latency separately for
-  // audio and video, they use the same network so the value should be the same.
-  Clock::duration estimated_network_latency_{};
 
   // Maps of frame / packet infos used for stats that rely on seeing multiple
   // events. For example, network latency is the calculated time difference
