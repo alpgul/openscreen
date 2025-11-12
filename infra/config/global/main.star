@@ -350,7 +350,7 @@ try_and_ci_builders(
     "linux_arm64",
     get_properties(target_cpu = "arm64", is_component_build = False),
 )
-try_and_ci_builders("mac_x64", get_properties(), os = MAC_VERSION)
+try_and_ci_builders("mac_arm64", get_properties(), os = MAC_VERSION, cpu = "arm64")
 try_and_ci_builders(
     "win_x64",
     get_properties(),
@@ -361,9 +361,10 @@ try_and_ci_builders(
     get_properties(chromium = True),
 )
 try_and_ci_builders(
-    "chromium_mac_x64",
+    "chromium_mac_arm64",
     get_properties(chromium = True),
     os = MAC_VERSION,
+    cpu = "arm64",
 )
 try_and_ci_builders(
     "chromium_win_x64",
