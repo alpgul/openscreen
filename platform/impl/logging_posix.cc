@@ -12,6 +12,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "build/build_config.h"
 #include "platform/impl/logging.h"
 #include "platform/impl/logging_test.h"
 #include "util/trace_logging.h"
@@ -108,7 +109,9 @@ void LogWithLevel(LogLevel level,
   ss << "[" << level << ":" << file << "(" << line << "):T" << std::hex
      << TRACE_CURRENT_ID << "] " << message.rdbuf() << std::endl;
 
-#if OSP_DCHECK_IS_ON()
+// NOTE: backtrace() is only supported in modern versions of Android (33+), so
+// it is just disabled here.
+#if OSP_DCHECK_IS_ON() && !BUILDFLAG(IS_ANDROID)
   if (level == LogLevel::kFatal) {
     constexpr size_t kMaxCallstackSize = 128;
     std::array<void*, kMaxCallstackSize> callstack = {};
