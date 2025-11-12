@@ -14,10 +14,10 @@ Current builders include:
 | linux_x64_tsan_rel     | x86-64 | Ubuntu Linux 24.04     | clang     | release | TSAN enabled           |  N  |
 | linux_x64_coverage     | x86-64 | Ubuntu Linux 24.04     | clang     | debug   | used for code coverage |  N  |
 | linux_arm64_cast_receiver | arm64  | Ubuntu Linux 24.04 [\*] | clang | debug   | Builds cast sender/receiver |  N  |
-| mac_x64                | x86-64 | Mac OS 13              | clang     | debug   |                        |  Y  |
+| mac_arm64                | arm64 | Mac OS 15              | clang     | debug   |                        |  Y  |
 | win_x64                | x86-64 | Windows 10             | clang     | debug   |                        |  N  |
 | chromium_linux_x64     | x86-64 | Ubuntu Linux 24.04     | clang     | debug   | built with chromium    |  Y  |
-| chromium_mac_x64       | x86-64 | MacOS 13               | clang     | debug   | built with chromium    |  Y  |
+| chromium_mac_arm64       | arm64 | MacOS 15               | clang     | debug   | built with chromium    |  Y  |
 | chromium_win_x64       | x86-64 | Windows 10             | clang     | debug   | built with chromium    |  N  |
 <br />
 
