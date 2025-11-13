@@ -54,7 +54,7 @@ def _CheckGeneratedInfraFiles(input_api, output_api):
     if (any(f.endswith('.star') for f in files)
             and all(not f.endswith('.cfg') for f in files)):
         return [
-            output_api.PresubmitWarning(
+            output_api.PresubmitPromptWarning(
                 'You changed .star files, but didn\'t run `lucicfg generate '
                 'infra/config/global/main.star`')
         ]
