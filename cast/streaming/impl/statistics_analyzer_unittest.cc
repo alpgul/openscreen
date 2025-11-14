@@ -125,13 +125,14 @@ class StatisticsAnalyzerTest : public ::testing::Test {
     // In general, use an estimator that doesn't have an offset.
     // TODO(issuetracker.google.com/298085631): add test coverage for the
     // estimator usage in this class.
-    auto fake_estimator =
+    auto fake_estimator_unique_ptr =
         std::make_unique<NiceMock<FakeClockOffsetEstimator>>();
-    ON_CALL(*fake_estimator, GetEstimatedOffset())
+    fake_estimator_ = fake_estimator_unique_ptr.get();
+    ON_CALL(*fake_estimator_, GetEstimatedOffset())
         .WillByDefault(Return(Clock::duration{}));
     analyzer_ = std::make_unique<StatisticsAnalyzer>(
         &stats_client_, fake_clock_.now, fake_task_runner_,
-        std::move(fake_estimator));
+        std::move(fake_estimator_unique_ptr));
     collector_ = analyzer_->statistics_collector();
   }
 
@@ -169,7 +170,7 @@ TEST_F(StatisticsAnalyzerTest, FrameEncoded) {
   analyzer_->ScheduleAnalysis();
 
   Clock::time_point first_event_time = fake_clock_.now();
-  Clock::time_point last_event_time;
+  Clock::time_point last_event_time = Clock::time_point::min();
   RtpTimeTicks rtp_timestamp;
 
   for (int i = 0; i < kDefaultNumEvents; i++) {
@@ -478,11 +479,14 @@ TEST_F(StatisticsAnalyzerTest, PacketSentAndReceived) {
 }
 
 TEST_F(StatisticsAnalyzerTest, FrameEncodedPacketSentAndReceived) {
+  EXPECT_CALL(*fake_estimator_, GetEstimatedLatency())
+      .WillRepeatedly(Return(std::optional(milliseconds(40))));
+
   analyzer_->ScheduleAnalysis();
 
   Clock::duration total_packet_latency = milliseconds(0);
   RtpTimeTicks rtp_timestamp;
-  Clock::time_point last_event_time;
+  Clock::time_point last_event_time = Clock::time_point::min();
 
   for (int i = 0; i < kDefaultNumEvents; i++) {
     FrameEvent event1 = MakeFrameEvent(i, rtp_timestamp);
@@ -492,14 +496,16 @@ TEST_F(StatisticsAnalyzerTest, FrameEncodedPacketSentAndReceived) {
     // Let packet latency be either 20, 40, 60, 80, or 100 ms.
     Clock::duration packet_latency = milliseconds(100 - (20 * (i % 5)));
     total_packet_latency += packet_latency;
-    if (fake_clock_.now() + packet_latency > last_event_time) {
-      last_event_time = fake_clock_.now() + packet_latency;
-    }
 
     PacketEvent event3 = MakePacketEvent(i, rtp_timestamp);
     event3.timestamp += packet_latency;
     event3.received_timestamp += packet_latency * 2;
     event3.type = StatisticsEvent::Type::kPacketReceived;
+
+    if (event3.type == StatisticsEvent::Type::kPacketReceived &&
+        event3.received_timestamp > last_event_time) {
+      last_event_time = event3.received_timestamp;
+    }
 
     collector_->CollectFrameEvent(event1);
     collector_->CollectPacketEvent(event2);
@@ -517,8 +523,8 @@ TEST_F(StatisticsAnalyzerTest, FrameEncodedPacketSentAndReceived) {
 
         const double expected_time_since_last_receiver_response =
             static_cast<double>(
-                (to_milliseconds(fake_clock_.now() - last_event_time) -
-                 milliseconds(25))
+                to_milliseconds(fake_clock_.now() -
+                                (last_event_time - milliseconds(40)))
                     .count());
         ExpectStatEq(stats.video_statistics,
                      StatisticType::kTimeSinceLastReceiverResponseMs,
