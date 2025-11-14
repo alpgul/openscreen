@@ -6,13 +6,10 @@
 
 #include <algorithm>
 
-#include "cast/streaming/impl/statistics_common.h"
 #include "platform/base/trivial_clock_traits.h"
 #include "util/chrono_helpers.h"
 
 namespace openscreen::cast {
-
-using openscreen::clock_operators::operator<<;
 
 namespace {
 
@@ -303,11 +300,15 @@ void StatisticsAnalyzer::RecordPacketLatencies(
     }
     packet_received_time -= *receiver_offset;
 
-    const auto latency = packet_received_time - packet_sent_time;
-    AddToLatencyAggregrate(StatisticType::kAvgNetworkLatencyMs, latency,
+    // Network latency is the time between when a packet is sent and when it
+    // is received.
+    const Clock::duration network_latency =
+        packet_received_time - packet_sent_time;
+    RecordEstimatedNetworkLatency(network_latency);
+    AddToLatencyAggregrate(StatisticType::kAvgNetworkLatencyMs, network_latency,
                            packet_event.media_type);
     AddToHistogram(HistogramType::kNetworkLatencyMs, packet_event.media_type,
-                   InMilliseconds(latency));
+                   InMilliseconds(network_latency));
 
     // Packet latency is the time from when a frame is encoded until when the
     // packet is received.
@@ -328,13 +329,10 @@ void StatisticsAnalyzer::RecordEventTimes(const StatisticsEvent& event) {
 
   Clock::time_point sender_timestamp = event.timestamp;
   if (IsReceiverEvent(event.type)) {
-    const auto latency = offset_estimator_->GetEstimatedLatency();
-    if (latency) {
-      const Clock::time_point estimated_sent_time =
-          event.received_timestamp - *latency;
-      session_stats.last_response_received_time = std::max(
-          session_stats.last_response_received_time, estimated_sent_time);
-    }
+    const Clock::time_point estimated_sent_time =
+        event.received_timestamp - estimated_network_latency_;
+    session_stats.last_response_received_time = std::max(
+        session_stats.last_response_received_time, estimated_sent_time);
 
     const auto result = ToSenderTimestamp(event.timestamp, event.media_type);
     if (!result) {
@@ -546,9 +544,11 @@ void StatisticsAnalyzer::PopulateSessionStats(
         InMilliseconds(session_stats.last_event_time.time_since_epoch());
   }
 
-  stats_list[static_cast<int>(
-      StatisticType::kTimeSinceLastReceiverResponseMs)] =
-      InMilliseconds(end_time - session_stats.last_response_received_time);
+  if (session_stats.last_response_received_time != Clock::time_point::min()) {
+    stats_list[static_cast<int>(
+        StatisticType::kTimeSinceLastReceiverResponseMs)] =
+        InMilliseconds(end_time - session_stats.last_response_received_time);
+  }
 
   stats_list[static_cast<int>(StatisticType::kNumLateFrames)] =
       session_stats.late_frame_counter;
@@ -562,7 +562,22 @@ std::optional<Clock::time_point> StatisticsAnalyzer::ToSenderTimestamp(
   if (!receiver_offset) {
     return {};
   }
-  return receiver_timestamp - *receiver_offset;
+  return receiver_timestamp + estimated_network_latency_ - *receiver_offset;
+}
+
+void StatisticsAnalyzer::RecordEstimatedNetworkLatency(
+    Clock::duration latency) {
+  if (estimated_network_latency_ == Clock::duration{}) {
+    estimated_network_latency_ = latency;
+    return;
+  }
+
+  // We use an exponential moving average for recording the network latency.
+  // NOTE: value chosen experimentally to perform some smoothing and represent
+  // the past few seconds of data.
+  constexpr double kWeight = 2.0 / 301.0;
+  estimated_network_latency_ = to_microseconds(
+      latency * kWeight + estimated_network_latency_ * (1.0 - kWeight));
 }
 
 }  // namespace openscreen::cast

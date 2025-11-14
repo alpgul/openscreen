@@ -172,8 +172,6 @@ class FakeClient : public SenderSession::Client {
               (override));
 };
 
-// TODO(jophba): this matcher is likely more generally useful and should
-// be refactored.
 MATCHER_P(CodeEquals, code, "Checks error codes but not messages.") {
   return arg.code() == code;
 }
