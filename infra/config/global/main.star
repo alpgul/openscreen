@@ -96,6 +96,26 @@ luci.bucket(
     ],
 )
 luci.bucket(
+    name = "try.shadow",
+    shadows = "try",
+    constraints = luci.bucket_constraints(
+        pools = ["luci.flex.try"],
+        service_accounts = [
+            "openscreen-try-builder@chops-service-accounts.iam.gserviceaccount.com",
+        ],
+    ),
+    bindings = [
+        # For led permissions.
+        luci.binding(
+            roles = "role/buildbucket.creator",
+            groups = [
+                "mdb/chrome-build-access-sphinx",
+            ],
+        ),
+    ],
+    dynamic = True,
+)
+luci.bucket(
     name = "ci",
     acls = [
         acl.entry(
@@ -103,6 +123,26 @@ luci.bucket(
             users = "luci-scheduler@appspot.gserviceaccount.com",
         ),
     ],
+)
+luci.bucket(
+    name = "ci.shadow",
+    shadows = "ci",
+    constraints = luci.bucket_constraints(
+        pools = ["luci.flex.ci"],
+        service_accounts = [
+            "openscreen-ci-builder@chops-service-accounts.iam.gserviceaccount.com",
+        ],
+    ),
+    bindings = [
+        # For led permissions.
+        luci.binding(
+            roles = "role/buildbucket.creator",
+            groups = [
+                "mdb/chrome-build-access-sphinx",
+            ],
+        ),
+    ],
+    dynamic = True,
 )
 
 luci.console_view(
