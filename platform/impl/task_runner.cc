@@ -30,6 +30,8 @@ void OnReceivedSignal(int signal) {
 
 }  // namespace
 
+TaskRunnerImpl::TaskWaiter::~TaskWaiter() = default;
+
 TaskRunnerImpl::TaskRunnerImpl(ClockNowFunctionPtr now_function,
                                TaskWaiter* event_waiter,
                                Clock::duration waiter_timeout)

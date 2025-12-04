@@ -130,6 +130,9 @@ AsynchronousTraceLogger::~AsynchronousTraceLogger() {
   }
 }
 
+TraceIdSetter::TraceIdSetter(TraceIdHierarchy ids)
+    : ScopedTraceOperation(ids.current, ids.parent, ids.root) {}
+
 TraceIdSetter::~TraceIdSetter() = default;
 
 }  // namespace openscreen::internal
