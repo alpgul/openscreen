@@ -70,17 +70,16 @@ vars = {
 }
 
 deps = {
-  # NOTE: These commit hashes here reference a repository/branch that is a
-  # mirror of the commits in the corresponding Chromium repository directory,
-  # and should be regularly updated with the tip of the MIRRORED master branch,
-  # found here:
+  # A mirror of the corresponding folder in Chromium maintained here:
   # https://chromium.googlesource.com/chromium/src/buildtools/+/refs/heads/main
+  #
+  # IMPORTANT: Read the instructions at docs/roll_deps.md
   'buildtools': {
     'url': Var('chromium_git') + '/chromium/src/buildtools' +
       '@' + 'eca5f0685c48ed59ff06077cb18cee00934249dd',
   },
 
-  # and here:
+  # A mirror of the corresponding folder in Chromium maintained here:
   # https://chromium.googlesource.com/chromium/src/build/+/refs/heads/main
   'build': {
     'url': Var('chromium_git') + '/chromium/src/build' +
@@ -207,12 +206,14 @@ deps = {
     'condition': 'not build_with_chromium',
   },
 
+  # IMPORTANT: Read the instructions at docs/roll_deps.md
   'third_party/libc++/src': {
     'url': Var('chromium_git') +
     '/external/github.com/llvm/llvm-project/libcxx.git' + '@' + '07572e7b169225ef3a999584cba9d9004631ae66',
     'condition': 'not build_with_chromium',
   },
 
+  # IMPORTANT: Read the instructions at docs/roll_deps.md
   'third_party/libc++abi/src': {
     'url': Var('chromium_git') +
     '/external/github.com/llvm/llvm-project/libcxxabi.git' + '@' + '83a852080747b9a362e8f9e361366b7a601f302c',

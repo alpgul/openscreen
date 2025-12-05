@@ -3,13 +3,14 @@
 The Open Screen Library uses several external libraries that are compiled from
 source and fetched from additional git repositories into folders below
 `third_party/`.  These libraries are listed in the `DEPS` file in the root of
-the repository.  (`DEPS` listed with `dep_type: cipd` are not managed through git.)
+the repository.  (`DEPS` listed with `dep_type: cipd` or `gcs` are not managed
+through git.)
 
 Periodically the versions of these libraries are updated to pick up bug and
-security fixes from upstream repositories. 
+security fixes from upstream repositories.
 
-Note that depot_tools is in the process of migrating dependency management from
-`DEPS` to git submodules.
+Library versions are tracked both in the `DEPS` file and in git submodules.
+Using the roll-dep script below will keep the two in sync.
 
 The process is roughly as follows:
 
@@ -27,8 +28,9 @@ The process is roughly as follows:
    adjustments, etc.
 4. Use a tryjob to verify that nothing is broken and send for code review.
 
-## Libraries also used by Chromium
+## Libraries used in Chromium
 
+* `build` (mirrored from Chromium)
 * `third_party/libprotobuf-mutator/src`
 * `third_party/jsoncpp/src`
 * `third_party/googletest/src` (not kept in sync with Chromium, see comment in `DEPS`)
@@ -37,11 +39,34 @@ The process is roughly as follows:
 * `third_party/libfuzzer/src`
 * `third_party/googleurl/src` (not kept in sync with Chromium, see comment in `DEPS`)
 
-## Special cases that are updated manually
+## Rolling buildtools/
+
+`buildtools/` is a special case because it is interdependent with
+`third_party/libc++/src` and `third_party/libc++abi/src`; they must all be
+rolled in one CL.
+
+The steps to roll:
+
+1. Get the [current commit hash](https://chromium.googlesource.com/chromium/src/buildtools/) of the buildtools mirror (call it X).
+2. Get the [commit hash of libc++](https://chromium.googlesource.com/chromium/src/buildtools/+/refs/heads/main/deps_revisions.gni) from `deps_revisions.gni` (call it Y).
+3. Get the [commit hash of libc++abi](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/DEPS) (call it Z) from `chromium/src/DEPS`.
+4. In the same local branch:
+   * `$ roll-dep --roll-to X -r <reviewer>@chromium.org buildtools/`
+   * `$ roll=dep --ignore-dirty-tree --roll-to Y third_party/libc++/src`
+   * `$ roll=dep --ignore-dirty-tree --roll-to Z third_party/libc++abi/src`
+5. `$ git cl upload` the resulting commits.
+
+[Roll buildtools/ 5df641722..eca5f0685 (13 commits)](https://chromium-review.googlesource.com/c/openscreen/+/7226339)
+is an example of a successful roll CL.
+
+## Other special cases that are updated manually
 
 * `third_party/protobuf`: See instructions in `third-party/protobuf/README.chromium`
 * `third_party/boringssl/src`: See instructions in `third_party/boringssl/README.openscreen.md`
-* `third_party/mozilla`: See README.md
+
+## Rolling GCS dependencies
+
+TODO: Find and link instructions, and list GCS dependencies
 
 
 
