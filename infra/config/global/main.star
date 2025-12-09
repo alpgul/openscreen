@@ -175,7 +175,6 @@ def get_properties(
         chromium = False,
         is_presubmit = False,
         is_component_build = None,
-        use_cxx23 = None,
         is_ci = None):
     """Property generator method, used to configure the build system.
 
@@ -193,8 +192,6 @@ def get_properties(
       chromium: if True, the build is for use in an embedder, such as Chrome.
       is_presubmit: if True, this is a presubmit run.
       is_component_build: if set, enables or disables component builds.
-      use_cxx23: If not None, specifies whether to use C++23 (true), or 20
-        (false). If None, the default flag value is used.
       is_ci: If set, it adds is_ci flag to the properties.
 
     Returns:
@@ -207,8 +204,6 @@ def get_properties(
             "server": "https://chromium-swarm.appspot.com",
         },
     }
-    if use_cxx23 != None:
-        properties["use_cxx23"] = use_cxx23
     if not is_debug:
         properties["is_debug"] = False
     if is_gcc:
@@ -385,7 +380,6 @@ try_and_ci_builders(
 )
 try_and_ci_builders("linux_x64_coverage", LINUX_VERSION, "x86-64", get_properties("x64", use_coverage = True))
 try_and_ci_builders("linux_x64", LINUX_VERSION, "x86-64", get_properties("x64", is_asan = True))
-try_and_ci_builders("linux_x64_cxx23", LINUX_VERSION, "x86-64", get_properties("x64", is_asan = True, use_cxx23 = True))
 try_and_ci_builders(
     "linux_x64_gcc",
     LINUX_VERSION,
