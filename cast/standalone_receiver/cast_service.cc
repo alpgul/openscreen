@@ -80,8 +80,8 @@ CastService::CastService(CastService::Configuration config)
       OSP_LOG_WARN << "Hardware address for interface " << config.interface.name
                    << " is empty. Generating a random unique_id.";
       std::array<uint8_t, kCastUniqueIdLength> random_bytes;
-      GenerateRandomBytes(random_bytes.data(), kCastUniqueIdLength);
-      info.unique_id = HexEncode(random_bytes.data(), kCastUniqueIdLength);
+      GenerateRandomBytes(random_bytes);
+      info.unique_id = HexEncode(random_bytes);
     }
     info.friendly_name = config.friendly_name;
     info.model_name = config.model_name;

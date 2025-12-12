@@ -13,6 +13,7 @@
 #include <vector>
 
 // String query and manipulation utilities.
+// TODO(jophba): remove nested string_util namespace.
 namespace openscreen::string_util {
 
 namespace internal {
@@ -23,33 +24,45 @@ extern const char kToUpper[256];
 
 }  // namespace internal
 
-// Determines whether the given character is an alphabetic character.
+// Determines whether `c` is a valid ASCII alphabetic character code.
 inline bool ascii_isalpha(unsigned char c) {
   return (internal::kPropertyBits[c] & 0x01) != 0;
 }
 
-// Determines whether the given character can be represented as a decimal
-// digit character (i.e. {0-9}).
+// Determines whether `c` is a valid ASCII decimal digit (i.e. [0-9]).
 inline bool ascii_isdigit(unsigned char c) {
-  return c >= '0' && c <= '9';
+  return '0' <= c && c <= '9';
 }
 
-// Determines whether the given character is printable, including spaces.
+// Determines whether `c` is a valid ASCII lower case hexadecimal digit
+// (i.e. [a-fA-F0-9]).
+inline bool ascii_islowerhex(unsigned char c) {
+  return ascii_isdigit(c) || ('a' <= c && c <= 'f');
+}
+
+// Determines whether `c` is a valid ASCII hexadecimal digit (i.e. [a-fA-F0-9]).
+inline bool ascii_ishex(unsigned char c) {
+  return ascii_islowerhex(c) || ('A' <= c && c <= 'F');
+}
+
+// Determines whether `c` is a valid, printable ASCII digit.
 inline bool ascii_isprint(unsigned char c) {
   return c >= 32 && c < 127;
 }
 
-// Determines whether the given character is a whitespace character (space,
-// tab, vertical tab, formfeed, linefeed, or carriage return).
+// Determines whether `c` is a whitespace character
+// (space, tab, vertical tab, formfeed, linefeed, or carriage return).
 inline bool ascii_isspace(unsigned char c) {
   return (internal::kPropertyBits[c] & 0x08) != 0;
 }
 
+// If `c` is an upper case ASCII character, returns its lower case equivalent.
+// Otherwise, returns `c` unchanged.
 inline char ascii_tolower(unsigned char c) {
   return internal::kToLower[c];
 }
 
-// Converts s to lowercase.
+// Converts `s` to lowercase.
 void AsciiStrToLower(std::string& s);
 
 // Creates a lowercase string from a given string_view.
@@ -59,7 +72,7 @@ inline char ascii_toupper(unsigned char c) {
   return internal::kToUpper[c];
 }
 
-// Converts s to uppercase.
+// Converts `s` to uppercase.
 void AsciiStrToUpper(std::string& s);
 
 // Creates a uppercase string from a given string_view.
@@ -67,8 +80,7 @@ std::string AsciiStrToUpper(std::string_view s);
 
 // Returns whether a given string `text` begins with `prefix`.
 //
-// NOTE: Replace with std::{string,string_view}::starts_with() once C++20 is the
-// default.
+// TODO(jophba): Replace with std::{string,string_view}::starts_with().
 inline bool starts_with(std::string_view text, std::string_view prefix) {
   return prefix.empty() ||
          (text.size() >= prefix.size() &&
@@ -77,8 +89,7 @@ inline bool starts_with(std::string_view text, std::string_view prefix) {
 
 // Returns whether a given string `text` ends with `suffix`.
 //
-// NOTE: Replace with std::{string,string_view}::ends_with() once C++20 is the
-// default.
+// TODO(jophba): Replace with std::{string,string_view}::ends_with().
 inline bool ends_with(std::string_view text, std::string_view suffix) {
   return suffix.empty() || (text.size() >= suffix.size() &&
                             memcmp(text.data() + (text.size() - suffix.size()),
