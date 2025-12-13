@@ -32,6 +32,9 @@ inline constexpr char kReceiverNamespace[] =
 inline constexpr char kBroadcastNamespace[] =
     "urn:x-cast:com.google.cast.broadcast";
 inline constexpr char kMediaNamespace[] = "urn:x-cast:com.google.cast.media";
+static constexpr char kSetupNamespace[] = "urn:x-cast:com.google.cast.setup";
+static constexpr char kDiscoveryNamespace[] =
+    "urn:x-cast:com.google.cast.receiver.discovery";
 
 // Sender and receiver IDs to use for platform messages.
 inline constexpr char kPlatformSenderId[] = "sender-0";
@@ -42,6 +45,14 @@ inline constexpr char kBroadcastId[] = "*";
 inline constexpr proto::CastMessage_ProtocolVersion
     kDefaultOutgoingMessageVersion =
         proto::CastMessage_ProtocolVersion_CASTV2_1_0;
+
+// Default device capabilities reported in DeviceInfo messages.
+// This value is a bitmask representing:
+// CAP_VIDEO_OUT (0x1) | CAP_AUDIO_OUT (0x4) | CAP_MASTER_OR_FIXED_VOLUME
+// (0x800) | CAP_ATTENUATION_OR_FIXED_VOLUME (0x1000)
+// See
+// https://developers.google.com/android/reference/com/google/android/gms/cast/CastDevice#constants
+constexpr int kDefaultDeviceCapabilities = 6149;
 
 // JSON message key strings.
 inline constexpr char kMessageKeyType[] = "type";
@@ -90,6 +101,7 @@ inline constexpr char kMessageKeyStepInterval[] = "stepInterval";
 inline constexpr char kMessageKeyUniversalAppId[] = "universalAppId";
 inline constexpr char kMessageKeyUserEq[] = "userEq";
 inline constexpr char kMessageKeyVolume[] = "volume";
+inline constexpr char kMessageKeyLaunchRequestId[] = "launchRequestId";
 
 // JSON message field value strings specific to application control messages.
 inline constexpr char kMessageValueAttenuation[] = "attenuation";
@@ -98,6 +110,29 @@ inline constexpr char kMessageValueInvalidSessionId[] = "INVALID_SESSION_ID";
 inline constexpr char kMessageValueInvalidCommand[] = "INVALID_COMMAND";
 inline constexpr char kMessageValueNotFound[] = "NOT_FOUND";
 inline constexpr char kMessageValueSystemError[] = "SYSTEM_ERROR";
+inline constexpr char kMessageValueUserAllowed[] = "USER_ALLOWED";
+
+// JSON message key strings specific to DEVICE_INFO messages.
+inline constexpr char kMessageKeyControlNotifications[] =
+    "controlNotifications";
+inline constexpr char kMessageKeyDeviceCapabilities[] = "deviceCapabilities";
+inline constexpr char kMessageKeyDeviceId[] = "deviceId";
+inline constexpr char kMessageKeyDeviceModel[] = "deviceModel";
+inline constexpr char kMessageKeyFriendlyName[] = "friendlyName";
+
+// JSON message key strings specific to eureka_info messages.
+inline constexpr char kMessageKeyEurekaInfoRequestId[] = "request_id";
+inline constexpr char kMessageKeyData[] = "data";
+inline constexpr char kMessageKeyDeviceInfo[] = "device_info";
+inline constexpr char kMessageKeyManufacturer[] = "manufacturer";
+inline constexpr char kMessageKeyProductName[] = "product_name";
+inline constexpr char kMessageKeySsdpUdn[] = "ssdp_udn";
+inline constexpr char kMessageKeyBuildInfo[] = "build_info";
+inline constexpr char kMessageKeyBuildType[] = "build_type";
+inline constexpr char kMessageKeyCastBuildRevision[] = "cast_build_revision";
+inline constexpr char kMessageKeySystemBuildNumber[] = "system_build_number";
+inline constexpr char kMessageKeyResponseCode[] = "response_code";
+inline constexpr char kMessageKeyResponseString[] = "response_string";
 
 enum class CastMessageType {
   // Heartbeat messages.
@@ -122,6 +157,7 @@ enum class CastMessageType {
 
   // Session launch request.
   kLaunch,
+  kLaunchStatus,
 
   // Session stop request.
   kStop,
@@ -145,6 +181,9 @@ enum class CastMessageType {
   kInvalidRequest,
   kPresentation,
   kGetCapabilities,
+
+  kDeviceInfo,
+  kEurekaInfo,
 
   kOther,  // Add new types above `kOther`.
   kMaxValue = kOther,

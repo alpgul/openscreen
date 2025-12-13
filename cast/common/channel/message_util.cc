@@ -169,7 +169,7 @@ std::string ToString(const CastMessage& message) {
   return ss.str();
 }
 
-constexpr EnumNameTable<CastMessageType, 25> kCastMessageTypeNames{
+constexpr EnumNameTable<CastMessageType, 28> kCastMessageTypeNames{
     {{"PING", CastMessageType::kPing},
      {"PONG", CastMessageType::kPong},
      {"RPC", CastMessageType::kRpc},
@@ -179,6 +179,7 @@ constexpr EnumNameTable<CastMessageType, 25> kCastMessageTypeNames{
      {"CLOSE", CastMessageType::kCloseConnection},
      {"APPLICATION_BROADCAST", CastMessageType::kBroadcast},
      {"LAUNCH", CastMessageType::kLaunch},
+     {"LAUNCH_STATUS", CastMessageType::kLaunchStatus},
      {"STOP", CastMessageType::kStop},
      {"RECEIVER_STATUS", CastMessageType::kReceiverStatus},
      {"MEDIA_STATUS", CastMessageType::kMediaStatus},
@@ -194,6 +195,8 @@ constexpr EnumNameTable<CastMessageType, 25> kCastMessageTypeNames{
      {"INVALID_REQUEST", CastMessageType::kInvalidRequest},
      {"PRESENTATION", CastMessageType::kPresentation},
      {"GET_CAPABILITIES", CastMessageType::kGetCapabilities},
+     {"GET_DEVICE_INFO", CastMessageType::kDeviceInfo},
+     {"eureka_info", CastMessageType::kEurekaInfo},
      {"OTHER", CastMessageType::kOther}}};
 
 const char* CastMessageTypeToString(CastMessageType type) {

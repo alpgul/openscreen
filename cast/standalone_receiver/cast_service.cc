@@ -44,7 +44,7 @@ discovery::Config MakeDiscoveryConfig(const InterfaceInfo& interface) {
 CastService::CastService(CastService::Configuration config)
     : local_endpoint_(DetermineEndpoint(config.interface)),
       credentials_(std::move(config.credentials)),
-      agent_(config.task_runner, *credentials_.provider),
+      agent_(config.task_runner, *credentials_.provider, config.device_uuid),
       mirroring_application_(config.task_runner,
                              local_endpoint_.address,
                              agent_),

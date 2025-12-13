@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <iostream>
 #include <memory>
+#include <random>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -24,6 +26,7 @@
 #include "util/string_util.h"
 #include "util/stringprintf.h"
 #include "util/trace_logging.h"
+#include "util/uuid.h"
 
 namespace openscreen::cast {
 namespace {
@@ -209,9 +212,11 @@ int RunStandaloneReceiver(int argc, char* argv[]) {
   auto* const task_runner = new TaskRunnerImpl(&Clock::now);
   PlatformClientPosix::Create(milliseconds(50),
                               std::unique_ptr<TaskRunnerImpl>(task_runner));
+
   RunCastService(task_runner,
                  CastService::Configuration{
                      *task_runner, interface, std::move(creds.value()),
+                     Uuid::GenerateRandomV4().AsLowercaseString(),
                      friendly_name, model_name, enable_discovery});
   PlatformClientPosix::ShutDown();
 
