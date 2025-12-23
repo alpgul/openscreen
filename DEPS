@@ -172,10 +172,12 @@ deps = {
     'condition': 'not build_with_chromium',
   },
 
-  # To roll forward, use quiche_revision from chromium/src/DEPS.
+  # To roll forward, typically it is best to match Chrome's version by using
+  # quiche_revision from chromium/src/DEPS. Coordination with the QUICHE
+  # maintainers may be needed for some breaking changes.
   'third_party/quiche/src': {
     'url': Var('quiche_git') + '/quiche.git' +
-      '@' + '2b80e306994b02b4bdb067166960d3550fcb9430',  # 2025-11-11
+      '@' + 'd54ca111b1085b9fea302560b41e371df349061c',  # 2025-12-19
     'condition': 'not build_with_chromium',
   },
 
@@ -402,8 +404,6 @@ deps = {
 
   # Googleurl recommends living at head. This is a copy of Chrome's URL parsing
   # library. It is meant to be used by QUICHE.
-  #
-  # NOTE: Pin to the current revision as newer versions use C++20 features.
   'third_party/googleurl/src': {
     'url': Var('quiche_git') + '/googleurl.git' +
       '@' + '94ff147fe0b96b4cca5d6d316b9af6210c0b8051',  #2025-11-11
