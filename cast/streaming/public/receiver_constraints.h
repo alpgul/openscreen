@@ -114,7 +114,7 @@ struct RemotingConstraints {
   // ALAC (Apple Lossless)
   // AC-3 (Dolby Digital)
   // These properties are tied directly to what Chrome supports. See:
-  // https://source.chromium.org/chromium/chromium/src/+/master:media/base/audio_codecs.h
+  // https://source.chromium.org/chromium/chromium/src/+/main:media/base/audio_codecs.h
   bool supports_chrome_audio_codecs = false;
 
   // Current remoting senders assume that the receiver supports 4K for all

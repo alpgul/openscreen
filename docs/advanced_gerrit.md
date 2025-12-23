@@ -46,11 +46,11 @@ land, you can do so in Gerrit using dependent changes.  There doesn't appear to
 be any official documentation for this, but the rule seems to be: if the parent
 of the commit you are pushing has a Change-Id line, that change will also be the
 current change's parent.  This is useful so you can look at only the relative
-diff between changes instead of looking at all of them relative to master.
+diff between changes instead of looking at all of them relative to main.
 
 To put this into an example, let's say you have a commit for feature A with
 Change-Id: aaa and this is in the process of being reviewed on Gerrit.  Now
-let's say you want to start more work based on it before it lands on master.
+let's say you want to start more work based on it before it lands on main.
 
 ``` bash
   git checkout featureA
@@ -64,7 +64,7 @@ let's say you want to start more work based on it before it lands on master.
 The git history then looks something like this:
 
 ```
-  ... ----  master
+  ... ----  main
           \
            A
             \
@@ -92,7 +92,7 @@ Date:   Thu Mar 22 13:18:09 2018 -0700
 Now you can push B to create a new change for it in Gerrit:
 
 ``` bash
-git push origin HEAD:refs/for/master
+git push origin HEAD:refs/for/main
 ```
 
 In Gerrit, there would then be a "relation chain" shown where the feature A
@@ -107,14 +107,14 @@ B changes, the review for B will only show the diff from A.
             A-B-C-F-G-H --- feature A
            /    ^M  ^O
           /
-  ... ----  master
+  ... ----  main
         /|
        M O
        |
        N
 ```
 
-Consider a local repo with a master branch and two feature branches.  Commits M,
+Consider a local repo with a main branch and two feature branches.  Commits M,
 N, and O are squash commits that were pushed to Gerrit.  The arrow/caret (`^`)
 indicates whence those were created.  M, N, and O should all have Change-Id
 lines in them (this can be done with the [commit-msg
@@ -128,20 +128,20 @@ Starting without M, N, or O, the commands to create them are as follows:
 ``` bash
 git checkout C
 git checkout -b M
-git rebase -i origin/master # squash commits
+git rebase -i origin/main # squash commits
 # Note: make sure a Change-Id line exists on M at this point since N will need
 # it.  You can git commit --amend with the commit-msg hook active or add it via
 # git commit --amend after pushing.  Don't git commit --amend after creating N
 # though.
-git push origin HEAD:refs/for/master
+git push origin HEAD:refs/for/main
 git checkout E
 git checkout -b N
 git rebase -i C --onto M # squash commits
-git push origin HEAD:refs/for/master
+git push origin HEAD:refs/for/main
 git checkout G
 git checkout -b O
-git rebase -i origin/master # squash commits and copy the Change-Id line from M
-git push origin HEAD:refs/for/master
+git rebase -i origin/main # squash commits and copy the Change-Id line from M
+git push origin HEAD:refs/for/main
 ```
 
 ```
@@ -150,7 +150,7 @@ git push origin HEAD:refs/for/master
             A-B-C-F-G-H --- feature A
            /          ^P
           /
-  ... ----  master
+  ... ----  main
          /|\
         M O P
         |   |
@@ -167,11 +167,11 @@ as follows:
 ``` bash
 git checkout H
 git checkout -b P
-git rebase -i origin/master # squash commits, same note as M about Change-Id
-git push origin HEAD:refs/for/master
+git rebase -i origin/main # squash commits, same note as M about Change-Id
+git push origin HEAD:refs/for/main
 git checkout featureB # E
 git rebase # assume featureA is set as featureB's upstream branch
 git checkout -b Q
 git rebase -i H --onto P
-git push origin HEAD:refs/for/master
+git push origin HEAD:refs/for/main
 ```

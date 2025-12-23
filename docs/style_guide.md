@@ -32,7 +32,7 @@ unions, complex constructors, etc.).
 - `<functional>` and `std::function` objects are allowed.
 - `<chrono>` is allowed and encouraged for representation of time.
 - Abseil types are allowed based on the allowed list in [DEPS](
-  https://chromium.googlesource.com/openscreen/+/refs/heads/master/DEPS).
+  https://chromium.googlesource.com/openscreen/+/refs/heads/main/DEPS).
 - However, Abseil types **must not be used in public APIs**.  Public APIs are
   headers in targets with GN visibility outside the library or in public/ folders.
 - `<thread>` and `<mutex>` are allowed, but discouraged from general use as the
@@ -171,7 +171,7 @@ Ref: [Test Behavior, Not Implementation](https://testing.googleblog.com/2013/08/
 ## Open Screen Library Features
 
 - For public API functions that return values or errors, please return
-  [`ErrorOr<T>`](https://chromium.googlesource.com/openscreen/+/master/platform/base/error.h).
+  [`ErrorOr<T>`](https://chromium.googlesource.com/openscreen/+/main/platform/base/error.h).
 - In the implementation of public APIs invoked by the embedder, use
   `OSP_DCHECK(TaskRunner::IsRunningOnTaskRunner())` to catch thread safety
   problems early.
@@ -179,10 +179,10 @@ Ref: [Test Behavior, Not Implementation](https://testing.googleblog.com/2013/08/
 ### Helpers for `std::chrono`
 
 One of the trickier parts of the Open Screen Library is using time and clock
-functionality provided by [`platform/api/time.h`](https://chromium.googlesource.com/openscreen/+/refs/heads/master/platform/api/time.h).
+functionality provided by [`platform/api/time.h`](https://chromium.googlesource.com/openscreen/+/refs/heads/main/platform/api/time.h).
 
 - When working extensively with `std::chrono` types in implementation code,
-  [`util/chrono_helpers.h`](https://chromium.googlesource.com/openscreen/+/refs/heads/master/util/chrono_helpers.h)
+  [`util/chrono_helpers.h`](https://chromium.googlesource.com/openscreen/+/refs/heads/main/util/chrono_helpers.h)
   can be included for access to type aliases for
   common `std::chrono` types, so they can just be referred to as `hours`,
   `milliseconds`, etc. This header also includes helpful conversion functions,
@@ -198,7 +198,7 @@ functionality provided by [`platform/api/time.h`](https://chromium.googlesource.
 
 ### OSP_CHECK and OSP_DCHECK
 
-These are provided in [`platform/api/logging.h`](https://chromium.googlesource.com/openscreen/+/refs/heads/master/platform/api/logging.h)
+These are provided in [`platform/api/logging.h`](https://chromium.googlesource.com/openscreen/+/refs/heads/main/platform/api/logging.h)
 and act as run-time assertions (i.e., they
 test an expression, and crash the program if it evaluates as false). They are
 not only useful in determining correctness, but also serve as inline

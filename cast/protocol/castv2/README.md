@@ -4,7 +4,7 @@
 
 CSCP is the standardized and modernized implement of the Castv2 Mirroring
 Control Protocol, a legacy API implemented both inside of
-[Chrome's Mirroring Service](https://source.chromium.org/chromium/chromium/src/+/master:components/mirroring/service/receiver_response.h;l=75?q=receiverresponse%20&ss=chromium%2Fchromium%2Fsrc)
+[Chrome's Mirroring Service](https://source.chromium.org/chromium/chromium/src/+/main:components/mirroring/service/receiver_response.h;l=75?q=receiverresponse%20&ss=chromium%2Fchromium%2Fsrc)
 and other Google products that communicate with
 Chrome, such as Chromecast. This API handles session control messaging, such as
 managing OFFER/ANSWER exchanges, getting status and capability information from

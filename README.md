@@ -245,7 +245,7 @@ You can also run `git cl try` from the commandline to submit a tryjob.
 ## Code reviews
 
 Send your patch to one or more committers in the
-[COMMITTERS](https://chromium.googlesource.com/openscreen/+/refs/heads/master/COMMITTERS)
+[COMMITTERS](https://chromium.googlesource.com/openscreen/+/refs/heads/main/COMMITTERS)
 file for code review.  All patches must receive at least one LGTM by a committer
 before it can be submitted.
 
