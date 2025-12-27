@@ -16,7 +16,6 @@ will continue to function as described below.
 Note that this DNS-SD implementation is fully generic and can be used for
 advertisement and discovery of any RFC 6763 compliant services.
 
-
 ## How To Use This Module
 
 In order to use the discovery module, embedders should only need to reference
@@ -62,7 +61,6 @@ For an example use case of this module, see the
 and
 [standalone receiver](https://chromium.googlesource.com/openscreen/+/refs/heads/main/cast/standalone_receiver/main.cc)
 code.
-
 
 ## Limitations
 

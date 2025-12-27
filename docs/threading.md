@@ -14,8 +14,3 @@ used to run tasks on the client's
 * The [POSIX platform implementation](https://chromium.googlesource.com/openscreen/+/refs/heads/main/platform/impl/)
   starts a network thread, and handles interactions between that thread and the
   TaskRunner internally.
-
-
-
-
-

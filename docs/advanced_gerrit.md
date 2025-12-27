@@ -28,8 +28,8 @@ following command:
 
 ### Uploading a new patch for review
 
-You should run `git cl presubmit --upload` in the root of the repository before pushing for
-review (which primarily checks formatting).
+You should run `git cl presubmit --upload` in the root of the repository before
+pushing for review (which primarily checks formatting).
 
 After verifying that presubmission works correctly, you can then execute:
 `git cl upload`, which will prompt you to verify the commit message and check
@@ -37,7 +37,9 @@ for owners.
 
 The first time you upload an issue, the issue number is associated with the
 current branch. If you upload again, it uploads on the same issue (which is tied
-to the branch, not the commit). See the [git-cl](https://chromium.googlesource.com/chromium/tools/depot_tools.git/+/HEAD/README.git-cl.md) documentation for more information.
+to the branch, not the commit). See the
+[git-cl](https://chromium.googlesource.com/chromium/tools/depot_tools.git/+/HEAD/README.git-cl.md)
+documentation for more information.
 
 ## Uploading a new dependent change
 
@@ -63,7 +65,7 @@ let's say you want to start more work based on it before it lands on main.
 
 The git history then looks something like this:
 
-```
+```ascii
   ... ----  main
           \
            A
@@ -73,7 +75,7 @@ The git history then looks something like this:
 
 and `git log` might show:
 
-```
+```bash
 commit 47525d663586ba09f40e29fb5da1d23e496e0798 (HEAD -> featureB)
 Author: btolsch <btolsch@chromium.org>
 Date:   Fri Mar 23 10:18:01 2018 -0700
@@ -101,7 +103,7 @@ B changes, the review for B will only show the diff from A.
 
 ## Examples for maintaining local git history
 
-```
+```ascii
                   D-E --- feature B
                  /  ^N
             A-B-C-F-G-H --- feature A
@@ -117,8 +119,8 @@ B changes, the review for B will only show the diff from A.
 Consider a local repo with a main branch and two feature branches.  Commits M,
 N, and O are squash commits that were pushed to Gerrit.  The arrow/caret (`^`)
 indicates whence those were created.  M, N, and O should all have Change-Id
-lines in them (this can be done with the [commit-msg
-hook](https://gerrit-documentation.storage.googleapis.com/Documentation/2.14.7/cmd-hook-commit-msg.html)).
+lines in them (this can be done with the
+[commit-msg hook](https://gerrit-documentation.storage.googleapis.com/Documentation/2.14.7/cmd-hook-commit-msg.html)).
 M and O are separate patchsets in one review (M containing A, B, C and O
 containing A, B, C, F, G) and N is the first patchset in a new review that is
 dependent on the first patchset of the first review.
@@ -144,7 +146,7 @@ git rebase -i origin/main # squash commits and copy the Change-Id line from M
 git push origin HEAD:refs/for/main
 ```
 
-```
+```ascii
                         D-E --- feature B
                        /  ^Q
             A-B-C-F-G-H --- feature A
