@@ -97,8 +97,7 @@ void GetInterfaceAttributes(struct rtattr* rta,
     } else if (rta->rta_type == IFLA_ADDRESS) {
       ByteView address_bytes(reinterpret_cast<uint8_t*>(RTA_DATA(rta)),
                              RTA_PAYLOAD(rta));
-      info->hardware_address.assign(address_bytes.cbegin(),
-                                    address_bytes.cend());
+      info->hardware_address.assign(address_bytes.begin(), address_bytes.end());
     }
   }
 

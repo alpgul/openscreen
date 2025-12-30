@@ -238,7 +238,6 @@ openscreen_source_set("unittests") {
     "base/error_unittest.cc",
     "base/ip_address_unittest.cc",
     "base/location_unittest.cc",
-    "base/span_unittest.cc",
     "base/udp_packet_unittest.cc",
   ]
 

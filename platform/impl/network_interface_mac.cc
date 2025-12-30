@@ -132,8 +132,8 @@ std::vector<InterfaceInfo> ProcessInterfacesList(ifaddrs* interfaces) {
       auto* const addr_dl = reinterpret_cast<const sockaddr_dl*>(cur->ifa_addr);
       ByteView address_bytes(reinterpret_cast<uint8_t*>(LLADDR(addr_dl)),
                              addr_dl->sdl_alen);
-      interface->hardware_address.assign(address_bytes.cbegin(),
-                                         address_bytes.cend());
+      interface->hardware_address.assign(address_bytes.begin(),
+                                         address_bytes.end());
     } else if (cur->ifa_addr->sa_family == AF_INET6) {  // Ipv6 address.
       struct in6_ifreq ifr = {};
       // Reject network interfaces that have a deprecated flag set.
