@@ -31,23 +31,24 @@ constexpr char kAudioSourceType[] = "audio_source";
 constexpr char kVideoSourceType[] = "video_source";
 constexpr char kStreamType[] = "type";
 
-bool CodecParameterIsValid(VideoCodec codec,
-                           const std::string& codec_parameter) {
-  if (codec_parameter.empty()) {
+[[nodiscard]] constexpr bool CodecParameterIsValid(VideoCodec codec,
+                                                   std::string_view parameter) {
+  if (parameter.empty()) {
     return true;
   }
   switch (codec) {
-    case VideoCodec::kVp8:
-      return string_util::starts_with(codec_parameter, "vp08");
-    case VideoCodec::kVp9:
-      return string_util::starts_with(codec_parameter, "vp09");
-    case VideoCodec::kAv1:
-      return string_util::starts_with(codec_parameter, "av01");
-    case VideoCodec::kHevc:
-      return string_util::starts_with(codec_parameter, "hev1");
-    case VideoCodec::kH264:
-      return string_util::starts_with(codec_parameter, "avc1");
-    case VideoCodec::kNotSpecified:
+    using enum VideoCodec;
+    case kVp8:
+      return parameter.starts_with("vp08");
+    case kVp9:
+      return parameter.starts_with("vp09");
+    case kAv1:
+      return parameter.starts_with("av01");
+    case kHevc:
+      return parameter.starts_with("hev1");
+    case kH264:
+      return parameter.starts_with("avc1");
+    case kNotSpecified:
       return false;
   }
   OSP_NOTREACHED();
@@ -60,7 +61,7 @@ bool CodecParameterIsValid(AudioCodec codec,
   }
   switch (codec) {
     case AudioCodec::kAac:
-      return string_util::starts_with(codec_parameter, "mp4a.");
+      return codec_parameter.starts_with("mp4a.");
 
     // Opus doesn't use codec parameters.
     case AudioCodec::kOpus:  // fallthrough
@@ -271,7 +272,7 @@ Error AudioStream::TryParse(const Json::Value& value, AudioStream* out) {
   out->codec = codec.value();
   if (!CodecParameterIsValid(codec.value(), out->stream.codec_parameter)) {
     return Error(Error::Code::kInvalidCodecParameter,
-                 StringPrintf("Invalid audio codec parameter (%s for codec %s)",
+                 StringFormat("Invalid audio codec parameter ({} for codec {})",
                               out->stream.codec_parameter.c_str(),
                               CodecToString(codec.value())));
   }
@@ -310,7 +311,7 @@ Error VideoStream::TryParse(const Json::Value& value, VideoStream* out) {
   out->codec = codec.value();
   if (!CodecParameterIsValid(codec.value(), out->stream.codec_parameter)) {
     return Error(Error::Code::kInvalidCodecParameter,
-                 StringPrintf("Invalid video codec parameter (%s for codec %s)",
+                 StringFormat("Invalid video codec parameter ({} for codec {})",
                               out->stream.codec_parameter.c_str(),
                               CodecToString(codec.value())));
   }

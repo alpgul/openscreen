@@ -334,7 +334,7 @@ Json::Value DisplayDescription::ToJson() const {
   Json::Value root;
   if (aspect_ratio.has_value()) {
     root[kAspectRatio] =
-        StringPrintf("%d%c%d", aspect_ratio->width, kAspectRatioDelimiter,
+        StringFormat("{}{}{}", aspect_ratio->width, kAspectRatioDelimiter,
                      aspect_ratio->height);
   }
   if (dimensions.has_value()) {

@@ -39,7 +39,6 @@
 #include "platform/base/span.h"
 #include "platform/base/trivial_clock_traits.h"
 #include "platform/base/udp_packet.h"
-#include "platform/test/byte_view_test_util.h"
 #include "platform/test/fake_clock.h"
 #include "platform/test/fake_task_runner.h"
 #include "util/chrono_helpers.h"
@@ -393,7 +392,8 @@ class ReceiverTest : public testing::Test {
                 EqualsDuration(received_frame.reference_time));
     EXPECT_THAT(sent_frame.new_playout_delay,
                 EqualsDuration(received_frame.new_playout_delay));
-    ExpectByteViewsHaveSameBytes(sent_frame.data, received_frame.data);
+    EXPECT_THAT(sent_frame.data,
+                testing::ElementsAreArray(received_frame.data));
   }
 
   // Consume zero or more frames from the Receiver, verifying that they are the

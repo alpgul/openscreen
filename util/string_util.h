@@ -78,27 +78,9 @@ void AsciiStrToUpper(std::string& s);
 // Creates a uppercase string from a given string_view.
 std::string AsciiStrToUpper(std::string_view s);
 
-// Returns whether a given string `text` begins with `prefix`.
-//
-// TODO(jophba): Replace with std::{string,string_view}::starts_with().
-inline bool starts_with(std::string_view text, std::string_view prefix) {
-  return prefix.empty() ||
-         (text.size() >= prefix.size() &&
-          memcmp(text.data(), prefix.data(), prefix.size()) == 0);
-}
-
-// Returns whether a given string `text` ends with `suffix`.
-//
-// TODO(jophba): Replace with std::{string,string_view}::ends_with().
-inline bool ends_with(std::string_view text, std::string_view suffix) {
-  return suffix.empty() || (text.size() >= suffix.size() &&
-                            memcmp(text.data() + (text.size() - suffix.size()),
-                                   suffix.data(), suffix.size()) == 0);
-}
-
-// Returns whether given ASCII strings `piece1` and `piece2` are equal, ignoring
+// Returns whether given ASCII strings `a` and `b` are equal, ignoring
 // case in the comparison.
-bool EqualsIgnoreCase(std::string_view piece1, std::string_view piece2);
+[[nodiscard]] bool EqualsIgnoreCase(std::string_view a, std::string_view b);
 
 // Returns std::string_view with whitespace stripped from the beginning of the
 // given string_view.
@@ -108,8 +90,21 @@ inline std::string_view StripLeadingAsciiWhitespace(std::string_view str) {
 }
 
 // Concatenates arguments into a single string.
-[[nodiscard]] std::string StrCat(
-    std::initializer_list<std::string_view> pieces);
+[[nodiscard]] constexpr std::string StrCat(
+    std::initializer_list<std::string_view> pieces) {
+  // Prefer a loop over std::accumulate since it is not constexpr in C++20.
+  size_t length = 0;
+  for (const auto& piece : pieces) {
+    length += piece.size();
+  }
+
+  std::string result;
+  result.reserve(length);
+  for (const auto& piece : pieces) {
+    result.append(piece);
+  }
+  return result;
+}
 
 // Splits `value` into tokens separated by `delim`.  Leading and trailing
 // delimeters are stripped, and multiple consecutive delimeters are treated as

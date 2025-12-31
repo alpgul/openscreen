@@ -32,8 +32,8 @@ namespace openscreen::cast {
 namespace {
 
 void LogUsage(const char* argv0) {
-  constexpr char kTemplate[] = R"(
-usage: %s <options> <interface>
+  static constexpr char kTemplate[] = R"(
+usage: {} <options> <interface>
 
     interface
         Specifies the network interface to bind to. The interface is
@@ -75,7 +75,7 @@ options:
 
 )";
 
-  std::cerr << StringPrintf(kTemplate, argv0);
+  std::cerr << StringFormat(kTemplate, argv0);
 }
 
 InterfaceInfo GetInterfaceInfoFromName(const char* name) {

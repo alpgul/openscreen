@@ -11,6 +11,7 @@
 #include <array>
 #include <cassert>
 #include <span>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -19,21 +20,19 @@
 namespace openscreen {
 
 // In Open Screen code, use these aliases for the most common types of Spans.
+// TODO(crbug.com/364687926): rename to byte_view.h and remove Span alias.
 using ByteView = std::span<const uint8_t>;
 using ByteBuffer = std::span<uint8_t>;
-
-// Contains a pointer and length to a span of contiguous data. Currently just
-// a using statement for std::span.
-// TODO(crbug.com/364687926): remove in favor of direct use of std::span.
-//
-// The API is a slimmed-down version of a C++20 std::span<T> and is intended to
-// be forwards-compatible with very slight modifications.  We don't intend to
-// add support for static extents.
-//
-// - Unit tests that want to compare the bytes behind two ByteViews can use
-//   ExpectByteViewsHaveSameBytes().
 template <typename T>
 using Span = std::span<T>;
+
+inline ByteView ByteViewFromString(std::string_view str) {
+  return ByteView(reinterpret_cast<const uint8_t*>(str.data()), str.size());
+}
+
+inline std::string ByteViewToString(ByteView bytes) {
+  return std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+}
 
 }  // namespace openscreen
 

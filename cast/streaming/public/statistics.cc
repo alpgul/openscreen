@@ -154,7 +154,7 @@ std::string SimpleHistogram::GetBucketName(size_t index) const {
   // are calculated.
   const int bucket_min = min + width * (index - 1);
   const int bucket_max = min + index * width - 1;
-  return StringPrintf("%d-%d", bucket_min, bucket_max);
+  return StringFormat("{}-{}", bucket_min, bucket_max);
 }
 
 Json::Value SenderStats::ToJson() const {

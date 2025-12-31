@@ -47,19 +47,6 @@ TEST(StringUtilTest, AsciiTest) {
   EXPECT_EQ(ascii_toupper('0'), '0');
 }
 
-TEST(StringUtilTest, StartsAndEndsWith) {
-  constexpr char kString[] = "United Federation of Planets";
-  EXPECT_TRUE(starts_with("", ""));
-  EXPECT_TRUE(starts_with(kString, ""));
-  EXPECT_TRUE(starts_with(kString, "United"));
-  EXPECT_FALSE(starts_with(kString, "Klingons"));
-
-  EXPECT_TRUE(ends_with("", ""));
-  EXPECT_TRUE(ends_with(kString, ""));
-  EXPECT_TRUE(ends_with(kString, "Planets"));
-  EXPECT_FALSE(ends_with(kString, "Borg"));
-}
-
 TEST(StringUtilTest, EqualsIgnoreCase) {
   constexpr char kString[] = "Vulcans!";
   EXPECT_TRUE(EqualsIgnoreCase("", ""));

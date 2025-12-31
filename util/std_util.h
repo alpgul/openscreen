@@ -23,18 +23,6 @@ constexpr size_t countof(T (&array)[N]) {
   return N;
 }
 
-// std::basic_string::data() has no mutable overload prior to C++17 [1].
-// Hence this overload is provided.
-// Note: str[0] is safe even for empty strings, as they are guaranteed to be
-// null-terminated [2].
-//
-// [1] http://en.cppreference.com/w/cpp/string/basic_string/data
-// [2] http://en.cppreference.com/w/cpp/string/basic_string/operator_at
-template <typename CharT, typename Traits, typename Allocator>
-CharT* data(std::basic_string<CharT, Traits, Allocator>& str) {
-  return std::addressof(str[0]);
-}
-
 // Stringify a vector of objects that have an operator<< overload.
 template <typename T>
 std::string Join(const std::vector<T>& vec, const char* delimiter = ", ") {

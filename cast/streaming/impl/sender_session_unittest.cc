@@ -251,18 +251,18 @@ class SenderSessionTest : public ::testing::Test {
     const int video_index = video_stream["index"].asInt();
     const int video_ssrc = video_stream["ssrc"].asUInt();
 
-    constexpr char kAnswerTemplate[] = R"({
+    static constexpr char kAnswerTemplate[] = R"({{
         "type": "ANSWER",
-        "seqNum": %d,
+        "seqNum": {},
         "result": "ok",
-        "answer": {
-          "castMode": "%s",
+        "answer": {{
+          "castMode": "{}",
           "udpPort": 1234,
-          "sendIndexes": [%d, %d],
-          "ssrcs": [%d, %d]
-        }
-        })";
-    return StringPrintf(kAnswerTemplate, offer["seqNum"].asInt(),
+          "sendIndexes": [{}, {}],
+          "ssrcs": [{}, {}]
+        }}
+  }})";
+    return StringFormat(kAnswerTemplate, offer["seqNum"].asInt(),
                         mode == CastMode::kMirroring ? "mirroring" : "remoting",
                         audio_index, video_index, audio_ssrc + 1,
                         video_ssrc + 1);

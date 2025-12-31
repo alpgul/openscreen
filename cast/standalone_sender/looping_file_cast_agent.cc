@@ -266,12 +266,12 @@ void LoopingFileCastAgent::OnReceiverMessagingOpened(bool success) {
   }
 
   static constexpr char kLaunchMessageTemplate[] =
-      R"({"type":"LAUNCH", "requestId":%d, "appId":"%s", "language": "en-US",
-       "supportedAppTypes":["WEB"]})";
+      R"({{"type":"LAUNCH", "requestId":{}, "appId":"{}", "language": "en-US",
+       "supportedAppTypes":["WEB"]}})";
   router_.Send(*platform_remote_connection_,
                MakeSimpleUTF8Message(
                    kReceiverNamespace,
-                   StringPrintf(kLaunchMessageTemplate, next_request_id_++,
+                   StringFormat(kLaunchMessageTemplate, next_request_id_++,
                                 GetStreamingAppId())));
 }
 
@@ -413,8 +413,8 @@ void LoopingFileCastAgent::Shutdown() {
   if (!app_session_id_.empty()) {
     OSP_LOG_INFO << "Stopping the Cast Receiver's Mirroring App...";
     static constexpr char kStopMessageTemplate[] =
-        R"({"type":"STOP", "requestId":%d, "sessionId":"%s"})";
-    std::string stop_json = StringPrintf(
+        R"({{"type":"STOP", "requestId":{}, "sessionId":"{}"}})";
+    std::string stop_json = StringFormat(
         kStopMessageTemplate, next_request_id_++, app_session_id_.c_str());
     router_.Send(
         VirtualConnection{kPlatformSenderId, kPlatformReceiverId,

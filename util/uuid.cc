@@ -82,12 +82,13 @@ Uuid Uuid::FormatRandomDataAsV4Impl(ByteView input) {
   second_u64 |= 0x80000000'00000000ULL;
 
   Uuid uuid;
-  uuid.lowercase_ = StringPrintf(
-      "%08x-%04x-%04x-%04x-%012llx", static_cast<uint32_t>(first_u64 >> 32),
-      static_cast<uint32_t>((first_u64 >> 16) & 0x0000ffff),
-      static_cast<uint32_t>(first_u64 & 0x0000ffff),
-      static_cast<uint32_t>(second_u64 >> 48),
-      second_u64 & 0x0000ffff'ffffffffULL);
+  uuid.lowercase_ =
+      StringFormat("{:08x}-{:04x}-{:04x}-{:04x}-{:012x}",
+                   static_cast<uint32_t>(first_u64 >> 32),
+                   static_cast<uint32_t>((first_u64 >> 16) & 0x0000'ffff),
+                   static_cast<uint32_t>(first_u64 & 0x0000'ffff),
+                   static_cast<uint32_t>(second_u64 >> 48),
+                   second_u64 & 0x0000'ffff'ffff'ffffULL);
   return uuid;
 }
 

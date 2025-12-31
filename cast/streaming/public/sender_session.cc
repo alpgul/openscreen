@@ -403,8 +403,8 @@ void SenderSession::OnCapabilitiesResponse(ErrorOr<ReceiverMessage> message) {
   }
 
   if (remoting_version > kSupportedRemotingVersion) {
-    std::string error_message = StringPrintf(
-        "Receiver is using too new of a version for remoting (%d > %d)",
+    std::string error_message = StringFormat(
+        "Receiver is using too new of a version for remoting ({} > {})",
         remoting_version, kSupportedRemotingVersion);
     config_.client.OnError(this, Error(Error::Code::kRemotingNotSupported,
                                        std::move(error_message)));

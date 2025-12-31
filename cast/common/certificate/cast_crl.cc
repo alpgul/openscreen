@@ -13,7 +13,6 @@
 #include "cast/common/public/trust_store.h"
 #include "util/crypto/sha2.h"
 #include "util/osp_logging.h"
-#include "util/span_util.h"
 
 namespace openscreen::cast {
 namespace {

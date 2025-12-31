@@ -33,12 +33,12 @@ namespace openscreen::cast {
 namespace {
 
 void LogUsage(const char* argv0) {
-  constexpr char kTemplate[] = R"(
-usage: %s <options> network_interface media_file
+  static constexpr char kTemplate[] = R"(
+usage: {} <options> network_interface media_file
 
 or
 
-usage: %s <options> addr[:port] media_file
+usage: {} <options> addr[:port] media_file
 
    The first form runs this application in discovery+interactive mode. It will
    scan for Cast Receivers on the LAN reachable from the given network
@@ -79,7 +79,7 @@ usage: %s <options> addr[:port] media_file
                    vp8, vp9, av1. Defaults to vp8 if not specified.
 )";
 
-  std::cerr << StringPrintf(kTemplate, argv0, argv0, kDefaultCastPort,
+  std::cerr << StringFormat(kTemplate, argv0, argv0, kDefaultCastPort,
                             kDefaultCastPort, kDefaultMaxBitrate);
 }
 
