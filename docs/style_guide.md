@@ -15,6 +15,8 @@ that are only used in one place for one thing.  Once there are multiple usages o
 a function that can be handled in a generic way, that function is a candidate
 for our base libraries in `util/` and `platform/base`.
 
+[TOC]
+
 ## Disallowed Styles and Features
 
 [Blink style](https://chromium.googlesource.com/chromium/src/+/main/styleguide/c++/blink-c++.md)

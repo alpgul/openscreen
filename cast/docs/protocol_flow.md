@@ -77,13 +77,25 @@ The following diagram illustrates the typical message flow.
 - Cast Receivers on the network respond with their IP address, port, and
   device information.
 
+A minimal mDNS record for a Cast device, named `Living Room`, is shown below.
+For more details on how this record is parsed, see
+`DnsSdInstanceEndpointToReceiverInfo()` in
+`cast/common/public/receiver_info.cc`.
+
+```bash
+_googlecast._tcp.local. 86400 IN PTR LivingRoom.local.
+LivingRoom.local. 86400 IN SRV 0 0 8009 LivingRoom.local.
+LivingRoom.local. 86400 IN A 192.168.1.100
+LivingRoom.local. 86400 IN TXT "id=<unique_id>" "ve=02" "ca=5" "fn=Living Room" "st=0" "md=Chromecast"
+```
+
 ### Connection Establishment
 
 - The Sender establishes a TCP connection to the Receiver's IP address and
   port.
 - A TLS handshake is performed to create a secure channel.
-- The CastV2 protocol handshake occurs over this secure channel, where devices
-  authenticate each other and exchange capabilities.
+- The CastV2 protocol handshake occurs over this secure channel, where the
+  sender authenticates that the receiver is an official Cast receiver device.
 
 ### Application Launch
 
