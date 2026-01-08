@@ -102,7 +102,7 @@ constexpr char kDisplay[] = "display";
 // std::optional array of numbers specifying the indexes of streams that will
 // send event logs through RTCP.
 constexpr char kReceiverRtcpEventLog[] = "receiverRtcpEventLog";
-// OPtional array of numbers specifying the indexes of streams that will use
+// Optional array of numbers specifying the indexes of streams that will use
 // DSCP values specified in the OFFER message for RTCP packets.
 constexpr char kReceiverRtcpDscp[] = "receiverRtcpDscp";
 // If this optional field is present the receiver supports the specific

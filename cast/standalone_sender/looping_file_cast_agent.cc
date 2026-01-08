@@ -289,7 +289,8 @@ void LoopingFileCastAgent::CreateAndStartSession() {
       &message_port_,
       remote_connection_->local_id,
       remote_connection_->peer_id,
-      connection_settings_->use_android_rtp_hack};
+      connection_settings_->use_android_rtp_hack,
+      connection_settings_->enable_dscp};
   current_session_ = std::make_unique<SenderSession>(std::move(config));
   current_session_->SetStatsClient(this);
   OSP_CHECK(!message_port_.source_id().empty());

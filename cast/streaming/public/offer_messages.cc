@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -215,7 +216,16 @@ Error Stream::TryParse(const Json::Value& value,
 
   json::TryParseBool(value["receiverRtcpEventLog"],
                      &out->receiver_rtcp_event_log);
-  json::TryParseString(value["receiverRtcpDscp"], &out->receiver_rtcp_dscp);
+  int dscp_value;
+  if (json::TryParseInt(value["receiverRtcpDscp"], &dscp_value)) {
+    // DSCP values are clamped to [0, 63].
+    if (dscp_value < 0 || dscp_value > 63) {
+      return Error(Error::Code::kJsonParseError,
+                   "receiverRtcpDscp (invalid DSCP value)");
+    }
+    out->receiver_rtcp_dscp = dscp_value;
+  }
+
   json::TryParseString(value["codecParameter"], &out->codec_parameter);
 
   return Error::None();
@@ -239,7 +249,9 @@ Json::Value Stream::ToJson() const {
   root["aesKey"] = HexEncode(aes_key.data(), aes_key.size());
   root["aesIvMask"] = HexEncode(aes_iv_mask.data(), aes_iv_mask.size());
   root["receiverRtcpEventLog"] = receiver_rtcp_event_log;
-  root["receiverRtcpDscp"] = receiver_rtcp_dscp;
+  if (receiver_rtcp_dscp.has_value()) {
+    root["receiverRtcpDscp"] = receiver_rtcp_dscp.value();
+  }
   root["timeBase"] = "1/" + std::to_string(rtp_timebase);
   root["codecParameter"] = codec_parameter;
   return root;
@@ -375,6 +387,9 @@ Error Offer::TryParse(const Json::Value& root, Offer* out) {
 
   std::vector<AudioStream> audio_streams;
   std::vector<VideoStream> video_streams;
+
+  using Dscp = std::optional<int>;
+  std::optional<Dscp> receiver_rtcp_dscp;
   for (Json::ArrayIndex i = 0; i < supported_streams.size(); ++i) {
     const Json::Value& fields = supported_streams[i];
     std::string type;
@@ -387,12 +402,24 @@ Error Offer::TryParse(const Json::Value& root, Offer* out) {
       AudioStream stream;
       error = AudioStream::TryParse(fields, &stream);
       if (error.ok()) {
+        if (!receiver_rtcp_dscp) {
+          receiver_rtcp_dscp.emplace(stream.stream.receiver_rtcp_dscp);
+        } else if (stream.stream.receiver_rtcp_dscp != *receiver_rtcp_dscp) {
+          return Error(Error::Code::kJsonParseError,
+                       "Mixed DSCP values in offer");
+        }
         audio_streams.push_back(std::move(stream));
       }
     } else if (type == kVideoSourceType) {
       VideoStream stream;
       error = VideoStream::TryParse(fields, &stream);
       if (error.ok()) {
+        if (!receiver_rtcp_dscp) {
+          receiver_rtcp_dscp.emplace(stream.stream.receiver_rtcp_dscp);
+        } else if (stream.stream.receiver_rtcp_dscp != *receiver_rtcp_dscp) {
+          return Error(Error::Code::kJsonParseError,
+                       "Mixed DSCP values in offer");
+        }
         video_streams.push_back(std::move(stream));
       }
     }
@@ -430,9 +457,9 @@ Json::Value Offer::ToJson() const {
 }
 
 bool Offer::IsValid() const {
-  return std::all_of(audio_streams.begin(), audio_streams.end(),
-                     [](const AudioStream& a) { return a.IsValid(); }) &&
-         std::all_of(video_streams.begin(), video_streams.end(),
-                     [](const VideoStream& v) { return v.IsValid(); });
+  return std::ranges::all_of(
+             audio_streams, [](const AudioStream& a) { return a.IsValid(); }) &&
+         std::ranges::all_of(video_streams,
+                             [](const VideoStream& v) { return v.IsValid(); });
 }
 }  // namespace openscreen::cast

@@ -47,7 +47,8 @@ CastService::CastService(CastService::Configuration config)
       agent_(config.task_runner, *credentials_.provider, config.device_uuid),
       mirroring_application_(config.task_runner,
                              local_endpoint_.address,
-                             agent_),
+                             agent_,
+                             config.enable_dscp),
       socket_factory_(agent_, *agent_.cast_socket_client()),
       connection_factory_(
           TlsConnectionFactory::CreateFactory(socket_factory_,

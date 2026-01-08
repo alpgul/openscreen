@@ -203,7 +203,8 @@ class SenderSessionTest : public ::testing::Test {
                                         message_port_.get(),
                                         "sender-12345",
                                         "receiver-12345",
-                                        /* use_android_rtp_hack */ true};
+                                        /* use_android_rtp_hack */ true,
+                                        /* use_dscp */ true};
     session_ = std::make_unique<SenderSession>(std::move(config));
   }
 
@@ -645,6 +646,88 @@ TEST_F(SenderSessionTest, SuccessfulGetCapabilitiesRequest) {
 
   // The "video" capability is ignored since it means nothing.
   EXPECT_THAT(capabilities.video, testing::ElementsAre(VideoCapability::kVp8));
+}
+
+TEST_F(SenderSessionTest, SendsOfferWithoutDscp) {
+  // Tear down the default session before attempting to do a custom one here.
+  session_.reset();
+  message_port_ = std::make_unique<SimpleMessagePort>("receiver-12345");
+  environment_ = MakeEnvironment();
+
+  SenderSession::Configuration config{
+      IPAddress::kV4LoopbackAddress(),
+      client_,
+      environment_.get(),
+      message_port_.get(),
+      "sender-12345",
+      "receiver-12345",
+      true,  // use_android_rtp_hack
+      false  // enable_dscp
+  };
+  session_ = std::make_unique<SenderSession>(std::move(config));
+
+  session_->Negotiate(
+      std::vector<AudioCaptureConfig>{kAudioCaptureConfigValid},
+      std::vector<VideoCaptureConfig>{kVideoCaptureConfigValid});
+
+  const auto& messages = message_port_->posted_messages();
+  ASSERT_EQ(1u, messages.size());
+
+  auto message_body = json::Parse(messages[0]);
+  ASSERT_TRUE(message_body.is_value());
+  const Json::Value offer = std::move(message_body.value());
+  const Json::Value& offer_body = offer["offer"];
+  const Json::Value& streams = offer_body["supportedStreams"];
+  EXPECT_TRUE(streams.isArray());
+  EXPECT_EQ(2u, streams.size());
+
+  const Json::Value& audio_stream = streams[0];
+  EXPECT_TRUE(audio_stream["receiverRtcpDscp"].isNull());
+
+  const Json::Value& video_stream = streams[1];
+  EXPECT_TRUE(video_stream["receiverRtcpDscp"].isNull());
+}
+
+TEST_F(SenderSessionTest, SendsOfferWithDscp) {
+  // Tear down the default session before attempting to do a custom one here.
+  session_.reset();
+  message_port_ = std::make_unique<SimpleMessagePort>("receiver-12345");
+  environment_ = MakeEnvironment();
+
+  SenderSession::Configuration config{
+      IPAddress::kV4LoopbackAddress(),
+      client_,
+      environment_.get(),
+      message_port_.get(),
+      "sender-12345",
+      "receiver-12345",
+      true,  // use_android_rtp_hack
+      true   // enable_dscp
+  };
+  session_ = std::make_unique<SenderSession>(std::move(config));
+
+  session_->Negotiate(
+      std::vector<AudioCaptureConfig>{kAudioCaptureConfigValid},
+      std::vector<VideoCaptureConfig>{kVideoCaptureConfigValid});
+
+  const auto& messages = message_port_->posted_messages();
+  ASSERT_EQ(1u, messages.size());
+
+  auto message_body = json::Parse(messages[0]);
+  ASSERT_TRUE(message_body.is_value());
+  const Json::Value offer = std::move(message_body.value());
+  const Json::Value& offer_body = offer["offer"];
+  const Json::Value& streams = offer_body["supportedStreams"];
+  EXPECT_TRUE(streams.isArray());
+  EXPECT_EQ(2u, streams.size());
+
+  const Json::Value& audio_stream = streams[0];
+  EXPECT_EQ(static_cast<int>(UdpSocket::DscpMode::kAF41),
+            audio_stream["receiverRtcpDscp"].asInt());
+
+  const Json::Value& video_stream = streams[1];
+  EXPECT_EQ(static_cast<int>(UdpSocket::DscpMode::kAF41),
+            video_stream["receiverRtcpDscp"].asInt());
 }
 
 }  // namespace openscreen::cast

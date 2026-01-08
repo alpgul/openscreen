@@ -16,6 +16,7 @@
 #include "util/chrono_helpers.h"
 #include "util/osp_logging.h"
 #include "util/std_util.h"
+#include "util/string_util.h"
 #include "util/trace_logging.h"
 
 namespace openscreen::cast {
@@ -416,7 +417,7 @@ void Sender::OnReceiverCheckpoint(FrameId frame_id,
 void Sender::OnReceiverHasFrames(std::vector<FrameId> acks) {
   OSP_DCHECK(!acks.empty() && AreElementsSortedAndUnique(acks));
   TRACE_SCOPED1(TraceCategory::kSender, "OnReceiverHasFrames", "frame_ids",
-                Join(acks));
+                string_util::Join(acks));
 
   if (acks.back() > last_enqueued_frame_id_) {
     TRACE_SET_RESULT(Error::Code::kParameterOutOfRange);

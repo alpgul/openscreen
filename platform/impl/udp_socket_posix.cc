@@ -561,27 +561,36 @@ void UdpSocketPosix::SendMessage(ByteView data, const IPEndpoint& dest) {
   OSP_CHECK_EQ(static_cast<size_t>(num_bytes_sent), data.size());
 }
 
-void UdpSocketPosix::SetDscp(UdpSocket::DscpMode state) {
+void UdpSocketPosix::SetDscp(UdpSocket::DscpMode mode) {
   if (is_closed()) {
     OnError(Error::Code::kSocketClosedFailure);
     return;
   }
 
-  constexpr auto kSettingLevel = IPPROTO_IP;
-  uint8_t code_array[1] = {static_cast<uint8_t>(state)};
-  auto code = setsockopt(handle_.fd, kSettingLevel, IP_TOS, code_array,
-                         sizeof(uint8_t));
-
-  if (code == EBADF || code == ENOTSOCK || code == EFAULT) {
-    OSP_VLOG << "BAD SOCKET PROVIDED. CODE: " << code;
-    OnError(Error::Code::kSocketOptionSettingFailure);
-  } else if (code == EINVAL) {
-    OSP_VLOG << "INVALID DSCP INFO PROVIDED";
-    OnError(Error::Code::kSocketOptionSettingFailure);
-  } else if (code == ENOPROTOOPT) {
-    OSP_VLOG << "INVALID DSCP SETTING LEVEL PROVIDED: " << kSettingLevel;
-    OnError(Error::Code::kSocketOptionSettingFailure);
+  int level;
+  int option;
+  switch (local_endpoint_.address.version()) {
+    case UdpSocket::Version::kV4:
+      level = IPPROTO_IP;
+      option = IP_TOS;
+      break;
+    case UdpSocket::Version::kV6:
+      level = IPPROTO_IPV6;
+      option = IPV6_TCLASS;
+      break;
   }
+
+  // The DSCP value is a 6-bit field, while the IP_TOS and IPV6_TCLASS fields
+  // are 8-bit fields that expect the DSCP value in the six most significant
+  // digits.
+  const int value = static_cast<int>(mode) << 2;
+  if (setsockopt(handle_.fd, level, option, &value, sizeof(value)) == -1) {
+    OnError(Error::Code::kSocketOptionSettingFailure);
+    return;
+  }
+
+  OSP_DVLOG << __func__ << ": successfully set DSCP to "
+            << static_cast<int>(mode);
 }
 
 void UdpSocketPosix::OnError(Error::Code error_code) {

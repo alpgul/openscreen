@@ -42,7 +42,7 @@ class UdpSocketPosix : public UdpSocket {
   void JoinMulticastGroup(const IPAddress& address,
                           NetworkInterfaceIndex ifindex) override;
   void SendMessage(ByteView data, const IPEndpoint& dest) override;
-  void SetDscp(DscpMode state) override;
+  void SetDscp(DscpMode mode) override;
 
   const SocketHandle& GetHandle() const;
 

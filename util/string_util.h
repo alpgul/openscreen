@@ -8,6 +8,9 @@
 #include <algorithm>
 #include <cstring>
 #include <initializer_list>
+#include <numeric>
+#include <ranges>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -112,32 +115,26 @@ inline std::string_view StripLeadingAsciiWhitespace(std::string_view str) {
 [[nodiscard]] std::vector<std::string_view> Split(std::string_view value,
                                                   char delim);
 
+template <std::ranges::input_range R>
+[[nodiscard]] std::string Join(R&& range, std::string_view delimeter = ", ") {
+  if (std::ranges::empty(range)) {
+    return {};
+  }
+  std::stringstream ss;
+  ss << range.front();
+  for (auto element : range | std::views::drop(1)) {
+    ss << delimeter << element;
+  }
+  return ss.str();
+}
+
 // Returns a string made by concatenating the strings iterated by `[begin,
 // end)`, each separated by `delim`.
 template <typename Iterator>
 [[nodiscard]] std::string Join(Iterator begin,
                                Iterator end,
-                               std::string_view delim) {
-  // Compute size of the result.
-  size_t result_size = 0;
-  for (auto it = begin; it != end; it++) {
-    result_size += it->size() + delim.size();
-  }
-  std::string result;
-  if (!result_size) {
-    return result;
-  } else {
-    result_size -= delim.size();
-  }
-  result.reserve(result_size);
-
-  // Populate the result, which should never allocate.
-  for (auto it = begin; it != end; it++) {
-    result.append(*it);
-    if (it + 1 != end)
-      result.append(delim);
-  }
-  return result;
+                               std::string_view delimeter = ", ") {
+  return Join(std::ranges::subrange{begin, end}, delimeter);
 }
 
 }  // namespace openscreen::string_util

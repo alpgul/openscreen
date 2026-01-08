@@ -23,20 +23,6 @@ constexpr size_t countof(T (&array)[N]) {
   return N;
 }
 
-// Stringify a vector of objects that have an operator<< overload.
-template <typename T>
-std::string Join(const std::vector<T>& vec, const char* delimiter = ", ") {
-  std::stringstream ss;
-
-  auto it = vec.begin();
-  ss << *it;
-  for (++it; it != vec.end(); ++it) {
-    ss << delimiter << *it;
-  }
-
-  return ss.str();
-}
-
 // Removes ALL whitespace in place from the string, based on the present C
 // locale. This includes spaces, tabs, and returns. This is useful for string
 // comparisons where whitespace doesn't matter, or, in the case of JSON
