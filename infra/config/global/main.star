@@ -229,7 +229,6 @@ def get_properties(
             "enable_cloud_monitoring": True,
             "enable_cloud_profiler": True,
             "enable_cloud_trace": True,
-            "metrics_project": "chromium-reclient-metrics",
             "project": _siso.project.DEFAULT_UNTRUSTED,
         }
 
