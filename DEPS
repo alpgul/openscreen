@@ -166,6 +166,8 @@ deps = {
     'condition': 'not build_with_chromium',
   },
 
+  # Make sure to also update ./third_party/boringssl/README.chromium's
+  # `Revision:` field when updating this dependency.
   'third_party/boringssl/src': {
     'url' : Var('boringssl_git') + '/boringssl.git' +
       '@' + '26e8a8acb91a0cfbd2f95bf7245e2eb87d533a2f',
