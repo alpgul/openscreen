@@ -406,6 +406,9 @@ deps = {
 
   # Googleurl recommends living at head. This is a copy of Chrome's URL parsing
   # library. It is meant to be used by QUICHE.
+  #
+  # Make sure to also update ./third_party/googleurl/README.chromium's
+  # `Revision:` field when updating this dependency.
   'third_party/googleurl/src': {
     'url': Var('quiche_git') + '/googleurl.git' +
       '@' + '94ff147fe0b96b4cca5d6d316b9af6210c0b8051',  #2025-11-11
