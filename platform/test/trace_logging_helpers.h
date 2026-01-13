@@ -32,10 +32,16 @@ class MockLoggingPlatform : public TraceLoggingPlatform {
 
   ~MockLoggingPlatform() override { StopTracing(); }
 
-  MOCK_METHOD1(IsTraceLoggingEnabled, bool(TraceCategory category));
-  MOCK_METHOD2(LogTrace, void(TraceEvent event, Clock::time_point));
-  MOCK_METHOD1(LogAsyncStart, void(TraceEvent event));
-  MOCK_METHOD1(LogAsyncEnd, void(TraceEvent event));
+  MOCK_METHOD(bool,
+              IsTraceLoggingEnabled,
+              (TraceCategory category),
+              (override));
+  MOCK_METHOD(void,
+              LogTrace,
+              (TraceEvent event, Clock::time_point),
+              (override));
+  MOCK_METHOD(void, LogAsyncStart, (TraceEvent event), (override));
+  MOCK_METHOD(void, LogAsyncEnd, (TraceEvent event), (override));
 };
 
 // Methods to validate the results of platform-layer calls.

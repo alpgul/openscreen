@@ -163,7 +163,8 @@ class MockCompoundRtcpBuilder : public CompoundRtcpBuilder {
       : CompoundRtcpBuilder(session) {}
   MOCK_METHOD(void,
               IncludeReceiverLogsInNextPacket,
-              (std::vector<RtcpReceiverFrameLogMessage> logs));
+              (std::vector<RtcpReceiverFrameLogMessage> logs),
+              (override));
 };
 
 // Processes packets from the Receiver under test, as a real Sender might, and
@@ -269,14 +270,27 @@ class MockSender : public CompoundRtcpParser::Client {
   // CompoundRtcpParser::Client implementation: Tests set expectations on these
   // mocks to confirm that the receiver is providing the right data to the
   // sender in its RTCP packets.
-  MOCK_METHOD1(OnReceiverReferenceTimeAdvanced,
-               void(Clock::time_point reference_time));
-  MOCK_METHOD1(OnReceiverReport, void(const RtcpReportBlock& receiver_report));
-  MOCK_METHOD0(OnReceiverIndicatesPictureLoss, void());
-  MOCK_METHOD2(OnReceiverCheckpoint,
-               void(FrameId frame_id, milliseconds playout_delay));
-  MOCK_METHOD1(OnReceiverHasFrames, void(std::vector<FrameId> acks));
-  MOCK_METHOD1(OnReceiverIsMissingPackets, void(std::vector<PacketNack> nacks));
+  MOCK_METHOD(void,
+              OnReceiverReferenceTimeAdvanced,
+              (Clock::time_point reference_time),
+              (override));
+  MOCK_METHOD(void,
+              OnReceiverReport,
+              (const RtcpReportBlock& receiver_report),
+              (override));
+  MOCK_METHOD(void, OnReceiverIndicatesPictureLoss, (), (override));
+  MOCK_METHOD(void,
+              OnReceiverCheckpoint,
+              (FrameId frame_id, milliseconds playout_delay),
+              (override));
+  MOCK_METHOD(void,
+              OnReceiverHasFrames,
+              (std::vector<FrameId> acks),
+              (override));
+  MOCK_METHOD(void,
+              OnReceiverIsMissingPackets,
+              (std::vector<PacketNack> nacks),
+              (override));
 
  private:
   TaskRunner& task_runner_;
@@ -294,7 +308,7 @@ class MockSender : public CompoundRtcpParser::Client {
 
 class MockConsumer : public Receiver::Consumer {
  public:
-  MOCK_METHOD1(OnFramesReady, void(int next_frame_buffer_size));
+  MOCK_METHOD(void, OnFramesReady, (int next_frame_buffer_size), (override));
 };
 
 class ReceiverTest : public testing::Test {

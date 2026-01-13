@@ -55,7 +55,7 @@ class SenderSocketsClient : public SenderSocketFactory::Client,
   // SenderSocketFactory::Client overrides.
   void OnConnected(SenderSocketFactory* factory,
                    const IPEndpoint& endpoint,
-                   std::unique_ptr<CastSocket> socket) {
+                   std::unique_ptr<CastSocket> socket) override {
     OSP_CHECK(!socket_);
     OSP_LOG_INFO << kLogDecorator
                  << "Sender connected to endpoint: " << endpoint;

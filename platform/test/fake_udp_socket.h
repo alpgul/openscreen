@@ -20,10 +20,10 @@ class FakeUdpSocket : public UdpSocket {
  public:
   class MockClient : public UdpSocket::Client {
    public:
-    MOCK_METHOD1(OnBound, void(UdpSocket*));
-    MOCK_METHOD2(OnError, void(UdpSocket*, const Error&));
-    MOCK_METHOD2(OnSendError, void(UdpSocket*, const Error&));
-    MOCK_METHOD2(OnReadInternal, void(UdpSocket*, const ErrorOr<UdpPacket>&));
+    MOCK_METHOD(void, OnBound, (UdpSocket*), (override));
+    MOCK_METHOD(void, OnError, (UdpSocket*, const Error&), (override));
+    MOCK_METHOD(void, OnSendError, (UdpSocket*, const Error&), (override));
+    MOCK_METHOD(void, OnReadInternal, (UdpSocket*, const ErrorOr<UdpPacket>&));
 
     void OnRead(UdpSocket* socket, ErrorOr<UdpPacket> packet) override {
       OnReadInternal(socket, packet);

@@ -18,15 +18,20 @@ class MockUdpSocket : public UdpSocket {
   MockUdpSocket() = default;
   ~MockUdpSocket() override = default;
 
-  MOCK_CONST_METHOD0(IsIPv4, bool());
-  MOCK_CONST_METHOD0(IsIPv6, bool());
-  MOCK_CONST_METHOD0(GetLocalEndpoint, IPEndpoint());
-  MOCK_METHOD0(Bind, void());
-  MOCK_METHOD1(SetMulticastOutboundInterface, void(NetworkInterfaceIndex));
-  MOCK_METHOD2(JoinMulticastGroup,
-               void(const IPAddress&, NetworkInterfaceIndex));
-  MOCK_METHOD2(SendMessage, void(ByteView, const IPEndpoint&));
-  MOCK_METHOD1(SetDscp, void(UdpSocket::DscpMode));
+  MOCK_METHOD(bool, IsIPv4, (), (const, override));
+  MOCK_METHOD(bool, IsIPv6, (), (const, override));
+  MOCK_METHOD(IPEndpoint, GetLocalEndpoint, (), (const, override));
+  MOCK_METHOD(void, Bind, (), (override));
+  MOCK_METHOD(void,
+              SetMulticastOutboundInterface,
+              (NetworkInterfaceIndex),
+              (override));
+  MOCK_METHOD(void,
+              JoinMulticastGroup,
+              (const IPAddress&, NetworkInterfaceIndex),
+              (override));
+  MOCK_METHOD(void, SendMessage, (ByteView, const IPEndpoint&), (override));
+  MOCK_METHOD(void, SetDscp, (UdpSocket::DscpMode), (override));
 };
 
 }  // namespace openscreen
