@@ -211,6 +211,10 @@ openscreen_source_set("sender") {
     ":unittests",
     ":compound_rtcp_parser_fuzzer",
   ]
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs = [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 openscreen_source_set("testing") {
@@ -293,6 +297,10 @@ openscreen_source_set("unittests") {
     ":sender",
     ":receiver",
   ]
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs = [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 openscreen_fuzzer_test("compound_rtcp_parser_fuzzer") {
