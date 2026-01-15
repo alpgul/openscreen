@@ -218,8 +218,9 @@ def get_properties(
     if use_coverage:
         properties["use_coverage"] = True
     if cast_receiver:
-        properties["have_ffmpeg"] = True
-        properties["have_libsdl2"] = True
+        # TODO(crbug.com/337080120): enable receiver-side dependencies.
+        #properties["have_ffmpeg"] = True
+        #properties["have_libsdl2"] = True
         properties["have_libopus"] = True
         properties["have_libvpx"] = True
     if chromium:
