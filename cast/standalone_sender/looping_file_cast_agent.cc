@@ -353,7 +353,7 @@ void LoopingFileCastAgent::OnStatisticsUpdated(
   // Only log every 10 times, or roughly every 5 seconds.
   constexpr int kLoggingInterval = 10;
   if ((num_times_on_statistics_updated_called_++ % kLoggingInterval) == 0) {
-    OSP_VLOG << __func__ << ": updated_stats=" << updated_stats.ToString();
+    OSP_VLOG << __func__ << ": updated_stats=" << updated_stats;
   }
   last_reported_statistics_ = std::make_optional<SenderStats>(updated_stats);
 }
@@ -388,8 +388,7 @@ void LoopingFileCastAgent::Shutdown() {
     current_session_.reset();
 
     if (last_reported_statistics_) {
-      OSP_LOG_INFO << "Last reported statistics="
-                   << last_reported_statistics_->ToString();
+      OSP_LOG_INFO << "Last reported statistics=" << *last_reported_statistics_;
     }
   }
   OSP_CHECK(message_port_.source_id().empty());

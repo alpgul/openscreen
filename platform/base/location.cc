@@ -47,4 +47,8 @@ OSP_NOINLINE const void* GetProgramCounter() {
   return RETURN_ADDRESS();
 }
 
+std::ostream& operator<<(std::ostream& out, const Location& location) {
+  return out << location.ToString();
+}
+
 }  // namespace openscreen

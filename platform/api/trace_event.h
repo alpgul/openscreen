@@ -65,6 +65,8 @@ struct TraceEvent {
   std::vector<Argument> arguments;
 };
 
+std::ostream& operator<<(std::ostream& out, const TraceEvent& event);
+
 }  // namespace openscreen
 
 #endif  // PLATFORM_API_TRACE_EVENT_H_

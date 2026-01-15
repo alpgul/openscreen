@@ -31,20 +31,19 @@ void TextTraceLoggingPlatform::LogTrace(TraceEvent event,
                                         Clock::time_point end_time) {
   const auto total_runtime = (end_time - event.start_time);
   std::stringstream ss;
-  ss << "[TRACE" << " (" << std::dec << total_runtime << ")] "
-     << event.ToString();
+  ss << "[TRACE" << " (" << std::dec << total_runtime << ")] " << event;
   LogTraceMessage(ss.str());
 }
 
 void TextTraceLoggingPlatform::LogAsyncStart(TraceEvent event) {
   std::stringstream ss;
-  ss << "[ASYNC TRACE START]  " << event.ToString();
+  ss << "[ASYNC TRACE START]  " << event;
   LogTraceMessage(ss.str());
 }
 
 void TextTraceLoggingPlatform::LogAsyncEnd(TraceEvent event) {
   std::stringstream ss;
-  ss << "[ASYNC TRACE END] " << event.ToString();
+  ss << "[ASYNC TRACE END] " << event;
   LogTraceMessage(ss.str());
 }
 

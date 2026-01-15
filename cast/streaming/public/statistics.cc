@@ -170,6 +170,14 @@ std::string SenderStats::ToString() const {
   return json::Stringify(ToJson()).value();
 }
 
+std::ostream& operator<<(std::ostream& out, const SenderStats& stats) {
+  return out << stats.ToString();
+}
+
+std::ostream& operator<<(std::ostream& out, const SimpleHistogram& histogram) {
+  return out << histogram.ToString();
+}
+
 SenderStatsClient::~SenderStatsClient() {}
 
 }  // namespace openscreen::cast

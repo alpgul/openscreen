@@ -449,7 +449,7 @@ void SenderSession::OnCapabilitiesResponse(ErrorOr<ReceiverMessage> message) {
   // error response to indicate remoting is not supported.
   if (!message) {
     config_.client.OnError(this, Error(Error::Code::kRemotingNotSupported,
-                                       message.error().ToString()));
+                                       message.error().message()));
     return;
   }
   if (!message.value().valid ||
