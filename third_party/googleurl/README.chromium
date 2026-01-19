@@ -1,6 +1,7 @@
 Name: googleurl
 URL: https://quiche.googlesource.com/googleurl
 Revision: 94ff147fe0b96b4cca5d6d316b9af6210c0b8051
+Version: N/A
 License: BSD-3-Clause
 License File: src/LICENSE
 Security Critical: yes
