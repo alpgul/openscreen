@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <ostream>
+#include <span>
 #include <string>
 #include <type_traits>
 
@@ -101,6 +102,15 @@ class IPAddress {
             static_cast<uint8_t>(h7),
         }} {}
 
+  // IPv6 constructor with scope ID.
+  explicit constexpr IPAddress(std::span<const uint8_t, 16> bytes,
+                               uint32_t scope_id)
+      : version_(Version::kV6), scope_id_(scope_id) {
+    for (size_t i = 0; i < 16; ++i) {
+      bytes_[i] = bytes[i];
+    }
+  }
+
   constexpr IPAddress(const IPAddress& o) noexcept = default;
   constexpr IPAddress(IPAddress&& o) noexcept = default;
   ~IPAddress() = default;
@@ -124,6 +134,13 @@ class IPAddress {
   bool IsV4() const { return version_ == Version::kV4; }
   bool IsV6() const { return version_ == Version::kV6; }
 
+  // Returns true if the address is an IPv6 link-local address.
+  bool IsLinkLocal() const;
+
+  // Returns the scope ID for link-local IPv6 addresses. Returns 0 for
+  // non-link-local addresses.
+  uint32_t GetScopeId() const { return scope_id_; }
+
   // These methods assume `x` is the appropriate size, but due to various
   // callers' casting needs we can't check them like the constructors above.
   // Callers should instead make any necessary checks themselves.
@@ -139,8 +156,11 @@ class IPAddress {
   static ErrorOr<IPAddress> Parse(const std::string& s);
 
  private:
+  friend ErrorOr<IPAddress> ParseV6(const std::string& s);
+
   Version version_;
   std::array<uint8_t, 16> bytes_;
+  uint32_t scope_id_ = 0;
 };
 
 struct IPEndpoint {

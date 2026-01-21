@@ -4,11 +4,18 @@
 
 #include "platform/base/ip_address.h"
 
+#include "build/build_config.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "platform/base/error.h"
 
 namespace openscreen {
+
+#if BUILDFLAG(IS_MAC)
+constexpr char kLoopbackInterface[] = "lo0";
+#else
+constexpr char kLoopbackInterface[] = "lo";
+#endif
 
 using ::testing::ElementsAreArray;
 
@@ -426,6 +433,116 @@ TEST(IPAddressTest, OstreamOperatorForIPv4) {
   oss.str("");
   oss << IPAddress{23, 45, 67, 89};
   EXPECT_EQ("23.45.67.89", oss.str());
+}
+
+TEST(IPAddressTest, V6IsLinkLocal) {
+  ErrorOr<IPAddress> address = IPAddress::Parse("fe80::1");
+  ASSERT_TRUE(address);
+  EXPECT_TRUE(address.value().IsLinkLocal());
+
+  address = IPAddress::Parse("fe90::1");
+  ASSERT_TRUE(address);
+  EXPECT_TRUE(address.value().IsLinkLocal());
+
+  address = IPAddress::Parse("febf::ffff:ffff:ffff:ffff");
+  ASSERT_TRUE(address);
+  EXPECT_TRUE(address.value().IsLinkLocal());
+
+  address = IPAddress::Parse("fec0::1");
+  ASSERT_TRUE(address);
+  EXPECT_FALSE(address.value().IsLinkLocal());
+
+  address = IPAddress::Parse("::1");
+  ASSERT_TRUE(address);
+  EXPECT_FALSE(address.value().IsLinkLocal());
+}
+
+TEST(IPAddressTest, V6ParseLinkLocal) {
+  // NOTE: This test is using the loopback interface kLoopbackInterface which
+  // should exist on any Linux system.
+  ErrorOr<IPAddress> address =
+      IPAddress::Parse(std::string("fe80::1%") + kLoopbackInterface);
+  EXPECT_TRUE(address);
+  if (address) {
+    EXPECT_TRUE(address.value().IsLinkLocal());
+    EXPECT_NE(0u, address.value().GetScopeId());
+  }
+}
+
+TEST(IPAddressTest, V6ParseLinkLocalFailures) {
+  // Scope ID on non-link-local address.
+  EXPECT_FALSE(
+      IPAddress::Parse(std::string("::1%") + kLoopbackInterface).is_value());
+  // Invalid scope ID.
+  EXPECT_FALSE(IPAddress::Parse("fe80::1%invalidscope"));
+}
+
+TEST(IPAddressTest, V6ComparisonWithScopeId) {
+  ErrorOr<IPAddress> address1_or_error = IPAddress::Parse("fe80::1");
+  ASSERT_TRUE(address1_or_error);
+  IPAddress address1 = address1_or_error.value();
+
+  ErrorOr<IPAddress> address2_or_error = IPAddress::Parse("fe80::1");
+  ASSERT_TRUE(address2_or_error);
+  IPAddress address2 = address2_or_error.value();
+
+  ErrorOr<IPAddress> address3_or_error = IPAddress::Parse("fe80::2");
+  ASSERT_TRUE(address3_or_error);
+  IPAddress address3 = address3_or_error.value();
+
+  EXPECT_EQ(address1, address2);
+  EXPECT_NE(address1, address3);
+  EXPECT_LT(address1, address3);
+
+  // It is not possible to create an IPAddress with a scope ID in this test
+  // without creating a network interface.
+}
+
+TEST(IPAddressTest, OstreamOperatorForIPv6LinkLocal) {
+  std::ostringstream oss;
+  ErrorOr<IPAddress> address = IPAddress::Parse("fe80::1");
+  ASSERT_TRUE(address);
+
+  oss << address.value();
+  EXPECT_EQ("fe80:0000:0000:0000:0000:0000:0000:0001", oss.str());
+}
+
+TEST(IPAddressTest, OstreamOperatorForIPv6LinkLocalWithScope) {
+  std::ostringstream oss;
+  ErrorOr<IPAddress> address =
+      IPAddress::Parse(std::string("fe80::1%") + kLoopbackInterface);
+  ASSERT_TRUE(address);
+
+  oss << address.value();
+  EXPECT_EQ(std::string("fe80:0000:0000:0000:0000:0000:0000:0001%") +
+                kLoopbackInterface,
+            oss.str());
+}
+
+TEST(IPAddressTest, IPEndpointParseWithScope) {
+  // NOTE: This test is using the loopback interface kLoopbackInterface which
+  // should exist on any Linux system.
+  ErrorOr<IPEndpoint> result = IPEndpoint::Parse(std::string("[fe80::1%") +
+                                                 kLoopbackInterface + "]:8080");
+  ASSERT_TRUE(result.is_value()) << result.error();
+  EXPECT_TRUE(result.value().address.IsLinkLocal());
+  EXPECT_NE(0u, result.value().address.GetScopeId());
+  EXPECT_EQ(8080, result.value().port);
+
+  // Numeric scope ID.
+  result = IPEndpoint::Parse("[fe80::1%1]:8080");
+  ASSERT_TRUE(result.is_value()) << result.error();
+  EXPECT_TRUE(result.value().address.IsLinkLocal());
+  EXPECT_EQ(1u, result.value().address.GetScopeId());
+  EXPECT_EQ(8080, result.value().port);
+
+  // Scope ID on non-link-local address should fail.
+  EXPECT_FALSE(
+      IPEndpoint::Parse(std::string("[::1%") + kLoopbackInterface + "]:8080")
+          .is_value());
+
+  // Invalid scope ID should fail.
+  EXPECT_FALSE(IPEndpoint::Parse("[fe80::1%nosuchinterface]:8080").is_value());
 }
 
 }  // namespace openscreen

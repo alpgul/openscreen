@@ -16,6 +16,12 @@
 #include <sstream>
 #include <utility>
 
+#include "build/build_config.h"
+
+#if BUILDFLAG(IS_POSIX)
+#include <net/if.h>
+#endif
+
 namespace openscreen {
 
 IPAddress::IPAddress(Version version, const uint8_t* b) : version_(version) {
@@ -35,7 +41,7 @@ bool IPAddress::operator==(const IPAddress& o) const {
     return bytes_[0] == o.bytes_[0] && bytes_[1] == o.bytes_[1] &&
            bytes_[2] == o.bytes_[2] && bytes_[3] == o.bytes_[3];
   }
-  return bytes_ == o.bytes_;
+  return bytes_ == o.bytes_ && scope_id_ == o.scope_id_;
 }
 
 bool IPAddress::operator!=(const IPAddress& o) const {
@@ -61,6 +67,14 @@ void IPAddress::CopyToV4(uint8_t x[4]) const {
 void IPAddress::CopyToV6(uint8_t x[16]) const {
   assert(version_ == Version::kV6);
   std::memcpy(x, bytes_.data(), 16);
+}
+
+bool IPAddress::IsLinkLocal() const {
+  if (!IsV6()) {
+    return false;
+  }
+  // Link-local addresses start with fe80::/10
+  return (bytes_[0] == 0xfe) && ((bytes_[1] & 0xc0) == 0x80);
 }
 
 namespace {
@@ -118,13 +132,45 @@ std::string ExpandIPv6DoubleColon(const std::string& s) {
   return expanded.str();
 }
 
+}  // namespace
+
 ErrorOr<IPAddress> ParseV6(const std::string& s) {
-  const std::string scan_input = ExpandIPv6DoubleColon(s);
+  std::string address_part = s;
+  uint32_t scope_id = 0;
+
+  // Handle link-local addresses with scope ID, e.g., fe80::1%eth0
+  const size_t scope_pos = s.find('%');
+  if (scope_pos != std::string::npos) {
+    address_part = s.substr(0, scope_pos);
+    std::string scope_name = s.substr(scope_pos + 1);
+#if BUILDFLAG(IS_POSIX)
+    scope_id = if_nametoindex(scope_name.c_str());
+#endif
+    if (scope_id == 0) {
+      // If if_nametoindex failed or is not available, try parsing as a number.
+      unsigned int parsed_id = 0;
+      int chars_scanned = 0;
+      // Check for non-numeric characters or incomplete parse.
+      if (!scope_name.empty() &&
+          sscanf(scope_name.c_str(), "%u%n", &parsed_id, &chars_scanned) == 1 &&
+          chars_scanned == static_cast<int>(scope_name.size()) &&
+          parsed_id > 0) {
+        scope_id = parsed_id;
+      }
+    }
+
+    if (scope_id == 0) {
+      return Error::Code::kInvalidIPV6Address;
+    }
+  }
+
+  const std::string scan_input = ExpandIPv6DoubleColon(address_part);
   uint16_t hextets[8];
   int chars_scanned;
   // Note: sscanf()'s parsing for %x allows leading whitespace; so the invalid
   // presence of whitespace must be explicitly checked too.
-  if (std::any_of(s.begin(), s.end(), [](char c) { return std::isspace(c); }) ||
+  if (std::ranges::any_of(address_part,
+                          [](char c) { return std::isspace(c); }) ||
       sscanf(scan_input.c_str(),
              "%4" SCNx16 ":%4" SCNx16 ":%4" SCNx16 ":%4" SCNx16 ":%4" SCNx16
              ":%4" SCNx16 ":%4" SCNx16 ":%4" SCNx16 "%n",
@@ -133,10 +179,16 @@ ErrorOr<IPAddress> ParseV6(const std::string& s) {
       chars_scanned != static_cast<int>(scan_input.size())) {
     return Error::Code::kInvalidIPV6Address;
   }
-  return IPAddress(hextets);
-}
 
-}  // namespace
+  IPAddress address(hextets);
+  if (scope_id != 0) {
+    if (!address.IsLinkLocal()) {
+      return Error::Code::kInvalidIPV6Address;
+    }
+    address.scope_id_ = scope_id;
+  }
+  return address;
+}
 
 // static
 ErrorOr<IPAddress> IPAddress::Parse(const std::string& s) {
@@ -221,7 +273,11 @@ bool IPAddress::operator<(const IPAddress& other) const {
   if (IsV4()) {
     return memcmp(bytes_.data(), other.bytes_.data(), 4) < 0;
   } else {
-    return memcmp(bytes_.data(), other.bytes_.data(), 16) < 0;
+    const int cmp = memcmp(bytes_.data(), other.bytes_.data(), 16);
+    if (cmp != 0) {
+      return cmp < 0;
+    }
+    return scope_id_ < other.scope_id_;
   }
 }
 
@@ -259,6 +315,18 @@ std::ostream& operator<<(std::ostream& out, const IPAddress& address) {
       out << separator;
     }
     out << std::setw(value_width) << static_cast<int>(values[i]);
+  }
+  if (address.IsLinkLocal() && address.GetScopeId() != 0) {
+#if BUILDFLAG(IS_POSIX)
+    char ifname[IF_NAMESIZE];
+    if (if_indextoname(address.GetScopeId(), ifname)) {
+      out << '%' << ifname;
+    } else {
+      out << '%' << address.GetScopeId();
+    }
+#else
+    out << '%' << address.GetScopeId();
+#endif
   }
   return out;
 }

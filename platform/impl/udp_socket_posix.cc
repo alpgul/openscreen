@@ -156,8 +156,9 @@ IPEndpoint UdpSocketPosix::GetLocalEndpoint() const {
                         &address_len) == 0) {
           OSP_CHECK_EQ(address.sin6_family, AF_INET6);
           local_endpoint_.address =
-              IPAddress(IPAddress::Version::kV6,
-                        reinterpret_cast<uint8_t*>(&address.sin6_addr));
+              IPAddress(std::span<const uint8_t, 16>(
+                            reinterpret_cast<uint8_t*>(&address.sin6_addr), 16),
+                        address.sin6_scope_id);
           local_endpoint_.port = ntohs(address.sin6_port);
         }
         break;
@@ -213,6 +214,10 @@ void UdpSocketPosix::Bind() {
       address.sin6_port = htons(local_endpoint_.port);
       local_endpoint_.address.CopyToV6(
           reinterpret_cast<uint8_t*>(&address.sin6_addr));
+      if (local_endpoint_.address.IsLinkLocal() &&
+          local_endpoint_.address.GetScopeId() != 0) {
+        address.sin6_scope_id = local_endpoint_.address.GetScopeId();
+      }
       if (bind(handle_.fd, reinterpret_cast<struct sockaddr*>(&address),
                sizeof(address)) != -1) {
         is_bound = true;
@@ -359,11 +364,13 @@ uint16_t GetPortFromFromSockAddr(const sockaddr_in& sa) {
 }
 
 IPAddress GetIPAddressFromSockAddr(const sockaddr_in6& sa) {
-  return IPAddress(IPAddress::Version::kV6, sa.sin6_addr.s6_addr);
+  return IPAddress(std::span<const uint8_t, 16>(sa.sin6_addr.s6_addr, 16),
+                   sa.sin6_scope_id);
 }
 
 IPAddress GetIPAddressFromPktInfo(const in6_pktinfo& pktinfo) {
-  return IPAddress(IPAddress::Version::kV6, pktinfo.ipi6_addr.s6_addr);
+  return IPAddress(std::span<const uint8_t, 16>(pktinfo.ipi6_addr.s6_addr, 16),
+                   pktinfo.ipi6_ifindex);
 }
 
 uint16_t GetPortFromFromSockAddr(const sockaddr_in6& sa) {
@@ -525,7 +532,7 @@ void UdpSocketPosix::SendMessage(ByteView data, const IPEndpoint& dest) {
   msg.msg_flags = 0;
 
   ssize_t num_bytes_sent = -2;
-  switch (local_endpoint_.address.version()) {
+  switch (dest.address.version()) {
     case UdpSocket::Version::kV4: {
       struct sockaddr_in sa {};
       sa.sin_family = AF_INET;
@@ -542,6 +549,9 @@ void UdpSocketPosix::SendMessage(ByteView data, const IPEndpoint& dest) {
       sa.sin6_family = AF_INET6;
       sa.sin6_port = htons(dest.port);
       dest.address.CopyToV6(reinterpret_cast<uint8_t*>(&sa.sin6_addr.s6_addr));
+      if (dest.address.IsLinkLocal() && dest.address.GetScopeId() != 0) {
+        sa.sin6_scope_id = dest.address.GetScopeId();
+      }
       msg.msg_name = &sa;
       msg.msg_namelen = sizeof(sa);
       num_bytes_sent = sendmsg(handle_.fd, &msg, 0);
