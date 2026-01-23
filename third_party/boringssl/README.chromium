@@ -6,6 +6,7 @@ License: SSLeay, ISC, MIT, BSD-3-Clause, OpenSSL
 License File: src/LICENSE
 License Android Compatible: yes
 Security Critical: yes
+Update Mechanism: Manual
 Shipped: yes
 
 Description:
