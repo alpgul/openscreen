@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 // clang-format: off
+#include <net/if.h>
 #include <sys/socket.h>
 // clang-format: on
 
@@ -74,7 +75,7 @@ InterfaceInfo::Type GetInterfaceType(const std::string& ifname) {
   OSP_CHECK_LT(ifname.size(), IFNAMSIZ);
   wr.ifr_name[IFNAMSIZ - 1] = 0;
   strncpy(ifr.ifr_name, ifname.c_str(), IFNAMSIZ - 1);
-  ifr.ifr_data = &ecmd;
+  ifr.ifr_data = reinterpret_cast<char*>(&ecmd);
   if (ioctl(s.get(), SIOCETHTOOL, &ifr) != -1) {
     return InterfaceInfo::Type::kEthernet;
   }
