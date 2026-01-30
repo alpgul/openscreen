@@ -198,6 +198,55 @@ above) if logging is enabled for the associated category. The id is expected
 to match that used by an `TRACE_ASYNC_START` call, and result is the same as
 `TRACE_SET_RESULT`'s argument.
 
+### Flow Tracing
+
+Flow events are used to connect trace events across different threads, processes,
+or even machines. They share a `flow_id` which links them together visually in
+trace viewers (like Perfetto).
+
+#### Flow Macros: `TRACE_FLOW_BEGIN`, `TRACE_FLOW_STEP`, `TRACE_FLOW_END`
+
+```c++
+TRACE_FLOW_BEGIN(category, name, flow_id)
+TRACE_FLOW_STEP(category, name, flow_id)
+TRACE_FLOW_END(category, name, flow_id)
+```
+
+* `TRACE_FLOW_BEGIN`: Marks the start of a flow.
+* `TRACE_FLOW_STEP`: Marks an intermediate step in the flow.
+* `TRACE_FLOW_END`: Marks the end of the flow.
+
+The `flow_id` can be an integer, a `FrameId`, or any type that is convertible to
+`uint64_t` or has a `.value()` method returning a numeric type that is castable
+to `uint64_t`.
+
+#### Flow Tracing with Explicit Timestamps
+
+If you need to log a flow event that occurred in the past (e.g., retroactively
+tracing a capture event), use the `_WITH_TIME` variants.
+
+```c++
+TRACE_FLOW_BEGIN_WITH_TIME(category, name, flow_id, timestamp)
+TRACE_FLOW_STEP_WITH_TIME(category, name, flow_id, timestamp)
+TRACE_FLOW_END_WITH_TIME(category, name, flow_id, timestamp)
+```
+
+* `timestamp`: A `Clock::time_point` representing when the event occurred.
+
+#### Default Flow Macros
+
+```c++
+TRACE_FLOW_DEFAULT_BEGIN(category, flow_id)
+TRACE_FLOW_DEFAULT_STEP(category, flow_id)
+TRACE_FLOW_DEFAULT_END(category, flow_id)
+```
+
+These macros behave identically to the ones above but automatically use the
+current function name (`__PRETTY_FUNCTION__`) as the flow event name.
+
+For an example usage of flows for on tracking video/audio frame lifecycles, see
+[Frame Flow Tracing](../cast/docs/frame_flow_tracing.md).
+
 ### Other Tracing Macros
 
 #### `TRACE_CURRENT_ID`

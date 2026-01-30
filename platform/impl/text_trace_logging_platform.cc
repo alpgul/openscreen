@@ -47,4 +47,26 @@ void TextTraceLoggingPlatform::LogAsyncEnd(TraceEvent event) {
   LogTraceMessage(ss.str());
 }
 
+void TextTraceLoggingPlatform::LogFlow(TraceEvent event, FlowType type) {
+  std::stringstream ss;
+  ss << "[FLOW";
+  if (!event.flow_ids.empty()) {
+    ss << " #" << std::hex << event.flow_ids[0] << std::dec;
+  }
+
+  switch (type) {
+    case FlowType::kFlowBegin:
+      ss << " BEGIN";
+      break;
+    case FlowType::kFlowStep:
+      ss << " STEP";
+      break;
+    case FlowType::kFlowEnd:
+      ss << " END";
+      break;
+  }
+  ss << "] " << event.ToString();
+  LogTraceMessage(ss.str());
+}
+
 }  // namespace openscreen

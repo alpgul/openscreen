@@ -42,6 +42,7 @@ class MockLoggingPlatform : public TraceLoggingPlatform {
               (override));
   MOCK_METHOD(void, LogAsyncStart, (TraceEvent event), (override));
   MOCK_METHOD(void, LogAsyncEnd, (TraceEvent event), (override));
+  MOCK_METHOD(void, LogFlow, (TraceEvent event, FlowType type), (override));
 };
 
 // Methods to validate the results of platform-layer calls.

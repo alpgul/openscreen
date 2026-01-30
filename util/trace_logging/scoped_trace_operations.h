@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <stack>
 #include <utility>
 #include <vector>
@@ -72,6 +73,16 @@ class ScopedTraceOperation {
                             const char* file,
                             TraceId id,
                             Error::Code e);
+
+  // Traces a flow event.
+  static bool TraceFlow(
+      TraceCategory category,
+      const char* name,
+      const char* file,
+      uint32_t line,
+      uint64_t flow_id,
+      FlowType type,
+      std::optional<Clock::time_point> timestamp = std::nullopt);
 
  protected:
   // Sets the result of this trace log.
