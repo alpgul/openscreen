@@ -59,7 +59,7 @@ class ApplicationAgent final
 
     // Launches the application and returns true if successful. `app_id` is the
     // specific ID that was used to launch the app, and `app_params` is a
-    // pass-through for any arbitrary app-specfic structure (or null if not
+    // pass-through for any arbitrary app-specific structure (or null if not
     // provided). If the Application wishes to send/receive messages, it uses
     // the provided `message_port` and must call MessagePort::SetClient() before
     // any flow will occur.

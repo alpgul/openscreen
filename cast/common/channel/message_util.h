@@ -134,59 +134,74 @@ inline constexpr char kMessageKeySystemBuildNumber[] = "system_build_number";
 inline constexpr char kMessageKeyResponseCode[] = "response_code";
 inline constexpr char kMessageKeyResponseString[] = "response_string";
 
+// Represents known types of cast messages, intended to be used on the wire in
+// JSON messages as a serialized string. Values are subject to change and should
+// not be depended upon statically.
+//
+// For more information, see the section on "Messages and Namespaces" in
+// ../../docs/streaming_session_protocol.md.
 enum class CastMessageType {
+  kUnknown = 0,
+
   // Heartbeat messages.
-  kPing,
-  kPong,
+  kPing = 1,
+  kPong = 2,
 
   // RPC control/status messages used by Media Remoting. These occur at high
   // frequency, up to dozens per second at times, and should not be logged.
-  kRpc,
+  kRpc = 3,
 
-  kGetAppAvailability,
-  kGetStatus,
-
-  // Virtual connection request.
-  kConnect,
-
-  // Close virtual connection.
-  kCloseConnection,
+  // Virtual connection open and close requests.
+  kConnect = 4,
+  kCloseConnection = 5,
 
   // Application broadcast / precache.
-  kBroadcast,
+  kBroadcast = 6,
 
   // Session launch request.
-  kLaunch,
-  kLaunchStatus,
+  kLaunch = 7,
+
+  // Launch request succeeded.
+  kLaunchStatus = 8,
+
+  // Indicates that the launch request failed.
+  kLaunchError = 9,
 
   // Session stop request.
-  kStop,
+  kStop = 10,
 
-  kReceiverStatus,
-  kMediaStatus,
+  // Sent by the receiver whenever an invalid request is received.
+  kInvalidRequest = 11,
 
-  // Error from receiver.
-  kLaunchError,
+  // Request and reply for information about what applications are available.
+  kGetAppAvailability = 12,
 
-  kOffer,
-  kAnswer,
-  kCapabilitiesResponse,
-  kStatusResponse,
+  // Reply with information about the current state of the receiver.
+  kReceiverStatus = 13,
+  kMediaStatus = 14,
 
-  // The following values are part of the protocol but are not currently used.
-  kMultizoneStatus,
-  kInvalidPlayerState,
-  kLoadFailed,
-  kLoadCancelled,
-  kInvalidRequest,
-  kPresentation,
-  kGetCapabilities,
+  // Used for starting and negotiating a streaming session.
+  kOffer = 15,
+  kAnswer = 16,
+  kGetCapabilities = 17,
+  kCapabilitiesResponse = 18,
+  kGetStatus = 19,
+  kStatusResponse = 20,
 
-  kDeviceInfo,
-  kEurekaInfo,
+  // The following values are part of the protocol but are not currently
+  // supported anywhere.
+  kInvalidPlayerState = 21,
+  kLoadCancelled = 22,
+  kLoadFailed = 23,
+  kMultizoneStatus = 24,
+  kPresentation = 25,
 
-  kOther,  // Add new types above `kOther`.
-  kMaxValue = kOther,
+  // Necessary for setup, request for device information.
+  kGetDeviceInfo = 26,
+  kEurekaInfo = 27,
+
+  // Max value should be updated to the highest value of the enum.
+  kMaxValue = kEurekaInfo,
 };
 
 enum class AppAvailabilityResult {

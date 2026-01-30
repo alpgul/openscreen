@@ -165,7 +165,7 @@ void ApplicationAgent::OnMessage(VirtualConnectionRouter* router,
   } else if (ns == kDiscoveryNamespace) {
     const Json::Value& value =
         request.value().get(kMessageKeyType, Json::Value::nullSingleton());
-    if (HasType(request.value(), CastMessageType::kDeviceInfo)) {
+    if (HasType(request.value(), CastMessageType::kGetDeviceInfo)) {
       response = HandleDeviceInfo(request.value());
     } else {
       response = HandleInvalidCommand(request.value());
@@ -450,7 +450,7 @@ void ApplicationAgent::PopulateDeviceInfo(Json::Value* out) {
   message[kMessageKeyDeviceModel] = receiver_info_.model_name;
   message[kMessageKeyFriendlyName] = receiver_info_.friendly_name;
   message[kMessageKeyType] =
-      CastMessageTypeToString(CastMessageType::kDeviceInfo);
+      CastMessageTypeToString(CastMessageType::kGetDeviceInfo);
 }
 
 void ApplicationAgent::PopulateEurekaInfo(Json::Value* out) {
