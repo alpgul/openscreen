@@ -190,8 +190,10 @@ std::optional<Arguments> ParseArgs(int argc, char* argv[]) {
   }
 
   args.interface_name = argv[get_opt::optind];
-  OSP_CHECK(args.interface_name && strlen(args.interface_name) > 0)
-      << "No interface name provided.";
+  if (!args.should_generate_credentials) {
+    OSP_CHECK(args.interface_name && strlen(args.interface_name) > 0)
+        << "No interface name provided.";
+  }
   return args;
 }
 
