@@ -1,0 +1,58 @@
+name: Exact OpenScreen Mirror with .github Protection
+
+on:
+  workflow_dispatch:  # Manuel olarak tetiklenebilir
+  schedule:
+    - cron: '0 0 */3 * *'  # Her 3 günde bir otomatik olarak çalışır
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest  # İş akışı Ubuntu üzerinde çalışır
+    steps:
+      # Adım 1: Mevcut depoyu tam tarihçe ile al
+      - name: Checkout Full History
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Tüm commit geçmişini al
+
+      # Adım 2: OpenScreen verilerini mevcut depoya entegre et
+      - name: Integrate OpenScreen
+        run: |
+          # 'actions' branch'ine geç
+          git checkout actions
+          
+          # OpenScreen'i uzak depo olarak ekle
+          git remote add openscreen https://chromium.googlesource.com/openscreen
+          
+          # OpenScreen'den tüm branch'leri ve tag'leri al
+          git fetch openscreen --tags
+          
+          # OpenScreen'deki tüm branch'leri yerel olarak oluştur (main hariç)
+          git branch -r | grep 'openscreen/' | grep -v 'HEAD' | while read remote; do
+            branch_name=${remote#openscreen/}
+            git branch -f "$branch_name" "$remote"
+          done
+
+      # Adım 3: Main branch'i koru ve .github dosyalarını güncelle
+      - name: Protect Main Branch
+        run: |
+          # Main branch'e geç
+          git checkout main
+          
+          # Git kullanıcı bilgilerini ayarla (commit için)
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # 'actions' branch'inden .github klasörünü al ve main branch'ine merge et
+          git checkout actions -- .github
+          git add .github
+          git commit --amend --no-edit  # Commit'i güncelle (fast-forward olmadan)
+
+      # Adım 4: Tüm branch'leri ve tag'leri force push et
+      - name: Force Push Mirrored Branches
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub token'ı kullan
+        run: |           
+          # Tüm branch'leri ve tag'leri force push et
+          git push origin --all --force
+          git push origin --tags --force
