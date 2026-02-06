@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <csignal>
+
 #include "platform/impl/logging.h"
 
 #if defined(CAST_STANDALONE_SENDER_HAVE_EXTERNAL_LIBS)
@@ -306,6 +308,11 @@ int StandaloneSenderMain(int argc, char* argv[]) {
 #endif
 
 int main(int argc, char* argv[]) {
+  // Ignore SIGPIPE events at the application level -- tearing down the network
+  // interface will close a TLS or UDP socket connection, which will result
+  // in a more graceful exit than terminating on the SIGPIPE call.
+  std::signal(SIGPIPE, SIG_IGN);
+
 #if defined(CAST_STANDALONE_SENDER_HAVE_EXTERNAL_LIBS)
   return openscreen::cast::StandaloneSenderMain(argc, argv);
 #else

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <algorithm>
+#include <csignal>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -254,5 +255,10 @@ int RunStandaloneReceiver(int argc, char* argv[]) {
 }  // namespace openscreen::cast
 
 int main(int argc, char* argv[]) {
+  // Ignore SIGPIPE events at the application level -- tearing down the network
+  // interface will close a TLS or UDP socket connection, which will result
+  // in a more graceful exit than terminating on the SIGPIPE call.
+  std::signal(SIGPIPE, SIG_IGN);
+
   return openscreen::cast::RunStandaloneReceiver(argc, argv);
 }

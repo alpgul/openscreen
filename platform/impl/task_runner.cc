@@ -117,12 +117,18 @@ void TaskRunnerImpl::RunUntilSignaled() {
   g_signal_state = kNotSignaled;
   const auto old_sigint_handler = std::signal(SIGINT, &OnReceivedSignal);
   const auto old_sigterm_handler = std::signal(SIGTERM, &OnReceivedSignal);
+#if defined(SIGHUP)
+  const auto old_sighup_handler = std::signal(SIGHUP, &OnReceivedSignal);
+#endif
 
   RunUntilStopped();
 
   std::signal(SIGINT, old_sigint_handler);
   std::signal(SIGTERM, old_sigterm_handler);
-  OSP_DVLOG << "Received SIGNIT or SIGTERM, setting state to not running...";
+#if defined(SIGHUP)
+  std::signal(SIGHUP, old_sighup_handler);
+#endif
+  OSP_DVLOG << "Received signal, setting state to not running...";
   g_signal_state = kNotRunning;
 }
 
