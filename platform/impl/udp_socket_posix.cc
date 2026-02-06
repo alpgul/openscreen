@@ -20,8 +20,10 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include "build/build_config.h"
+#include "platform/api/network_interface.h"
 #include "platform/api/task_runner.h"
 #include "platform/base/error.h"
 #include "platform/impl/udp_socket_reader_posix.h"
@@ -290,6 +292,28 @@ void UdpSocketPosix::JoinMulticastGroup(const IPAddress& address,
       multicast_properties.imr_address.s_addr = INADDR_ANY;
       multicast_properties.imr_ifindex =
           static_cast<IPv4NetworkInterfaceIndex>(ifindex);
+
+#if BUILDFLAG(IS_APPLE)
+      // On macOS, we must specify the interface address, not just the index,
+      // because it ignores imr_ifindex in ip_mreqn (interpreting it as
+      // ip_mreq).
+      const std::vector<InterfaceInfo> interfaces = GetNetworkInterfaces();
+      const auto it = std::find_if(interfaces.begin(), interfaces.end(),
+                                   [ifindex](const InterfaceInfo& info) {
+                                     return info.index == ifindex;
+                                   });
+
+      if (it != interfaces.end()) {
+        for (const auto& ip_net : it->addresses) {
+          if (ip_net.address.version() == IPAddress::Version::kV4) {
+            ip_net.address.CopyToV4(
+                reinterpret_cast<uint8_t*>(&multicast_properties.imr_address));
+            break;
+          }
+        }
+      }
+#endif
+
       static_assert(sizeof(multicast_properties.imr_multiaddr) == 4u,
                     "IPv4 address requires exactly 4 bytes");
       address.CopyToV4(

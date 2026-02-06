@@ -73,9 +73,7 @@ options:
 
     -v, --verbose: Enable verbose logging.
 
-    -x, --disable-discovery: Disable discovery, useful for platforms like Mac OS
-                             where our implementation is incompatible with
-                             the native Bonjour service.
+    -x, --disable-discovery: Disable discovery.
 
 )";
 
@@ -139,9 +137,6 @@ std::optional<Arguments> ParseArgs(int argc, char* argv[]) {
   // standalone sender, osp demo, and test_main argument options.
   const get_opt::option kArgumentOptions[] = {
       {"developer-certificate", required_argument, nullptr, 'd'},
-      // Discovery is enabled by default, however there are cases where it
-      // needs to be disabled, such as on macOS.
-      // TODO(jophba): why not just disable entirely on macOS?
       {"disable-discovery", no_argument, nullptr, 'x'},
       {"disable-dscp", no_argument, nullptr, 'q'},
       {"friendly-name", required_argument, nullptr, 'f'},
