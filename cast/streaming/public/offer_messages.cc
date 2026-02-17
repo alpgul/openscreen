@@ -226,6 +226,7 @@ Error Stream::TryParse(const Json::Value& value,
     out->receiver_rtcp_dscp = dscp_value;
   }
 
+  json::TryParseStringArray(value["rtpExtensions"], &out->rtp_extensions);
   json::TryParseString(value["codecParameter"], &out->codec_parameter);
 
   return Error::None();
@@ -254,6 +255,9 @@ Json::Value Stream::ToJson() const {
   }
   root["timeBase"] = "1/" + std::to_string(rtp_timebase);
   root["codecParameter"] = codec_parameter;
+  if (!rtp_extensions.empty()) {
+    root["rtpExtensions"] = json::PrimitiveVectorToJson(rtp_extensions);
+  }
   return root;
 }
 

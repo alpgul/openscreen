@@ -72,6 +72,8 @@ struct Stream {
   // The codec parameter field honors the format laid out in RFC 6381:
   // https://datatracker.ietf.org/doc/html/rfc6381.
   std::string codec_parameter;
+
+  std::vector<std::string> rtp_extensions;
 };
 
 struct AudioStream {

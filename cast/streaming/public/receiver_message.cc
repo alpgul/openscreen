@@ -22,10 +22,11 @@ namespace openscreen::cast {
 
 namespace {
 
-EnumNameTable<ReceiverMessage::Type, 3> kMessageTypeNames{
+EnumNameTable<ReceiverMessage::Type, 4> kMessageTypeNames{
     {{kMessageTypeAnswer, ReceiverMessage::Type::kAnswer},
      {"CAPABILITIES_RESPONSE", ReceiverMessage::Type::kCapabilitiesResponse},
-     {"RPC", ReceiverMessage::Type::kRpc}}};
+     {"RPC", ReceiverMessage::Type::kRpc},
+     {"INPUT", ReceiverMessage::Type::kInput}}};
 
 EnumNameTable<MediaCapability, 10> kMediaCapabilityNames{
     {{"audio", MediaCapability::kAudio},
@@ -174,9 +175,11 @@ ErrorOr<ReceiverMessage> ReceiverMessage::Parse(const Json::Value& value) {
 
   message.type = GetMessageType(value);
   message.valid =
-      (result == kResultOk || message.type == ReceiverMessage::Type::kRpc);
+      (result == kResultOk || message.type == ReceiverMessage::Type::kRpc ||
+       message.type == ReceiverMessage::Type::kInput);
 
-  if (message.type != ReceiverMessage::Type::kRpc) {
+  if (message.type != ReceiverMessage::Type::kRpc &&
+      message.type != ReceiverMessage::Type::kInput) {
     if (!json::TryParseInt(value[kSequenceNumber],
                            &(message.sequence_number))) {
       message.sequence_number = -1;
@@ -226,6 +229,16 @@ ErrorOr<ReceiverMessage> ReceiverMessage::Parse(const Json::Value& value) {
       }
     } break;
 
+    case Type::kInput: {
+      std::string encoded_input;
+      std::vector<uint8_t> input;
+      if (json::TryParseString(value[kInputMessageBody], &encoded_input) &&
+          base64::Decode(encoded_input, &input)) {
+        message.body = std::move(input);
+        message.valid = true;
+      }
+    } break;
+
     default:
       break;
   }
@@ -268,6 +281,11 @@ ErrorOr<Json::Value> ReceiverMessage::ToJson() const {
     // NOTE: RPC messages do NOT have a result field.
     case ReceiverMessage::Type::kRpc:
       root[kRpcMessageBody] =
+          base64::Encode(absl::get<std::vector<uint8_t>>(body));
+      break;
+
+    case ReceiverMessage::Type::kInput:
+      root[kInputMessageBody] =
           base64::Encode(absl::get<std::vector<uint8_t>>(body));
       break;
 

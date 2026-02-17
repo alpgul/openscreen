@@ -35,7 +35,9 @@ Offer kExampleOffer{
                         {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
                         false,
                         std::nullopt,
-                        48000},
+                        48000,
+                        "",
+                        {"input_events"}},
                  AudioCodec::kOpus, 1400}},
     {VideoStream{Stream{1,
                         Stream::Type::kVideoSource,
@@ -47,7 +49,9 @@ Offer kExampleOffer{
                         {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
                         false,
                         std::nullopt,
-                        90000},
+                        90000,
+                        "",
+                        {"input_events"}},
                  VideoCodec::kVp8,
                  SimpleFraction{30, 1},
                  3000000,
@@ -165,6 +169,47 @@ TEST_F(SessionMessengerTest, RpcMessaging) {
   ASSERT_TRUE(message_store_.sender_messages.empty());
   ASSERT_EQ(1u, message_store_.receiver_messages.size());
   EXPECT_EQ(ReceiverMessage::Type::kRpc,
+            message_store_.receiver_messages[0].value().type);
+  EXPECT_TRUE(message_store_.receiver_messages[0].value().valid);
+  EXPECT_EQ(kReceiverResponse,
+            absl::get<std::vector<uint8_t>>(
+                message_store_.receiver_messages[0].value().body));
+}
+
+TEST_F(SessionMessengerTest, InputMessaging) {
+  static const std::vector<uint8_t> kSenderMessage = {1, 2, 3, 4, 5};
+  static const std::vector<uint8_t> kSenderMessageTwo = {11, 12, 13};
+  static const std::vector<uint8_t> kReceiverResponse = {6, 7, 8, 9};
+
+  sender_messenger_->SetHandler(ReceiverMessage::Type::kInput,
+                                message_store_.GetReplyCallback());
+  receiver_messenger_->SetHandler(SenderMessage::Type::kInput,
+                                  message_store_.GetRequestCallback());
+
+  ASSERT_TRUE(sender_messenger_->SendInputMessage(kSenderMessage).ok());
+  ASSERT_TRUE(sender_messenger_->SendInputMessage(kSenderMessageTwo).ok());
+
+  ASSERT_EQ(2u, message_store_.sender_messages.size());
+  ASSERT_TRUE(message_store_.receiver_messages.empty());
+  EXPECT_EQ(SenderMessage::Type::kInput,
+            message_store_.sender_messages[0].second.type);
+  ASSERT_TRUE(message_store_.sender_messages[0].second.valid);
+  EXPECT_EQ(kSenderMessage, absl::get<std::vector<uint8_t>>(
+                                message_store_.sender_messages[0].second.body));
+  EXPECT_EQ(SenderMessage::Type::kInput,
+            message_store_.sender_messages[1].second.type);
+  ASSERT_TRUE(message_store_.sender_messages[1].second.valid);
+  EXPECT_EQ(kSenderMessageTwo,
+            absl::get<std::vector<uint8_t>>(
+                message_store_.sender_messages[1].second.body));
+
+  message_store_.sender_messages.clear();
+  ASSERT_TRUE(
+      receiver_messenger_->SendInputMessage(kSenderId, kReceiverResponse).ok());
+
+  ASSERT_TRUE(message_store_.sender_messages.empty());
+  ASSERT_EQ(1u, message_store_.receiver_messages.size());
+  EXPECT_EQ(ReceiverMessage::Type::kInput,
             message_store_.receiver_messages[0].value().type);
   EXPECT_TRUE(message_store_.receiver_messages[0].value().valid);
   EXPECT_EQ(kReceiverResponse,

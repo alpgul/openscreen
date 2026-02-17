@@ -32,6 +32,9 @@ struct SenderMessage {
 
     // Rpc binary messages. The payload is base64-encoded.
     kRpc,
+
+    // Input-related binary messages. The payload is base64-encoded.
+    kInput,
   };
 
   static ErrorOr<SenderMessage> Parse(const Json::Value& value);
@@ -41,7 +44,7 @@ struct SenderMessage {
   int32_t sequence_number = -1;
   bool valid = false;
   absl::variant<absl::monostate,
-                std::vector<uint8_t>,  // Binary-encoded RPC message.
+                std::vector<uint8_t>,  // Binary-encoded protobuf message.
                 Offer,
                 std::string>
       body;

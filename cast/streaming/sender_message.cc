@@ -17,10 +17,11 @@ namespace openscreen::cast {
 
 namespace {
 
-EnumNameTable<SenderMessage::Type, 3> kMessageTypeNames{
+EnumNameTable<SenderMessage::Type, 4> kMessageTypeNames{
     {{kMessageTypeOffer, SenderMessage::Type::kOffer},
      {"GET_CAPABILITIES", SenderMessage::Type::kGetCapabilities},
-     {"RPC", SenderMessage::Type::kRpc}}};
+     {"RPC", SenderMessage::Type::kRpc},
+     {"INPUT", SenderMessage::Type::kInput}}};
 
 SenderMessage::Type GetMessageType(const Json::Value& root) {
   std::string type;
@@ -66,6 +67,16 @@ ErrorOr<SenderMessage> SenderMessage::Parse(const Json::Value& value) {
       }
     } break;
 
+    case Type::kInput: {
+      std::string input_body;
+      std::vector<uint8_t> input;
+      if (json::TryParseString(value[kInputMessageBody], &input_body) &&
+          base64::Decode(input_body, &input)) {
+        message.body = input;
+        message.valid = true;
+      }
+    } break;
+
     case Type::kGetCapabilities:
       message.valid = true;
       break;
@@ -95,6 +106,11 @@ ErrorOr<Json::Value> SenderMessage::ToJson() const {
 
     case SenderMessage::Type::kRpc:
       root[kRpcMessageBody] =
+          base64::Encode(absl::get<std::vector<uint8_t>>(body));
+      break;
+
+    case SenderMessage::Type::kInput:
+      root[kInputMessageBody] =
           base64::Encode(absl::get<std::vector<uint8_t>>(body));
       break;
 

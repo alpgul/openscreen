@@ -429,7 +429,7 @@ into licensing issues.
 | aesIvMask            | `string` | A String specifying which initialization vector mask to use. Must consist of exactly 32 hex digits. Must be provided. |
 | receiverRtcpEventLog | `boolean` (optional) | True to request receiver to send event log via RTCP. False otherwise. |
 | receiverRtcpDscp     | `int` (optional) | Request receiver to send RTCP packets using DSCP value indicated. Typically this value is 46. |
-| rtpExtensions        | `Array of string` (optional) | RTP extensions (Currently only `adaptive_playout_delay`) supported by the Sender. Receivers can then reply with a list of rtpExtensions from this list that it also supports. |
+| rtpExtensions        | `Array of string` (optional) | RTP extensions supported by the Sender. Receivers can then reply with a list of rtpExtensions from this list that it also supports. |
 | timeBase             | `string` (optional) | Number specifying the time base used by this "rtpPayloadType". Default value is `1/90000`. Valid values are "1/\<sample rate\>" where sample rate is strictly positive. |
 
 ##### Audio Stream object
@@ -588,6 +588,19 @@ The "type" must be set to "RPC", with the base64-encoded protobuf message stored
 as a string under the "rpc" key.
 
 Protobuf messages are complex, and defined in the [remoting.proto](../streaming/remoting.proto)
+file.
+
+#### Input (Draft)
+
+The `com.google.cast.remoting` namespace also supports sending input events from
+receiver to sender.
+
+##### INPUT
+
+The "type" must be set to "INPUT", with the base64-encoded protobuf message
+stored as a string under the "input" key.
+
+Protobuf messages are complex, and defined in the [input.proto](../streaming/input.proto)
 file.
 
 #### Media Status Messages (`com.google.cast.media`)
