@@ -5,6 +5,7 @@
 #include "cast/streaming/sender_message.h"
 
 #include <utility>
+#include <variant>
 
 #include "cast/streaming/message_fields.h"
 #include "util/base64.h"
@@ -101,17 +102,17 @@ ErrorOr<Json::Value> SenderMessage::ToJson() const {
 
   switch (type) {
     case SenderMessage::Type::kOffer:
-      root[kOfferMessageBody] = absl::get<Offer>(body).ToJson();
+      root[kOfferMessageBody] = std::get<Offer>(body).ToJson();
       break;
 
     case SenderMessage::Type::kRpc:
       root[kRpcMessageBody] =
-          base64::Encode(absl::get<std::vector<uint8_t>>(body));
+          base64::Encode(std::get<std::vector<uint8_t>>(body));
       break;
 
     case SenderMessage::Type::kInput:
       root[kInputMessageBody] =
-          base64::Encode(absl::get<std::vector<uint8_t>>(body));
+          base64::Encode(std::get<std::vector<uint8_t>>(body));
       break;
 
     case SenderMessage::Type::kGetCapabilities:

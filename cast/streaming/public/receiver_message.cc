@@ -5,6 +5,7 @@
 #include "cast/streaming/public/receiver_message.h"
 
 #include <utility>
+#include <variant>
 
 #include "cast/streaming/message_fields.h"
 #include "json/reader.h"
@@ -260,10 +261,10 @@ ErrorOr<Json::Value> ReceiverMessage::ToJson() const {
     case ReceiverMessage::Type::kAnswer:
       if (valid) {
         root[kResult] = kResultOk;
-        root[kAnswerMessageBody] = absl::get<Answer>(body).ToJson();
+        root[kAnswerMessageBody] = std::get<Answer>(body).ToJson();
       } else {
         root[kResult] = kResultError;
-        root[kErrorMessageBody] = absl::get<ReceiverError>(body).ToJson();
+        root[kErrorMessageBody] = std::get<ReceiverError>(body).ToJson();
       }
       break;
 
@@ -271,22 +272,22 @@ ErrorOr<Json::Value> ReceiverMessage::ToJson() const {
       if (valid) {
         root[kResult] = kResultOk;
         root[kCapabilitiesMessageBody] =
-            absl::get<ReceiverCapability>(body).ToJson();
+            std::get<ReceiverCapability>(body).ToJson();
       } else {
         root[kResult] = kResultError;
-        root[kErrorMessageBody] = absl::get<ReceiverError>(body).ToJson();
+        root[kErrorMessageBody] = std::get<ReceiverError>(body).ToJson();
       }
       break;
 
     // NOTE: RPC messages do NOT have a result field.
     case ReceiverMessage::Type::kRpc:
       root[kRpcMessageBody] =
-          base64::Encode(absl::get<std::vector<uint8_t>>(body));
+          base64::Encode(std::get<std::vector<uint8_t>>(body));
       break;
 
     case ReceiverMessage::Type::kInput:
       root[kInputMessageBody] =
-          base64::Encode(absl::get<std::vector<uint8_t>>(body));
+          base64::Encode(std::get<std::vector<uint8_t>>(body));
       break;
 
     default:

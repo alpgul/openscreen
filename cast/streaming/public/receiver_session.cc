@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 
 #include "cast/common/channel/message_util.h"
 #include "cast/common/public/message_port.h"
@@ -188,7 +189,7 @@ void ReceiverSession::OnOffer(const std::string& sender_id,
   properties->sender_id = sender_id;
   properties->sequence_number = message.sequence_number;
 
-  const Offer& offer = absl::get<Offer>(message.body);
+  const Offer& offer = std::get<Offer>(message.body);
 
   if (offer.cast_mode == CastMode::kRemoting) {
     if (!constraints_.remoting) {
@@ -284,7 +285,7 @@ void ReceiverSession::OnRpcMessage(const std::string& sender_id,
     return;
   }
 
-  const auto& body = absl::get<std::vector<uint8_t>>(message.body);
+  const auto& body = std::get<std::vector<uint8_t>>(message.body);
   if (!rpc_messenger_) {
     OSP_DLOG_INFO << "Received an RPC message without having a messenger.";
     return;

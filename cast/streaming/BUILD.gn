@@ -45,10 +45,7 @@ openscreen_source_set("streaming_configs") {
     "resolution.cc",
   ]
 
-  public_deps = [
-    "../../third_party/abseil",
-    "../../third_party/jsoncpp",
-  ]
+  public_deps = [ "../../third_party/jsoncpp" ]
 
   deps = [
     "../../platform:base",
@@ -115,7 +112,6 @@ openscreen_source_set("common") {
     ":input_proto",
     ":remoting_proto",
     ":streaming_configs",
-    "../../third_party/abseil",
     "../../third_party/boringssl",
     "../common:channel",
     "../common:public",
@@ -313,10 +309,7 @@ openscreen_fuzzer_test("compound_rtcp_parser_fuzzer") {
   public = []
   sources = [ "impl/compound_rtcp_parser_fuzzer.cc" ]
 
-  deps = [
-    ":sender",
-    "../../third_party/abseil",
-  ]
+  deps = [ ":sender" ]
 
   seed_corpus = "compound_rtcp_parser_fuzzer_seeds"
 
@@ -328,10 +321,7 @@ openscreen_fuzzer_test("rtp_packet_parser_fuzzer") {
   public = []
   sources = [ "impl/rtp_packet_parser_fuzzer.cc" ]
 
-  deps = [
-    ":receiver",
-    "../../third_party/abseil",
-  ]
+  deps = [ ":receiver" ]
 
   seed_corpus = "rtp_packet_parser_fuzzer_seeds"
 
@@ -343,10 +333,7 @@ openscreen_fuzzer_test("sender_report_parser_fuzzer") {
   public = []
   sources = [ "impl/sender_report_parser_fuzzer.cc" ]
 
-  deps = [
-    ":receiver",
-    "../../third_party/abseil",
-  ]
+  deps = [ ":receiver" ]
 
   seed_corpus = "sender_report_parser_fuzzer_seeds"
 

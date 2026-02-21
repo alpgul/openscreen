@@ -11,6 +11,7 @@
 #include <iterator>
 #include <string>
 #include <utility>
+#include <variant>
 
 #include "cast/streaming/impl/clock_offset_estimator.h"
 #include "cast/streaming/message_fields.h"
@@ -438,7 +439,7 @@ void SenderSession::OnAnswer(ErrorOr<ReceiverMessage> message) {
     return;
   }
 
-  const Answer& answer = absl::get<Answer>(message.value().body);
+  const Answer& answer = std::get<Answer>(message.value().body);
   ConfiguredSenders senders = SelectSenders(answer);
   // If we didn't select any senders, the negotiation was unsuccessful.
   if (!senders.audio_sender && !senders.video_sender) {
@@ -473,7 +474,7 @@ void SenderSession::OnCapabilitiesResponse(ErrorOr<ReceiverMessage> message) {
   }
 
   const ReceiverCapability& caps =
-      absl::get<ReceiverCapability>(message.value().body);
+      std::get<ReceiverCapability>(message.value().body);
   int remoting_version = caps.remoting_version;
   // If not set, we assume it is version 1.
   if (remoting_version == ReceiverCapability::kRemotingVersionUnknown) {
@@ -504,15 +505,15 @@ void SenderSession::OnRpcMessage(ErrorOr<ReceiverMessage> message) {
     return;
   }
 
-  const auto& body = absl::get<std::vector<uint8_t>>(message.value().body);
+  const auto& body = std::get<std::vector<uint8_t>>(message.value().body);
   rpc_messenger_.ProcessMessageFromRemote(body.data(), body.size());
 }
 
 void SenderSession::HandleErrorMessage(ReceiverMessage message,
                                        const Error& default_error) {
   OSP_CHECK(!message.valid);
-  if (absl::holds_alternative<ReceiverError>(message.body)) {
-    const ReceiverError& error = absl::get<ReceiverError>(message.body);
+  if (std::holds_alternative<ReceiverError>(message.body)) {
+    const ReceiverError& error = std::get<ReceiverError>(message.body);
     Error converted_error = error.ToError();
 
     // If the receiver error code was an invalid value, fallback to

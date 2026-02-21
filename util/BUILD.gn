@@ -87,7 +87,6 @@ openscreen_source_set("util") {
     "../platform:api",
     "../platform:base",
     "../platform:logging",
-    "../third_party/abseil",
     "../third_party/boringssl",
     "../third_party/jsoncpp",
   ]
@@ -152,7 +151,6 @@ openscreen_source_set("unittests") {
   deps = [
     ":util",
     "../platform:test",
-    "../third_party/abseil",
     "../third_party/boringssl",
     "../third_party/googletest:gmock",
     "../third_party/googletest:gtest",

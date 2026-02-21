@@ -459,14 +459,9 @@ include_rules = [
   '+discovery/mdns/public',
   '+discovery/public',
 
-  # Don't include abseil from the root so the path can change via include_dirs
-  # rules when in Chromium.
+  # Don't include Abseil.
   '-third_party/abseil',
-
-  # Abseil allowed headers.
-  # IMPORTANT: Do not add new entries; abseil is being removed from the library.
-  # See https://issuetracker.google.com/158433927
-  '+absl/types/variant.h',
+  '-absl',
 
   # Similar to abseil, don't include boringssl using root path.  Instead,
   # explicitly allow 'openssl' where needed.

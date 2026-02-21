@@ -7,9 +7,9 @@
 
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
-#include "absl/types/variant.h"
 #include "cast/streaming/public/offer_messages.h"
 #include "json/value.h"
 #include "platform/base/error.h"
@@ -43,10 +43,10 @@ struct SenderMessage {
   Type type = Type::kUnknown;
   int32_t sequence_number = -1;
   bool valid = false;
-  absl::variant<absl::monostate,
-                std::vector<uint8_t>,  // Binary-encoded protobuf message.
-                Offer,
-                std::string>
+  std::variant<std::monostate,
+               std::vector<uint8_t>,  // Binary-encoded protobuf message.
+               Offer,
+               std::string>
       body;
 };
 

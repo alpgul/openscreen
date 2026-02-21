@@ -176,7 +176,6 @@ if (!is_ios) {
 
     deps = [
       ":api",
-      "../third_party/abseil",
       "../third_party/boringssl",
       "../util",
     ]
@@ -241,7 +240,6 @@ openscreen_source_set("test") {
 
   deps = [
     ":platform",
-    "../third_party/abseil",
     "../third_party/googletest:gmock",
     "../util",
   ]
@@ -266,7 +264,6 @@ openscreen_source_set("unittests") {
   deps = [
     ":platform",
     ":test",
-    "../third_party/abseil",
     "../third_party/boringssl",
     "../third_party/googletest:gmock",
     "../third_party/googletest:gtest",

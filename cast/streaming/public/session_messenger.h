@@ -10,7 +10,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/types/variant.h"
 #include "cast/common/public/message_port.h"
 #include "cast/streaming/public/answer_messages.h"
 #include "cast/streaming/public/offer_messages.h"
