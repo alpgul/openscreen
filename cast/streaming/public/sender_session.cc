@@ -59,6 +59,13 @@ const Error& InvalidRpcError() {
   return kError;
 }
 
+// Default error message for a bad INPUT message.
+const Error& InvalidInputError() {
+  static const Error kError(Error::Code::kJsonParseError,
+                            "Invalid INPUT message.");
+  return kError;
+}
+
 // Returns DSCP suggestions based on Table 1 in RFC 8837.
 // https://datatracker.ietf.org/doc/html/rfc8837#name-dscp-mappings
 UdpSocket::DscpMode GetDscpSuggestion(bool has_audio, bool has_video) {
@@ -87,43 +94,41 @@ std::optional<int> ToWire(std::optional<UdpSocket::DscpMode> mode) {
 AudioStream CreateStream(int index,
                          const AudioCaptureConfig& config,
                          bool use_android_rtp_hack,
-                         std::optional<UdpSocket::DscpMode> dscp_mode) {
-  return AudioStream{Stream{index,
-                            Stream::Type::kAudioSource,
-                            config.channels,
-                            GetPayloadType(config.codec, use_android_rtp_hack),
-                            GenerateSsrc(true /*high_priority*/),
-                            config.target_playout_delay,
-                            GenerateRandomBytes16(),
-                            GenerateRandomBytes16(),
-                            true /* receiver_rtcp_event_log */,
-                            ToWire(dscp_mode),
-                            config.sample_rate,
-                            config.codec_parameter,
-                            {}},
-                     config.codec,
-                     std::max(config.bit_rate, kDefaultAudioMinBitRate)};
+                         std::optional<UdpSocket::DscpMode> dscp_mode,
+                         bool supports_input_events) {
+  std::vector<std::string> rtp_extensions;
+  if (supports_input_events) {
+    rtp_extensions.push_back("input_events");
+  }
+  return AudioStream{
+      Stream{index, Stream::Type::kAudioSource, config.channels,
+             GetPayloadType(config.codec, use_android_rtp_hack),
+             GenerateSsrc(true /*high_priority*/), config.target_playout_delay,
+             GenerateRandomBytes16(), GenerateRandomBytes16(),
+             true /* receiver_rtcp_event_log */, ToWire(dscp_mode),
+             config.sample_rate, config.codec_parameter,
+             std::move(rtp_extensions)},
+      config.codec, std::max(config.bit_rate, kDefaultAudioMinBitRate)};
 }
 
 VideoStream CreateStream(int index,
                          const VideoCaptureConfig& config,
                          bool use_android_rtp_hack,
-                         std::optional<UdpSocket::DscpMode> dscp_mode) {
+                         std::optional<UdpSocket::DscpMode> dscp_mode,
+                         bool supports_input_events) {
   constexpr int kVideoStreamChannelCount = 1;
+  std::vector<std::string> rtp_extensions;
+  if (supports_input_events) {
+    rtp_extensions.push_back("input_events");
+  }
   return VideoStream{
-      Stream{index,
-             Stream::Type::kVideoSource,
-             kVideoStreamChannelCount,
+      Stream{index, Stream::Type::kVideoSource, kVideoStreamChannelCount,
              GetPayloadType(config.codec, use_android_rtp_hack),
-             GenerateSsrc(false /*high_priority*/),
-             config.target_playout_delay,
-             GenerateRandomBytes16(),
-             GenerateRandomBytes16(),
-             true /* receiver_rtcp_event_log */,
-             ToWire(dscp_mode),
-             kRtpVideoTimebase,
-             config.codec_parameter,
-             {}},
+             GenerateSsrc(false /*high_priority*/), config.target_playout_delay,
+             GenerateRandomBytes16(), GenerateRandomBytes16(),
+             true /* receiver_rtcp_event_log */, ToWire(dscp_mode),
+             kRtpVideoTimebase, config.codec_parameter,
+             std::move(rtp_extensions)},
       config.codec,
       config.max_frame_rate,
       (config.max_bit_rate >= kDefaultVideoMinBitRate)
@@ -142,18 +147,21 @@ void CreateStreamList(int offset_index,
                       const std::vector<C>& configs,
                       bool use_android_rtp_hack,
                       std::optional<UdpSocket::DscpMode> dscp_mode,
+                      bool supports_input_events,
                       std::vector<S>* out) {
   out->reserve(configs.size());
   for (size_t i = 0; i < configs.size(); ++i) {
     out->emplace_back(CreateStream(i + offset_index, configs[i],
-                                   use_android_rtp_hack, dscp_mode));
+                                   use_android_rtp_hack, dscp_mode,
+                                   supports_input_events));
   }
 }
 
 Offer CreateMirroringOffer(const std::vector<AudioCaptureConfig>& audio_configs,
                            const std::vector<VideoCaptureConfig>& video_configs,
                            bool use_android_rtp_hack,
-                           bool enable_dscp) {
+                           bool enable_dscp,
+                           bool supports_input_events) {
   Offer offer;
   offer.cast_mode = CastMode::kMirroring;
 
@@ -167,9 +175,9 @@ Offer CreateMirroringOffer(const std::vector<AudioCaptureConfig>& audio_configs,
   // NOTE here: IDs will always follow the pattern:
   // [0.. audio streams... N - 1][N.. video streams.. K]
   CreateStreamList(0, audio_configs, use_android_rtp_hack, dscp_mode,
-                   &offer.audio_streams);
+                   supports_input_events, &offer.audio_streams);
   CreateStreamList(audio_configs.size(), video_configs, use_android_rtp_hack,
-                   dscp_mode, &offer.video_streams);
+                   dscp_mode, supports_input_events, &offer.video_streams);
 
   return offer;
 }
@@ -177,7 +185,8 @@ Offer CreateMirroringOffer(const std::vector<AudioCaptureConfig>& audio_configs,
 Offer CreateRemotingOffer(const AudioCaptureConfig& audio_config,
                           const VideoCaptureConfig& video_config,
                           bool use_android_rtp_hack,
-                          bool enable_dscp) {
+                          bool enable_dscp,
+                          bool supports_input_events) {
   Offer offer;
   offer.cast_mode = CastMode::kRemoting;
 
@@ -186,15 +195,15 @@ Offer CreateRemotingOffer(const AudioCaptureConfig& audio_config,
     dscp_mode = GetDscpSuggestion(true, true);
   }
 
-  AudioStream audio_stream =
-      CreateStream(0, audio_config, use_android_rtp_hack, dscp_mode);
+  AudioStream audio_stream = CreateStream(0, audio_config, use_android_rtp_hack,
+                                          dscp_mode, supports_input_events);
   audio_stream.codec = AudioCodec::kNotSpecified;
   audio_stream.stream.rtp_payload_type =
       GetPayloadType(AudioCodec::kNotSpecified, use_android_rtp_hack);
   offer.audio_streams.push_back(std::move(audio_stream));
 
-  VideoStream video_stream =
-      CreateStream(1, video_config, use_android_rtp_hack, dscp_mode);
+  VideoStream video_stream = CreateStream(1, video_config, use_android_rtp_hack,
+                                          dscp_mode, supports_input_events);
   video_stream.codec = VideoCodec::kNotSpecified;
   video_stream.stream.rtp_payload_type =
       GetPayloadType(VideoCodec::kNotSpecified, use_android_rtp_hack);
@@ -320,7 +329,16 @@ SenderSession::SenderSession(Configuration config)
           },
           config_.environment->task_runner()),
       rpc_messenger_([this](std::vector<uint8_t> message) {
-        SendRpcMessage(std::move(message));
+        const Error error = this->messenger_.SendRpcMessage(message);
+        if (!error.ok()) {
+          OSP_LOG_WARN << "Failed to send RPC message: " << error;
+        }
+      }),
+      input_messenger_([this](std::vector<uint8_t> message) {
+        const Error error = this->messenger_.SendInputMessage(message);
+        if (!error.ok()) {
+          OSP_LOG_WARN << "Failed to send INPUT message: " << error;
+        }
       }),
       packet_router_(*config_.environment) {
   // We may or may not do remoting this session, however our RPC handler
@@ -329,6 +347,10 @@ SenderSession::SenderSession(Configuration config)
   messenger_.SetHandler(ReceiverMessage::Type::kRpc,
                         [this](ErrorOr<ReceiverMessage> message) {
                           this->OnRpcMessage(std::move(message));
+                        });
+  messenger_.SetHandler(ReceiverMessage::Type::kInput,
+                        [this](ErrorOr<ReceiverMessage> message) {
+                          this->OnInputMessage(std::move(message));
                         });
 }
 
@@ -345,9 +367,9 @@ Error SenderSession::Negotiate(std::vector<AudioCaptureConfig> audio_configs,
     return Error(Error::Code::kParameterInvalid, "Invalid configs provided.");
   }
 
-  Offer offer =
-      CreateMirroringOffer(audio_configs, video_configs,
-                           config_.use_android_rtp_hack, config_.enable_dscp);
+  Offer offer = CreateMirroringOffer(
+      audio_configs, video_configs, config_.use_android_rtp_hack,
+      config_.enable_dscp, input_messenger_.receive_message_cb() != nullptr);
   return StartNegotiation(std::move(audio_configs), std::move(video_configs),
                           std::move(offer));
 }
@@ -361,9 +383,9 @@ Error SenderSession::NegotiateRemoting(AudioCaptureConfig audio_config,
                  "Passed invalid audio or video config.");
   }
 
-  Offer offer =
-      CreateRemotingOffer(audio_config, video_config,
-                          config_.use_android_rtp_hack, config_.enable_dscp);
+  Offer offer = CreateRemotingOffer(
+      audio_config, video_config, config_.use_android_rtp_hack,
+      config_.enable_dscp, input_messenger_.receive_message_cb() != nullptr);
   return StartNegotiation({audio_config}, {video_config}, std::move(offer));
 }
 
@@ -398,6 +420,28 @@ void SenderSession::SetStatsClient(SenderStatsClient* client) {
   // Repeatedly takes and analyzes frame / packet events, and sends stats to
   // `stats_client_`.
   stats_analyzer_->ScheduleAnalysis();
+}
+
+void SenderSession::SetInputCallback(
+    std::function<void(InputMessage)> callback) {
+  if (callback) {
+    input_messenger_.SetReceiveMessageCallback(
+        [cb = std::move(callback)](std::unique_ptr<InputMessage> message) {
+          cb(std::move(*message));
+        });
+  } else {
+    input_messenger_.SetReceiveMessageCallback(nullptr);
+  }
+}
+
+void SenderSession::SendInputMessage(const InputMessage& message) {
+  if (state_ == State::kIdle) {
+    OSP_DLOG_WARN << "Can't send an INPUT message without a currently "
+                     "negotiated session.";
+    return;
+  }
+
+  input_messenger_.SendMessageToRemote(message);
 }
 
 void SenderSession::ResetState() {
@@ -506,7 +550,23 @@ void SenderSession::OnRpcMessage(ErrorOr<ReceiverMessage> message) {
   }
 
   const auto& body = std::get<std::vector<uint8_t>>(message.value().body);
-  rpc_messenger_.ProcessMessageFromRemote(body.data(), body.size());
+  rpc_messenger_.ProcessMessageFromRemote(body);
+}
+
+void SenderSession::OnInputMessage(ErrorOr<ReceiverMessage> message) {
+  if (!message) {
+    config_.client.OnError(this, message.error());
+    return;
+  }
+
+  if (!message.value().valid ||
+      message.value().type != ReceiverMessage::Type::kInput) {
+    HandleErrorMessage(message.value(), InvalidInputError());
+    return;
+  }
+
+  const auto& body = std::get<std::vector<uint8_t>>(message.value().body);
+  input_messenger_.ProcessMessageFromRemote(body);
 }
 
 void SenderSession::HandleErrorMessage(ReceiverMessage message,
@@ -613,16 +673,6 @@ SenderSession::ConfiguredSenders SenderSession::SelectSenders(
     }
   }
   return senders;
-}
-
-void SenderSession::SendRpcMessage(std::vector<uint8_t> message_body) {
-  Error error = this->messenger_.SendOutboundMessage(SenderMessage{
-      SenderMessage::Type::kRpc, ++(this->current_sequence_number_), true,
-      std::move(message_body)});
-
-  if (!error.ok()) {
-    OSP_LOG_WARN << "Failed to send RPC message: " << error;
-  }
 }
 
 }  // namespace openscreen::cast

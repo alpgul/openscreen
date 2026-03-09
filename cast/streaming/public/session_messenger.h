@@ -124,6 +124,10 @@ class ReceiverSessionMessenger final : public SessionMessenger {
   void SetHandler(SenderMessage::Type type, RequestCallback cb);
   void ResetHandler(SenderMessage::Type type);
 
+  // Convenience method for sending a valid RPC message.
+  [[nodiscard]] Error SendRpcMessage(const std::string& source_id,
+                                     ByteView message);
+
   // Convenience method for sending a valid INPUT message.
   [[nodiscard]] Error SendInputMessage(const std::string& source_id,
                                        ByteView message);

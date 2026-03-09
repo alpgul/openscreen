@@ -254,6 +254,15 @@ void ReceiverSessionMessenger::ResetHandler(SenderMessage::Type type) {
   callbacks_.erase_key(type);
 }
 
+Error ReceiverSessionMessenger::SendRpcMessage(const std::string& source_id,
+                                               ByteView message) {
+  return SendMessage(
+      source_id,
+      ReceiverMessage{ReceiverMessage::Type::kRpc, -1 /* sequence_number */,
+                      true /* valid */,
+                      std::vector<uint8_t>(message.begin(), message.end())});
+}
+
 Error ReceiverSessionMessenger::SendInputMessage(const std::string& source_id,
                                                  ByteView message) {
   return SendMessage(
