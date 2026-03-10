@@ -92,6 +92,8 @@ options:
 
     -P, --perfetto: Enable perfetto based performance trace logging.
 
+    -i, --enable-input-events: Enable receiving input events from the receiver.
+
 )";
 
   std::cerr << StringFormat(kTemplate, argv0, argv0, kDefaultCastPort,
@@ -143,6 +145,7 @@ struct Arguments {
   std::string developer_certificate_path;
   bool use_android_rtp_hack = false;
   bool use_remoting = false;
+  bool enable_input_events = false;
   bool is_verbose = false;
   VideoCodec codec = VideoCodec::kVp8;
   std::unique_ptr<TraceLoggingPlatform> trace_logger;
@@ -158,6 +161,7 @@ std::optional<Arguments> ParseArgs(int argc, char* argv[]) {
       {"android-hack", no_argument, nullptr, 'a'},
       {"codec", required_argument, nullptr, 'c'},
       {"developer-certificate", required_argument, nullptr, 'd'},
+      {"enable-input-events", no_argument, nullptr, 'i'},
       {"help", no_argument, nullptr, 'h'},
       {"max-bitrate", required_argument, nullptr, 'm'},
       {"no-looping", no_argument, nullptr, 'n'},
@@ -172,7 +176,7 @@ std::optional<Arguments> ParseArgs(int argc, char* argv[]) {
 
   Arguments args;
   int ch = -1;
-  while ((ch = getopt_long(argc, argv, "ac:d:hm:nqrtvP", kArgumentOptions,
+  while ((ch = getopt_long(argc, argv, "ac:d:him:nqrtvP", kArgumentOptions,
                            nullptr)) != -1) {
     switch (ch) {
       case 'a':
@@ -193,6 +197,9 @@ std::optional<Arguments> ParseArgs(int argc, char* argv[]) {
         break;
       case 'd':
         args.developer_certificate_path = get_opt::optarg;
+        break;
+      case 'i':
+        args.enable_input_events = true;
         break;
       case 'q':
         args.enable_dscp = false;
@@ -296,7 +303,8 @@ int StandaloneSenderMain(int argc, char* argv[]) {
                          .use_remoting = args->use_remoting,
                          .should_loop_video = args->should_loop_video,
                          .codec = args->codec,
-                         .enable_dscp = args->enable_dscp});
+                         .enable_dscp = args->enable_dscp,
+                         .enable_input_events = args->enable_input_events});
   });
 
   // Run the event loop until SIGINT (e.g., CTRL-C at the console) or

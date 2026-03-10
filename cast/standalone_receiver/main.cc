@@ -80,6 +80,9 @@ options:
     -x, --disable-discovery: Disable discovery.
 
     -P, --perfetto: Enable Perfetto based performance trace logging.
+
+    -i, --enable-input-events: Enable the Input event API (receiver-to-sender).
+
 )";
 
   std::cerr << StringFormat(kTemplate, argv0);
@@ -127,6 +130,7 @@ struct Arguments {
   std::string developer_certificate_path;
   bool enable_discovery = true;
   bool enable_dscp = true;
+  bool enable_input_events = false;
   std::string friendly_name = "Cast Standalone Receiver";
   bool should_generate_credentials = false;
   std::string model_name = "cast_standalone_receiver";
@@ -144,6 +148,7 @@ std::optional<Arguments> ParseArgs(int argc, char* argv[]) {
       {"developer-certificate", required_argument, nullptr, 'd'},
       {"disable-discovery", no_argument, nullptr, 'x'},
       {"disable-dscp", no_argument, nullptr, 'q'},
+      {"enable-input-events", no_argument, nullptr, 'i'},
       {"friendly-name", required_argument, nullptr, 'f'},
       {"generate-credentials", no_argument, nullptr, 'g'},
       {"help", no_argument, nullptr, 'h'},
@@ -158,7 +163,7 @@ std::optional<Arguments> ParseArgs(int argc, char* argv[]) {
 
   Arguments args;
   int ch = -1;
-  while ((ch = getopt_long(argc, argv, "d:f:ghm:p:qtvxP", kArgumentOptions,
+  while ((ch = getopt_long(argc, argv, "d:f:ghim:p:qtvxP", kArgumentOptions,
                            nullptr)) != -1) {
     switch (ch) {
       case 'd':
@@ -172,6 +177,9 @@ std::optional<Arguments> ParseArgs(int argc, char* argv[]) {
         break;
       case 'h':
         return {};
+      case 'i':
+        args.enable_input_events = true;
+        break;
       case 'm':
         args.model_name = get_opt::optarg;
         break;
@@ -253,7 +261,8 @@ int RunStandaloneReceiver(int argc, char* argv[]) {
       CastService::Configuration{
           *task_runner, interface, std::move(creds.value()),
           Uuid::GenerateRandomV4().AsLowercaseString(), args->friendly_name,
-          args->model_name, args->enable_discovery});
+          args->model_name, args->enable_discovery, args->enable_dscp,
+          args->enable_input_events});
   PlatformClientPosix::ShutDown();
 
   return 0;
