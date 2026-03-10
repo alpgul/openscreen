@@ -37,9 +37,9 @@
 #include "platform/test/fake_clock.h"
 #include "platform/test/fake_task_runner.h"
 #include "util/alarm.h"
+#include "util/bit_vector.h"
 #include "util/chrono_helpers.h"
 #include "util/std_util.h"
-#include "util/yet_another_bit_vector.h"
 
 using testing::_;
 using testing::AtLeast;
