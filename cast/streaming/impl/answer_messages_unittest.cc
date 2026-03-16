@@ -155,9 +155,8 @@ void ExpectFailureOnParse(std::string_view raw_json) {
   // Must be a valid JSON object, but not a valid answer.
   ASSERT_TRUE(root.is_value());
 
-  Answer answer;
-  EXPECT_FALSE(Answer::TryParse(std::move(root.value()), &answer));
-  EXPECT_FALSE(answer.IsValid());
+  const auto answer_or_error = Answer::TryParse(std::move(root.value()));
+  EXPECT_TRUE(answer_or_error.is_error());
 }
 
 // Functions that use ASSERT_* must return void, so we use an out parameter
@@ -167,11 +166,11 @@ void ExpectSuccessOnParse(std::string_view raw_json, Answer* out = nullptr) {
   // Must be a valid JSON object, but not a valid answer.
   ASSERT_TRUE(root.is_value());
 
-  Answer answer;
-  ASSERT_TRUE(Answer::TryParse(std::move(root.value()), &answer));
-  EXPECT_TRUE(answer.IsValid());
+  const auto answer_or_error = Answer::TryParse(std::move(root.value()));
+  ASSERT_TRUE(answer_or_error.is_value());
+  EXPECT_TRUE(answer_or_error.value().IsValid());
   if (out) {
-    *out = std::move(answer);
+    *out = std::move(answer_or_error.value());
   }
 }
 
@@ -507,22 +506,22 @@ TEST(AnswerMessagesTest, AspectRatioTryParse) {
   const Json::Value kZeroWidth = "0:9";
   const Json::Value kZeroHeight = "16:0";
 
-  AspectRatio out;
-  EXPECT_TRUE(AspectRatio::TryParse(kValid, &out));
-  EXPECT_EQ(out.width, 16);
-  EXPECT_EQ(out.height, 9);
-  EXPECT_FALSE(AspectRatio::TryParse(kWrongDelimiter, &out));
-  EXPECT_FALSE(AspectRatio::TryParse(kTooManyFields, &out));
-  EXPECT_FALSE(AspectRatio::TryParse(kTooFewFields, &out));
-  EXPECT_FALSE(AspectRatio::TryParse(kWrongDelimiter, &out));
-  EXPECT_FALSE(AspectRatio::TryParse(kNoDelimiter, &out));
-  EXPECT_FALSE(AspectRatio::TryParse(kNegativeWidth, &out));
-  EXPECT_FALSE(AspectRatio::TryParse(kNegativeHeight, &out));
-  EXPECT_FALSE(AspectRatio::TryParse(kNegativeBoth, &out));
-  EXPECT_FALSE(AspectRatio::TryParse(kNonNumberWidth, &out));
-  EXPECT_FALSE(AspectRatio::TryParse(kNonNumberHeight, &out));
-  EXPECT_FALSE(AspectRatio::TryParse(kZeroWidth, &out));
-  EXPECT_FALSE(AspectRatio::TryParse(kZeroHeight, &out));
+  const auto out = AspectRatio::TryParse(kValid);
+  ASSERT_TRUE(out.is_value());
+  EXPECT_EQ(out.value().width, 16);
+  EXPECT_EQ(out.value().height, 9);
+  EXPECT_TRUE(AspectRatio::TryParse(kWrongDelimiter).is_error());
+  EXPECT_TRUE(AspectRatio::TryParse(kTooManyFields).is_error());
+  EXPECT_TRUE(AspectRatio::TryParse(kTooFewFields).is_error());
+  EXPECT_TRUE(AspectRatio::TryParse(kWrongDelimiter).is_error());
+  EXPECT_TRUE(AspectRatio::TryParse(kNoDelimiter).is_error());
+  EXPECT_TRUE(AspectRatio::TryParse(kNegativeWidth).is_error());
+  EXPECT_TRUE(AspectRatio::TryParse(kNegativeHeight).is_error());
+  EXPECT_TRUE(AspectRatio::TryParse(kNegativeBoth).is_error());
+  EXPECT_TRUE(AspectRatio::TryParse(kNonNumberWidth).is_error());
+  EXPECT_TRUE(AspectRatio::TryParse(kNonNumberHeight).is_error());
+  EXPECT_TRUE(AspectRatio::TryParse(kZeroWidth).is_error());
+  EXPECT_TRUE(AspectRatio::TryParse(kZeroHeight).is_error());
 }
 
 TEST(AnswerMessagesTest, DisplayDescriptionTryParse) {
@@ -550,25 +549,29 @@ TEST(AnswerMessagesTest, DisplayDescriptionTryParse) {
   aspect_ratio_and_constraint["scaling"] = "sender";
   aspect_ratio_and_constraint["aspectRatio"] = "4:3";
 
-  DisplayDescription out;
-  ASSERT_TRUE(DisplayDescription::TryParse(valid_scaling, &out));
-  ASSERT_TRUE(out.aspect_ratio_constraint.has_value());
-  EXPECT_EQ(out.aspect_ratio_constraint.value(),
+  const auto out = DisplayDescription::TryParse(valid_scaling);
+  ASSERT_TRUE(out.is_value());
+  ASSERT_TRUE(out.value().aspect_ratio_constraint.has_value());
+  EXPECT_EQ(out.value().aspect_ratio_constraint.value(),
             AspectRatioConstraint::kVariable);
 
-  EXPECT_FALSE(DisplayDescription::TryParse(invalid_scaling, &out));
-  EXPECT_TRUE(DisplayDescription::TryParse(invalid_scaling_valid_ratio, &out));
+  EXPECT_TRUE(DisplayDescription::TryParse(invalid_scaling).is_error());
+  EXPECT_TRUE(
+      DisplayDescription::TryParse(invalid_scaling_valid_ratio).is_value());
 
-  ASSERT_TRUE(DisplayDescription::TryParse(valid_dimensions, &out));
-  ASSERT_TRUE(out.dimensions.has_value());
-  EXPECT_EQ(1920, out.dimensions->width);
-  EXPECT_EQ(1080, out.dimensions->height);
-  EXPECT_EQ((SimpleFraction{30, 1}), out.dimensions->frame_rate);
+  const auto out2 = DisplayDescription::TryParse(valid_dimensions);
+  ASSERT_TRUE(out2.is_value());
+  ASSERT_TRUE(out2.value().dimensions.has_value());
+  EXPECT_EQ(1920, out2.value().dimensions->width);
+  EXPECT_EQ(1080, out2.value().dimensions->height);
+  EXPECT_EQ((SimpleFraction{30, 1}), out2.value().dimensions->frame_rate);
 
-  EXPECT_FALSE(DisplayDescription::TryParse(invalid_dimensions, &out));
+  EXPECT_TRUE(DisplayDescription::TryParse(invalid_dimensions).is_error());
 
-  ASSERT_TRUE(DisplayDescription::TryParse(aspect_ratio_and_constraint, &out));
-  EXPECT_EQ(AspectRatioConstraint::kFixed, out.aspect_ratio_constraint.value());
+  const auto out3 = DisplayDescription::TryParse(aspect_ratio_and_constraint);
+  ASSERT_TRUE(out3.is_value());
+  EXPECT_EQ(AspectRatioConstraint::kFixed,
+            out3.value().aspect_ratio_constraint.value());
 }
 
 TEST(AnswerMessagesTest, DisplayDescriptionIsValid) {

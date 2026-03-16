@@ -51,9 +51,9 @@ ErrorOr<SenderMessage> SenderMessage::Parse(const Json::Value& value) {
   message.type = GetMessageType(value);
   switch (message.type) {
     case Type::kOffer: {
-      Offer offer;
-      if (Offer::TryParse(value[kOfferMessageBody], &offer).ok()) {
-        message.body = std::move(offer);
+      auto offer_or_error = Offer::TryParse(value[kOfferMessageBody]);
+      if (offer_or_error.is_value()) {
+        message.body = std::move(offer_or_error.value());
         message.valid = true;
       }
     } break;

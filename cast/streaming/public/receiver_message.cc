@@ -203,10 +203,10 @@ ErrorOr<ReceiverMessage> ReceiverMessage::Parse(const Json::Value& value) {
 
   switch (message.type) {
     case Type::kAnswer: {
-      Answer answer;
-      if (openscreen::cast::Answer::TryParse(value[kAnswerMessageBody],
-                                             &answer)) {
-        message.body = std::move(answer);
+      auto answer_or_error =
+          openscreen::cast::Answer::TryParse(value[kAnswerMessageBody]);
+      if (answer_or_error.is_value()) {
+        message.body = std::move(answer_or_error.value());
         message.valid = true;
       }
     } break;

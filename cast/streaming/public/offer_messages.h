@@ -43,9 +43,7 @@ inline constexpr int kDefaultNumAudioChannels = 2;
 struct Stream {
   enum class Type : uint8_t { kAudioSource, kVideoSource };
 
-  static Error TryParse(const Json::Value& root,
-                        Stream::Type type,
-                        Stream* out);
+  static ErrorOr<Stream> TryParse(const Json::Value& root, Stream::Type type);
   Json::Value ToJson() const;
   bool IsValid() const;
 
@@ -77,7 +75,7 @@ struct Stream {
 };
 
 struct AudioStream {
-  static Error TryParse(const Json::Value& root, AudioStream* out);
+  static ErrorOr<AudioStream> TryParse(const Json::Value& root);
   Json::Value ToJson() const;
   bool IsValid() const;
 
@@ -87,7 +85,7 @@ struct AudioStream {
 };
 
 struct VideoStream {
-  static Error TryParse(const Json::Value& root, VideoStream* out);
+  static ErrorOr<VideoStream> TryParse(const Json::Value& root);
   Json::Value ToJson() const;
   bool IsValid() const;
 
@@ -103,7 +101,7 @@ struct VideoStream {
 };
 
 struct Offer {
-  static Error TryParse(const Json::Value& root, Offer* out);
+  static ErrorOr<Offer> TryParse(const Json::Value& root);
   Json::Value ToJson() const;
   bool IsValid() const;
 
