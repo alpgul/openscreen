@@ -7,6 +7,7 @@
 #include <memory>
 #include <variant>
 
+#include "cast/streaming/impl/message_constants.h"
 #include "cast/streaming/testing/message_pipe.h"
 #include "cast/streaming/testing/simple_message_port.h"
 #include "gtest/gtest.h"
@@ -38,7 +39,7 @@ Offer kExampleOffer{
                         std::nullopt,
                         48000,
                         "",
-                        {"input_events"}},
+                        {kInputEventsRtpExtension}},
                  AudioCodec::kOpus, 1400}},
     {VideoStream{Stream{1,
                         Stream::Type::kVideoSource,
@@ -52,7 +53,7 @@ Offer kExampleOffer{
                         std::nullopt,
                         90000,
                         "",
-                        {"input_events"}},
+                        {kInputEventsRtpExtension}},
                  VideoCodec::kVp8,
                  SimpleFraction{30, 1},
                  3000000,

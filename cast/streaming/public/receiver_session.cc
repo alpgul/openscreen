@@ -13,6 +13,7 @@
 
 #include "cast/common/channel/message_util.h"
 #include "cast/common/public/message_port.h"
+#include "cast/streaming/impl/message_constants.h"
 #include "cast/streaming/message_fields.h"
 #include "cast/streaming/public/answer_messages.h"
 #include "cast/streaming/public/constants.h"
@@ -466,10 +467,9 @@ ReceiverSession::ConfiguredReceivers ReceiverSession::SpawnReceivers(
 
   bool input_enabled = false;
   if (constraints_.supports_input_events) {
-    const auto* audio = properties.selected_audio.get();
     const auto* video = properties.selected_video.get();
-    if ((audio && Contains(audio->stream.rtp_extensions, "input_events")) ||
-        (video && Contains(video->stream.rtp_extensions, "input_events"))) {
+    if (video &&
+        Contains(video->stream.rtp_extensions, kInputEventsRtpExtension)) {
       input_enabled = true;
     }
   }
@@ -494,6 +494,9 @@ void ReceiverSession::ResetReceivers(Client::ReceiversDestroyingReason reason) {
 Answer ReceiverSession::ConstructAnswer(const PendingOffer& properties) {
   OSP_CHECK(properties.IsValid());
 
+  // NOTE: The stream_indexes are intended to be always audio first, video
+  // second. Related arrays, such as stream_ssrcs and rtp_extensions, are
+  // expected to follow the same ordering.
   std::vector<int> stream_indexes;
   std::vector<Ssrc> stream_ssrcs;
   std::vector<int> stream_indexes_with_events;
@@ -566,13 +569,16 @@ Answer ReceiverSession::ConstructAnswer(const PendingOffer& properties) {
     stream_ssrcs.push_back(properties.selected_video->stream.ssrc + 1);
   }
 
-  std::vector<std::string> rtp_extensions;
+  std::vector<std::vector<std::string>> rtp_extensions;
   if (constraints_.supports_input_events) {
-    const auto* audio = properties.selected_audio.get();
-    const auto* video = properties.selected_video.get();
-    if ((audio && Contains(audio->stream.rtp_extensions, "input_events")) ||
-        (video && Contains(video->stream.rtp_extensions, "input_events"))) {
-      rtp_extensions.push_back("input_events");
+    const bool sender_requested_input_events =
+        properties.selected_video &&
+        Contains(properties.selected_video->stream.rtp_extensions,
+                 kInputEventsRtpExtension);
+
+    if (sender_requested_input_events) {
+      rtp_extensions.emplace_back();
+      rtp_extensions.push_back({kInputEventsRtpExtension});
     }
   }
 

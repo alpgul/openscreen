@@ -14,6 +14,7 @@
 #include <variant>
 
 #include "cast/streaming/impl/clock_offset_estimator.h"
+#include "cast/streaming/impl/message_constants.h"
 #include "cast/streaming/message_fields.h"
 #include "cast/streaming/public/capture_recommendations.h"
 #include "cast/streaming/public/environment.h"
@@ -95,19 +96,15 @@ AudioStream CreateStream(int index,
                          const AudioCaptureConfig& config,
                          bool use_android_rtp_hack,
                          std::optional<UdpSocket::DscpMode> dscp_mode,
-                         bool supports_input_events) {
+                         bool /* supports_input_events */) {
   std::vector<std::string> rtp_extensions;
-  if (supports_input_events) {
-    rtp_extensions.push_back("input_events");
-  }
   return AudioStream{
       Stream{index, Stream::Type::kAudioSource, config.channels,
              GetPayloadType(config.codec, use_android_rtp_hack),
              GenerateSsrc(true /*high_priority*/), config.target_playout_delay,
              GenerateRandomBytes16(), GenerateRandomBytes16(),
              true /* receiver_rtcp_event_log */, ToWire(dscp_mode),
-             config.sample_rate, config.codec_parameter,
-             std::move(rtp_extensions)},
+             config.sample_rate, config.codec_parameter},
       config.codec, std::max(config.bit_rate, kDefaultAudioMinBitRate)};
 }
 
@@ -119,7 +116,7 @@ VideoStream CreateStream(int index,
   constexpr int kVideoStreamChannelCount = 1;
   std::vector<std::string> rtp_extensions;
   if (supports_input_events) {
-    rtp_extensions.push_back("input_events");
+    rtp_extensions.push_back(kInputEventsRtpExtension);
   }
   return VideoStream{
       Stream{index, Stream::Type::kVideoSource, kVideoStreamChannelCount,

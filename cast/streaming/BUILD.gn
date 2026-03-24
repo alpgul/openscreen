@@ -77,6 +77,7 @@ openscreen_source_set("common") {
     "impl/expanded_value_base.h",
     "impl/frame_crypto.cc",
     "impl/frame_crypto.h",
+    "impl/message_constants.h",
     "impl/ntp_time.cc",
     "impl/ntp_time.h",
     "impl/packet_util.cc",

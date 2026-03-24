@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "cast/streaming/capture_configs.h"
+#include "cast/streaming/impl/message_constants.h"
 #include "cast/streaming/input.pb.h"
 #include "cast/streaming/public/capture_recommendations.h"
 #include "cast/streaming/public/protobuf_messenger.h"
@@ -758,7 +759,7 @@ TEST_F(SenderSessionTest, InputEventsOptIn) {
   bool found_extension = false;
   for (const auto& stream : offer["supportedStreams"]) {
     for (const auto& ext : stream["rtpExtensions"]) {
-      if (ext.asString() == "input_events") {
+      if (ext.asString() == kInputEventsRtpExtension) {
         found_extension = true;
         break;
       }

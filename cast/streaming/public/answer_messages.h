@@ -114,7 +114,7 @@ struct Answer {
   std::vector<int> receiver_rtcp_dscp;
 
   // RTP extensions should be empty, but not null.
-  std::vector<std::string> rtp_extensions = {};
+  std::vector<std::vector<std::string>> rtp_extensions = {};
 };
 
 }  // namespace openscreen::cast

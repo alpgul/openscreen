@@ -63,7 +63,8 @@ constexpr char kValidAnswerJson[] = R"({
   },
   "receiverRtcpEventLog": [0, 1],
   "receiverRtcpDscp": [1, 3],
-  "rtpExtensions": ["adaptive_playout_delay"]
+  "rtpExtensions": [["input_events", "adaptive_playout_delay"],
+                    ["adaptive_playout_delay"]]
 })";
 
 const Answer kValidAnswer{
@@ -94,9 +95,9 @@ const Answer kValidAnswer{
         std::optional<AspectRatioConstraint>(
             AspectRatioConstraint::kFixed),  // scaling
     }),
-    std::vector<int>{7, 8, 9},              // receiver_rtcp_event_log
-    std::vector<int>{1, 3},                 // receiver_rtcp_dscp
-    std::vector<std::string>{"foo", "bar"}  // rtp_extensions
+    std::vector<int>{7, 8, 9},  // receiver_rtcp_event_log
+    std::vector<int>{1, 3},     // receiver_rtcp_dscp
+    std::vector<std::vector<std::string>>{{"foo"}, {"bar"}}  // rtp_extensions
 };
 
 constexpr int kValidMaxPixelsPerSecond = 1920 * 1080 * 30;
@@ -147,7 +148,9 @@ void ExpectEqualsValidAnswerJson(const Answer& answer) {
 
   EXPECT_THAT(answer.receiver_rtcp_event_log, ElementsAre(0, 1));
   EXPECT_THAT(answer.receiver_rtcp_dscp, ElementsAre(1, 3));
-  EXPECT_THAT(answer.rtp_extensions, ElementsAre("adaptive_playout_delay"));
+  EXPECT_THAT(answer.rtp_extensions,
+              ElementsAre(ElementsAre("input_events", "adaptive_playout_delay"),
+                          ElementsAre("adaptive_playout_delay")));
 }
 
 void ExpectFailureOnParse(std::string_view raw_json) {
@@ -243,8 +246,10 @@ TEST(AnswerMessagesTest, ProperlyPopulatedAnswerSerializesProperly) {
 
   Json::Value rtp_extensions = std::move(root["rtpExtensions"]);
   EXPECT_EQ(rtp_extensions.type(), Json::ValueType::arrayValue);
-  EXPECT_EQ(rtp_extensions[0], "foo");
-  EXPECT_EQ(rtp_extensions[1], "bar");
+  EXPECT_EQ(rtp_extensions[0].type(), Json::ValueType::arrayValue);
+  EXPECT_EQ(rtp_extensions[0][0], "foo");
+  EXPECT_EQ(rtp_extensions[1].type(), Json::ValueType::arrayValue);
+  EXPECT_EQ(rtp_extensions[1][0], "bar");
 }
 
 TEST(AnswerMessagesTest, EmptyArraysOmitted) {

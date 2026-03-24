@@ -8,6 +8,7 @@
 #include <memory>
 #include <utility>
 
+#include "cast/streaming/impl/message_constants.h"
 #include "cast/streaming/input.pb.h"
 #include "cast/streaming/public/receiver.h"
 #include "cast/streaming/testing/mock_environment.h"
@@ -1130,15 +1131,11 @@ TEST_F(ReceiverSessionTest, InputEventsOptIn) {
   ASSERT_EQ(1u, messages.size());
   Json::Value message = ExpectIsValidAnswer(messages[0]);
   const Json::Value& answer = message["answer"];
-
-  bool found_extension = false;
-  for (const auto& ext : answer["rtpExtensions"]) {
-    if (ext.asString() == "input_events") {
-      found_extension = true;
-      break;
-    }
-  }
-  EXPECT_TRUE(found_extension);
+  const Json::Value& extensions = answer["rtpExtensions"];
+  EXPECT_TRUE(
+      std::ranges::any_of(extensions, [](const Json::Value& stream_extensions) {
+        return Contains(stream_extensions, kInputEventsRtpExtension);
+      }));
 }
 
 TEST_F(ReceiverSessionTest, HandlesInputMessage) {

@@ -415,7 +415,7 @@ ErrorOr<Answer> Answer::TryParse(const Json::Value& root) {
   json::TryParseIntArray(root[kReceiverRtcpEventLog],
                          &out.receiver_rtcp_event_log);
   json::TryParseIntArray(root[kReceiverRtcpDscp], &out.receiver_rtcp_dscp);
-  json::TryParseStringArray(root[kRtpExtensions], &out.rtp_extensions);
+  json::TryParseNestedStringArray(root[kRtpExtensions], &out.rtp_extensions);
 
   if (!out.IsValid()) {
     return Error(Error::Code::kJsonParseError, "Invalid answer");
@@ -466,7 +466,7 @@ Json::Value Answer::ToJson() const {
     root[kReceiverRtcpDscp] = json::PrimitiveVectorToJson(receiver_rtcp_dscp);
   }
   if (!rtp_extensions.empty()) {
-    root[kRtpExtensions] = json::PrimitiveVectorToJson(rtp_extensions);
+    root[kRtpExtensions] = json::NestedStringArrayToJson(rtp_extensions);
   }
   return root;
 }

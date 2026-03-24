@@ -476,14 +476,14 @@ The "type" must be set to "ANSWER", with the message body in an "answer" object.
 
 | Name | Type | Value/description |
 | :---- | :---- | :---- |
-| udpPort | `int` | A Number specifying the UDP port used for all streams (RTP and RTCP) in this session. *Note: values 1 to 65535 is valid.* |
+| udpPort | `int` | A Number specifying the UDP port used for all streams (RTP and RTCP) in this session. *Note: values 1 to 65535 are valid.* |
 | sendIndexes | `Array of  int` | Numbers specifying the indexes chosen from the `OFFER` message. |
-| ssrcs | `Array of  uint32` | Number specifying the RTP SSRC used to send the RTCP feedback of the stream indicated by the "sendIndexes" above. *Note: values 0 to 2^32 is valid.* |
+| ssrcs | `Array of  uint32` | Numbers specifying the RTP SSRC used to send the RTCP feedback of the stream indicated by the "sendIndexes" above. Order must match `sendIndexes` exactly. *Note: values 0 to 2^32 are valid.* |
 | constraints | `receiver constraints object` (optional, but highly recommended) | Provides detailed maximum capabilities of the receiver for processing the streams selected in "sendIndexes" above; including audio sampling rate and number of channels, video dimensions and rates, encoded bit rates, and target latency. A sender may alter video resolution or frame rate throughout a session. The constraints here restrict how much data volume is allowed before the sender must subsample (e.g., downscale and/or reduce frame rate). |
 | display | `display description object` (optional, but highly recommended) | Provides details about the display on the receiver, including dimensions (aspect ratio implied), scaling behavior, color profile, etc. |
 | receiverRtcpEventLog | `Array of int` (optional) | Numbers specifying the indexes of streams that will send event log via RTCP. If this field is not present then the receiver does not support sending an event log via RTCP. |
 | receiverRtcpDscp | `Array of int` (optional) | Numbers specifying the indexes of streams that will use DSCP values specified in the `OFFER` message for RTCP packets. If this field is not present then the receiver does not support DSCP. |
-| rtpExtensions | `Array of string` (optional) | If this field is not present then the receiver does not support any RTP extensions. |
+| rtpExtensions | `Array of Array of string` (optional) | Arrays specifying the RTP extensions enabled for each stream, in the same order as `sendIndexes`. If this field is not present then the receiver does not support any RTP extensions. |
 
 ##### Receiver Constraints Object Definition
 
