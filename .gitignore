@@ -1,22 +1,43 @@
+# Build Outputs & Directories
 /out*/
-build/
-buildtools/
-clang-format
-osp/impl/quic/certificates/agent_certificate.crt
-osp/impl/quic/certificates/private_key.key
-tools/clang/scripts/update.py
-*sysroot
-*.profraw
-*.profdata
-generated_root_cast_receiver*
-yajsv
-yajsv.exe
-__pycache__
-.vs/
-*.pyc
-.vscode/
-build/mac_files/
-third_party/rust-toolchain/
 LASTCHANGE
 LASTCHANGE.committime
+build/
 gclient_args.gni
+
+# Tools & Dependencies
+*sysroot
+buildtools/
+clang-format
+third_party/rust-toolchain/
+tools/clang/scripts/update.py
+yajsv
+yajsv.exe
+
+# Certificates & Keys
+osp/impl/quic/certificates/agent_certificate.crt
+osp/impl/quic/certificates/private_key.key
+
+# Generated, Temp, and Trace Files
+*.pftrace
+*.profdata
+*.profraw
+*.pyc
+__pycache__/
+generated_root_cast_receiver*
+
+# IDEs & Editors
+.vs/
+.vscode/
+
+# AI Assistants & Agents
+*copilot*
+.aider*
+.claude/
+.cline/
+.cline_history/
+.cursor/
+.cursorrules
+.gemini/
+GEMINI.md
+claude.json
