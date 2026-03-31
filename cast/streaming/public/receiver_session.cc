@@ -14,6 +14,7 @@
 #include "cast/common/channel/message_util.h"
 #include "cast/common/public/message_port.h"
 #include "cast/streaming/impl/message_constants.h"
+#include "cast/streaming/impl/receiver_impl.h"
 #include "cast/streaming/message_fields.h"
 #include "cast/streaming/public/answer_messages.h"
 #include "cast/streaming/public/constants.h"
@@ -430,8 +431,8 @@ std::unique_ptr<Receiver> ReceiverSession::ConstructReceiver(
   if (!config.IsValid()) {
     return nullptr;
   }
-  return std::make_unique<Receiver>(environment_, packet_router_,
-                                    std::move(config));
+  return std::make_unique<ReceiverImpl>(environment_, packet_router_,
+                                        std::move(config));
 }
 
 ReceiverSession::ConfiguredReceivers ReceiverSession::SpawnReceivers(

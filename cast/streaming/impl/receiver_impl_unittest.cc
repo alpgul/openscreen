@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "cast/streaming/public/receiver.h"
+#include "cast/streaming/impl/receiver_impl.h"
 
 #include <stdint.h>
 
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -21,11 +22,11 @@
 #include "cast/streaming/impl/rtp_defines.h"
 #include "cast/streaming/impl/rtp_packetizer.h"
 #include "cast/streaming/impl/sender_report_builder.h"
-#include "cast/streaming/impl/session_config.h"
 #include "cast/streaming/impl/statistics_common.h"
 #include "cast/streaming/public/constants.h"
 #include "cast/streaming/public/encoded_frame.h"
 #include "cast/streaming/public/environment.h"
+#include "cast/streaming/public/session_config.h"
 #include "cast/streaming/rtp_time.h"
 #include "cast/streaming/ssrc.h"
 #include "cast/streaming/testing/mock_environment.h"
@@ -157,16 +158,6 @@ MATCHER_P(EqualsDuration, expected, ToString(expected)) {
   return false;
 }
 
-class MockCompoundRtcpBuilder : public CompoundRtcpBuilder {
- public:
-  explicit MockCompoundRtcpBuilder(RtcpSession& session)
-      : CompoundRtcpBuilder(session) {}
-  MOCK_METHOD(void,
-              IncludeReceiverLogsInNextPacket,
-              (std::vector<RtcpReceiverFrameLogMessage> logs),
-              (override));
-};
-
 // Processes packets from the Receiver under test, as a real Sender might, and
 // allows the unit tests to set expectations on events of interest to confirm
 // proper behavior of the Receiver.
@@ -278,6 +269,10 @@ class MockSender : public CompoundRtcpParser::Client {
               OnReceiverReport,
               (const RtcpReportBlock& receiver_report),
               (override));
+  MOCK_METHOD(void,
+              OnCastReceiverFrameLogMessages,
+              (std::vector<RtcpReceiverFrameLogMessage> messages),
+              (override));
   MOCK_METHOD(void, OnReceiverIndicatesPictureLoss, (), (override));
   MOCK_METHOD(void,
               OnReceiverCheckpoint,
@@ -308,7 +303,7 @@ class MockSender : public CompoundRtcpParser::Client {
 
 class MockConsumer : public Receiver::Consumer {
  public:
-  MOCK_METHOD(void, OnFramesReady, (int next_frame_buffer_size), (override));
+  MOCK_METHOD(void, OnFramesReady, (size_t next_frame_buffer_size), (override));
 };
 
 class ReceiverTest : public testing::Test {
@@ -324,14 +319,15 @@ class ReceiverTest : public testing::Test {
 
   ~ReceiverTest() override = default;
 
-  void ConstructReceiver() {
-    receiver_ = std::make_unique<Receiver>(
+  void ConstructReceiver(bool is_pli_enabled = true) {
+    receiver_.reset();
+    receiver_ = std::make_unique<ReceiverImpl>(
         env_, packet_router_,
-        SessionConfig(kSenderSsrc, kReceiverSsrc, kRtpTimebase,
-                      /* .channels = */ 2, kTargetPlayoutDelay, kAesKey,
-                      kCastIvMask,
-                      /* .is_pli_enabled = */ true, StreamType::kUnknown,
-                      /* .are_receiver_event_logs_enabled = */ true));
+        SessionConfig(
+            kSenderSsrc, kReceiverSsrc, kRtpTimebase,
+            /* .channels = */ 2, kTargetPlayoutDelay, kAesKey, kCastIvMask,
+            /* .is_pli_enabled = */ is_pli_enabled, StreamType::kUnknown,
+            /* .are_receiver_event_logs_enabled = */ true));
     env_.SetSocketSubscriber(&socket_subscriber_);
     ON_CALL(env_, SendPacket(_, _))
         .WillByDefault([this](ByteView packet, PacketMetadata metadata) {
@@ -345,7 +341,7 @@ class ReceiverTest : public testing::Test {
     receiver_->SetConsumer(&consumer_);
   }
 
-  Receiver* receiver() { return receiver_.get(); }
+  ReceiverImpl* receiver() { return receiver_.get(); }
   MockSender* sender() { return &sender_; }
   MockConsumer* consumer() { return &consumer_; }
 
@@ -389,9 +385,9 @@ class ReceiverTest : public testing::Test {
   void ConsumeAndVerifyFrame(const SimulatedFrame& sent_frame) {
     SCOPED_TRACE(testing::Message() << "for frame " << sent_frame.frame_id);
 
-    const int payload_size = receiver()->AdvanceToNextFrame();
-    ASSERT_NE(Receiver::kNoFramesReady, payload_size);
-    std::vector<uint8_t> buffer(payload_size);
+    const std::optional<size_t> payload_size = receiver()->AdvanceToNextFrame();
+    ASSERT_TRUE(payload_size.has_value());
+    std::vector<uint8_t> buffer(*payload_size);
     EncodedFrame received_frame = receiver()->ConsumeNextFrame(buffer);
 
     EXPECT_EQ(sent_frame.dependency, received_frame.dependency);
@@ -402,7 +398,7 @@ class ReceiverTest : public testing::Test {
     EXPECT_THAT(sent_frame.reference_time + kOneWayNetworkDelay +
                     SimulatedFrame::GetExpectedPlayoutDelay(
                         sent_frame.frame_id - FrameId::first()) -
-                    receiver()->GetPlayerProcessingTimeForTesting(),
+                    expected_player_processing_time_,
                 EqualsDuration(received_frame.reference_time));
     EXPECT_THAT(sent_frame.new_playout_delay,
                 EqualsDuration(received_frame.new_playout_delay));
@@ -420,12 +416,16 @@ class ReceiverTest : public testing::Test {
     }
   }
 
+ protected:
+  Clock::duration expected_player_processing_time_ =
+      Receiver::kDefaultPlayerProcessingTime;
+
  private:
   FakeClock clock_;
   FakeTaskRunner task_runner_;
   testing::NiceMock<MockEnvironment> env_;
   ReceiverPacketRouter packet_router_;
-  std::unique_ptr<Receiver> receiver_;
+  std::unique_ptr<ReceiverImpl> receiver_;
   testing::NiceMock<MockSender> sender_;
   testing::NiceMock<MockConsumer> consumer_;
   SimpleSubscriber socket_subscriber_;
@@ -534,7 +534,7 @@ TEST_F(ReceiverTest, ReceivesFramesInOrder) {
   testing::Mock::VerifyAndClearExpectations(sender());
 
   ConsumeAndVerifyFrames(0, 9, start_time);
-  EXPECT_EQ(Receiver::kNoFramesReady, receiver()->AdvanceToNextFrame());
+  EXPECT_FALSE(receiver()->AdvanceToNextFrame().has_value());
 }
 
 // Tests that the Receiver processes RTP packets, can receive frames out of
@@ -577,7 +577,7 @@ TEST_F(ReceiverTest, ReceivesFramesOutOfOrder) {
   testing::Mock::VerifyAndClearExpectations(sender());
 
   ConsumeAndVerifyFrames(0, 4, start_time);
-  EXPECT_EQ(Receiver::kNoFramesReady, receiver()->AdvanceToNextFrame());
+  EXPECT_FALSE(receiver()->AdvanceToNextFrame().has_value());
 }
 
 // Tests that the Receiver will respond to a key frame request from its client
@@ -644,7 +644,7 @@ TEST_F(ReceiverTest, RequestsKeyFrameToRectifyPictureLoss) {
 }
 
 TEST_F(ReceiverTest, PLICanBeDisabled) {
-  receiver()->SetPliEnabledForTesting(false);
+  ConstructReceiver(false);
 
   EXPECT_CALL(*sender(), OnReceiverIndicatesPictureLoss()).Times(0);
   receiver()->RequestKeyFrame();
@@ -724,11 +724,12 @@ TEST_F(ReceiverTest, DropsLateFrames) {
 
   // Before any packets have been sent/received, the Receiver should indicate no
   // frames are ready.
-  EXPECT_EQ(Receiver::kNoFramesReady, receiver()->AdvanceToNextFrame());
+  EXPECT_FALSE(receiver()->AdvanceToNextFrame().has_value());
 
   // Set a ridiculously-large estimated player processing time so that the logic
   // thinks every frame going to play out too late.
   receiver()->SetPlayerProcessingTime(seconds(3));
+  expected_player_processing_time_ = seconds(3);
 
   // In this test there are eight frames total:
   //   - Frame 0: Key frame.
@@ -758,7 +759,7 @@ TEST_F(ReceiverTest, DropsLateFrames) {
   }
   testing::Mock::VerifyAndClearExpectations(consumer());
   testing::Mock::VerifyAndClearExpectations(sender());
-  EXPECT_EQ(Receiver::kNoFramesReady, receiver()->AdvanceToNextFrame());
+  EXPECT_FALSE(receiver()->AdvanceToNextFrame().has_value());
 
   // Send all the packets of Frame 6 (the second key frame) and Frame 7. The
   // Receiver still cannot drop any frames because it has not seen packet 0 of
@@ -773,7 +774,7 @@ TEST_F(ReceiverTest, DropsLateFrames) {
   AdvanceClockAndRunTasks(kRoundTripNetworkDelay);
   testing::Mock::VerifyAndClearExpectations(consumer());
   testing::Mock::VerifyAndClearExpectations(sender());
-  EXPECT_EQ(Receiver::kNoFramesReady, receiver()->AdvanceToNextFrame());
+  EXPECT_FALSE(receiver()->AdvanceToNextFrame().has_value());
 
   // Send packet 0 for all but Frame 5, which contains a target playout delay
   // change. All but the last two frames will still be incomplete. The Receiver
@@ -791,7 +792,7 @@ TEST_F(ReceiverTest, DropsLateFrames) {
   AdvanceClockAndRunTasks(kRoundTripNetworkDelay);
   testing::Mock::VerifyAndClearExpectations(consumer());
   testing::Mock::VerifyAndClearExpectations(sender());
-  EXPECT_EQ(Receiver::kNoFramesReady, receiver()->AdvanceToNextFrame());
+  EXPECT_FALSE(receiver()->AdvanceToNextFrame().has_value());
 
   // Finally, send packet 0 for Frame 5. Now, the Receiver will drop every frame
   // before the completely-received second key frame, as they are all still
@@ -834,15 +835,12 @@ TEST_F(ReceiverTest, ReportsFrameAckAndPacketReceivedEvents) {
 
   const SimulatedFrame kFrame(start_time, 0);
 
-  // Mock the RTCP builder and report the playout event.
-  auto rtcp_builder = std::make_unique<NiceMock<MockCompoundRtcpBuilder>>(
-      *receiver()->GetRtcpSessionForTesting());
+  // Intercept the playout event logs sent to the sender.
   std::vector<RtcpReceiverFrameLogMessage> logs;
-  EXPECT_CALL(*rtcp_builder, IncludeReceiverLogsInNextPacket(_))
+  EXPECT_CALL(*sender(), OnCastReceiverFrameLogMessages(_))
       .WillRepeatedly([&](std::vector<RtcpReceiverFrameLogMessage> new_logs) {
         logs.insert(logs.end(), new_logs.begin(), new_logs.end());
       });
-  receiver()->SetRtcpBuilderForTesting(std::move(rtcp_builder));
 
   // Send a frame, and consume it.
   ReceiveFrame(0, start_time, kTargetPlayoutDelay, kRoundTripNetworkDelay);
@@ -877,28 +875,25 @@ TEST_F(ReceiverTest, ReportPlayoutEvent) {
 
   const SimulatedFrame kPlayedOutFrame(start_time, 0);
 
-  // Mock the RTCP builder and report the playout event.
-  auto rtcp_builder = std::make_unique<NiceMock<MockCompoundRtcpBuilder>>(
-      *receiver()->GetRtcpSessionForTesting());
-  std::vector<RtcpReceiverFrameLogMessage> logs;
-  EXPECT_CALL(*rtcp_builder, IncludeReceiverLogsInNextPacket(_))
-      .WillRepeatedly([&](std::vector<RtcpReceiverFrameLogMessage> new_logs) {
-        logs.insert(logs.end(), new_logs.begin(), new_logs.end());
-      });
-  receiver()->SetRtcpBuilderForTesting(std::move(rtcp_builder));
-
   // Send a frame, and consume it.
   ReceiveFrame(0, start_time, kTargetPlayoutDelay, kRoundTripNetworkDelay);
   ConsumeAndVerifyFrame(kPlayedOutFrame);
 
+  // Intercept the playout event logs sent to the sender.
+  std::vector<RtcpReceiverFrameLogMessage> logs;
+  EXPECT_CALL(*sender(), OnCastReceiverFrameLogMessages(_))
+      .WillRepeatedly([&](std::vector<RtcpReceiverFrameLogMessage> new_logs) {
+        logs.insert(logs.end(), new_logs.begin(), new_logs.end());
+      });
+
   receiver()->ReportPlayoutEvent(kPlayedOutFrame.frame_id,
                                  kPlayedOutFrame.rtp_timestamp, now());
-  AdvanceClockAndRunTasks(kRtcpReportInterval);
+  AdvanceClockAndRunTasks(kRtcpReportInterval + kOneWayNetworkDelay);
 
-  ASSERT_EQ(logs.size(), 2u);
+  ASSERT_EQ(logs.size(), 1u);
 
-  // Only check out the second log for the frame playout event.
-  const auto& frame_log = logs[1];
+  // Only check out the log for the frame playout event.
+  const auto& frame_log = logs[0];
   EXPECT_EQ(frame_log.rtp_timestamp, kPlayedOutFrame.rtp_timestamp);
   ASSERT_EQ(frame_log.messages.size(), 1u);
   const auto& event_log1 = frame_log.messages[0];
@@ -915,11 +910,12 @@ TEST_F(ReceiverTest, ReportPlayoutEventTooEarly) {
   ExchangeInitialReportPackets(start_time);
 
   const SimulatedFrame kPlayedOutFrame(start_time, 0);
-  // Mock the RTCP builder and report the playout event.
-  auto rtcp_builder = std::make_unique<NiceMock<MockCompoundRtcpBuilder>>(
-      *receiver()->GetRtcpSessionForTesting());
-  EXPECT_CALL(*rtcp_builder, IncludeReceiverLogsInNextPacket(_))
-      .WillOnce([](std::vector<RtcpReceiverFrameLogMessage>) {})
+  // Send a frame, and consume it.
+  ReceiveFrame(0, start_time, kTargetPlayoutDelay, kRoundTripNetworkDelay);
+  ConsumeAndVerifyFrame(kPlayedOutFrame);
+
+  // Intercept the playout event logs sent to the sender.
+  EXPECT_CALL(*sender(), OnCastReceiverFrameLogMessages(_))
       .WillOnce([&](std::vector<RtcpReceiverFrameLogMessage> logs) {
         ASSERT_EQ(logs.size(), 1u);
         const auto& frame_log = logs[0];
@@ -933,16 +929,11 @@ TEST_F(ReceiverTest, ReportPlayoutEventTooEarly) {
         EXPECT_THAT(frame_log.messages[0].timestamp,
                     EqualsDuration(start_time + milliseconds(62)));
       });
-  receiver()->SetRtcpBuilderForTesting(std::move(rtcp_builder));
-
-  // Send a frame, and consume it.
-  ReceiveFrame(0, start_time, kTargetPlayoutDelay, kRoundTripNetworkDelay);
-  ConsumeAndVerifyFrame(kPlayedOutFrame);
 
   AdvanceClockAndRunTasks(milliseconds(50));
   receiver()->ReportPlayoutEvent(kPlayedOutFrame.frame_id,
                                  kPlayedOutFrame.rtp_timestamp, now());
-  AdvanceClockAndRunTasks(kRtcpReportInterval);
+  AdvanceClockAndRunTasks(kRtcpReportInterval + kOneWayNetworkDelay);
 }
 
 // Verifies that reporting a playout event for a frame that is too old
@@ -956,9 +947,10 @@ TEST_F(ReceiverTest, ReportPlayoutEventForTooOldFrame) {
     sender()->SetFrameBeingSent(SimulatedFrame(start_time, i));
     sender()->SendRtpPackets(sender()->GetAllPacketIds());
     AdvanceClockAndRunTasks(kRoundTripNetworkDelay);
-    const int payload_size = receiver()->AdvanceToNextFrame();
-    ASSERT_NE(Receiver::kNoFramesReady, payload_size);
-    std::vector<uint8_t> buffer(payload_size);
+    const std::optional<size_t> payload_size = receiver()->AdvanceToNextFrame();
+    ASSERT_TRUE(payload_size.has_value());
+
+    std::vector<uint8_t> buffer(*payload_size);
     receiver()->ConsumeNextFrame(buffer);
   }
 
@@ -979,11 +971,12 @@ TEST_F(ReceiverTest, ReportPlayoutEventWithZeroDelay) {
 
   const SimulatedFrame kPlayedOutFrame(start_time, 0);
 
-  // Mock the RTCP builder and report the playout event.
-  auto rtcp_builder = std::make_unique<NiceMock<MockCompoundRtcpBuilder>>(
-      *receiver()->GetRtcpSessionForTesting());
-  EXPECT_CALL(*rtcp_builder, IncludeReceiverLogsInNextPacket(_))
-      .WillOnce([](std::vector<RtcpReceiverFrameLogMessage>) {})
+  // Send a frame, and consume it.
+  ReceiveFrame(0, start_time, kTargetPlayoutDelay, kRoundTripNetworkDelay);
+  ConsumeAndVerifyFrame(kPlayedOutFrame);
+
+  // Intercept the playout event logs sent to the sender.
+  EXPECT_CALL(*sender(), OnCastReceiverFrameLogMessages(_))
       .WillOnce([&](std::vector<RtcpReceiverFrameLogMessage> logs) {
         ASSERT_EQ(logs.size(), 1u);
         const auto& frame_log = logs[0];
@@ -997,15 +990,10 @@ TEST_F(ReceiverTest, ReportPlayoutEventWithZeroDelay) {
         EXPECT_THAT(event_log1.timestamp,
                     EqualsDuration(start_time + 2 * kRoundTripNetworkDelay));
       });
-  receiver()->SetRtcpBuilderForTesting(std::move(rtcp_builder));
-
-  // Send a frame, and consume it.
-  ReceiveFrame(0, start_time, kTargetPlayoutDelay, kRoundTripNetworkDelay);
-  ConsumeAndVerifyFrame(kPlayedOutFrame);
 
   receiver()->ReportPlayoutEvent(kPlayedOutFrame.frame_id,
                                  kPlayedOutFrame.rtp_timestamp, now());
-  AdvanceClockAndRunTasks(kRtcpReportInterval);
+  AdvanceClockAndRunTasks(kRtcpReportInterval + kOneWayNetworkDelay);
 }
 
 }  // namespace

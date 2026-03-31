@@ -15,6 +15,7 @@
 
 #include "cast/streaming/impl/clock_offset_estimator.h"
 #include "cast/streaming/impl/message_constants.h"
+#include "cast/streaming/impl/sender_impl.h"
 #include "cast/streaming/message_fields.h"
 #include "cast/streaming/public/capture_recommendations.h"
 #include "cast/streaming/public/environment.h"
@@ -598,8 +599,8 @@ std::unique_ptr<Sender> SenderSession::CreateSender(Ssrc receiver_ssrc,
                        /* is_pli_enabled*/ true,
                        ToStreamType(type, config_.use_android_rtp_hack)};
   OSP_DCHECK(config.IsValid());
-  return std::make_unique<Sender>(*config_.environment, packet_router_,
-                                  std::move(config), type);
+  return std::make_unique<SenderImpl>(*config_.environment, packet_router_,
+                                      std::move(config), type);
 }
 
 void SenderSession::SpawnAudioSender(ConfiguredSenders* senders,

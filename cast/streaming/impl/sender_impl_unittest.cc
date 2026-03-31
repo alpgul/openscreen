@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "cast/streaming/public/sender.h"
+#include "cast/streaming/impl/sender_impl.h"
 
 #include <stdint.h>
 
@@ -23,10 +23,10 @@
 #include "cast/streaming/impl/rtp_defines.h"
 #include "cast/streaming/impl/rtp_packet_parser.h"
 #include "cast/streaming/impl/sender_report_parser.h"
-#include "cast/streaming/impl/session_config.h"
 #include "cast/streaming/public/constants.h"
 #include "cast/streaming/public/encoded_frame.h"
 #include "cast/streaming/public/frame_id.h"
+#include "cast/streaming/public/session_config.h"
 #include "cast/streaming/sender_packet_router.h"
 #include "cast/streaming/ssrc.h"
 #include "cast/streaming/testing/mock_environment.h"
@@ -363,7 +363,7 @@ class SenderTest : public testing::Test {
 
   ~SenderTest() override = default;
 
-  Sender* sender() { return &sender_; }
+  SenderImpl* sender() { return &sender_; }
   MockReceiver* receiver() { return &receiver_; }
 
   void SetReceiverToSenderNetworkDelay(Clock::duration delay) {
@@ -439,7 +439,7 @@ class SenderTest : public testing::Test {
   FakeTaskRunner task_runner_;
   NiceMock<MockEnvironment> sender_environment_;
   SenderPacketRouter sender_packet_router_;
-  Sender sender_;
+  SenderImpl sender_;
   SimulatedNetworkPipe receiver_to_sender_pipe_;
   NiceMock<MockReceiver> receiver_;
   SimulatedNetworkPipe sender_to_receiver_pipe_;
@@ -457,15 +457,14 @@ TEST_F(SenderTest, SendsFramesEfficiently) {
   // Expect that each packet is only sent once.
   std::set<std::pair<FrameId, FramePacketId>> received_packets;
   EXPECT_CALL(*receiver(), OnRtpPacket(_))
-      .WillRepeatedly(
-          [&](const RtpPacketParser::ParseResult& parsed_packet) {
-            std::pair<FrameId, FramePacketId> id(parsed_packet.frame_id,
-                                                 parsed_packet.packet_id);
-            const auto insert_result = received_packets.insert(id);
-            EXPECT_TRUE(insert_result.second)
-                << "Received duplicate packet: " << id.first << ':'
-                << static_cast<int>(id.second);
-          });
+      .WillRepeatedly([&](const RtpPacketParser::ParseResult& parsed_packet) {
+        std::pair<FrameId, FramePacketId> id(parsed_packet.frame_id,
+                                             parsed_packet.packet_id);
+        const auto insert_result = received_packets.insert(id);
+        EXPECT_TRUE(insert_result.second)
+            << "Received duplicate packet: " << id.first << ':'
+            << static_cast<int>(id.second);
+      });
 
   // Simulate normal frame ACK'ing behavior.
   ON_CALL(*receiver(), OnFrameComplete(_)).WillByDefault(InvokeWithoutArgs([&] {
@@ -510,15 +509,14 @@ TEST_F(SenderTest, WaitsUntilEndOfReportToUpdateObservers) {
   // Expect that each packet is only sent once.
   std::set<std::pair<FrameId, FramePacketId>> received_packets;
   EXPECT_CALL(*receiver(), OnRtpPacket(_))
-      .WillRepeatedly(
-          [&](const RtpPacketParser::ParseResult& parsed_packet) {
-            std::pair<FrameId, FramePacketId> id(parsed_packet.frame_id,
-                                                 parsed_packet.packet_id);
-            const auto insert_result = received_packets.insert(id);
-            EXPECT_TRUE(insert_result.second)
-                << "Received duplicate packet: " << id.first << ':'
-                << static_cast<int>(id.second);
-          });
+      .WillRepeatedly([&](const RtpPacketParser::ParseResult& parsed_packet) {
+        std::pair<FrameId, FramePacketId> id(parsed_packet.frame_id,
+                                             parsed_packet.packet_id);
+        const auto insert_result = received_packets.insert(id);
+        EXPECT_TRUE(insert_result.second)
+            << "Received duplicate packet: " << id.first << ':'
+            << static_cast<int>(id.second);
+      });
 
   StrictMock<MockObserver> observer;
 
@@ -528,7 +526,7 @@ TEST_F(SenderTest, WaitsUntilEndOfReportToUpdateObservers) {
   EXPECT_CALL(observer, OnFrameCanceled(_))
       .Times(3)
       .WillRepeatedly([sender = sender()](FrameId id) {
-        EXPECT_EQ(0, sender->GetInFlightFrameCount());
+        EXPECT_EQ(0u, sender->GetInFlightFrameCount());
 
         // Since no frames are in flight, the next frame timestamp should not
         // matter.
@@ -1085,7 +1083,7 @@ TEST_F(SenderTest, ResendsIndividuallyNackedPackets) {
   }
   SimulateExecution(kTargetPlayoutDelay);
   Mock::VerifyAndClearExpectations(receiver());
-  EXPECT_EQ(3, sender()->GetInFlightFrameCount());
+  EXPECT_EQ(3u, sender()->GetInFlightFrameCount());
 
   // The Receiver NACKs the three dropped packets...
   receiver()->SetNacksAndAcks(dropped_packets, {});
@@ -1120,7 +1118,7 @@ TEST_F(SenderTest, ResendsIndividuallyNackedPackets) {
   // The Receiver checkpoint feedback(s) travel back to the Sender, and there
   // should no longer be any frames in-flight.
   SimulateExecution(kOneWayNetworkDelay);
-  EXPECT_EQ(0, sender()->GetInFlightFrameCount());
+  EXPECT_EQ(0u, sender()->GetInFlightFrameCount());
 
   // The Sender should not be transmitting anything from now on since all frames
   // are known to have been completely received.
@@ -1212,7 +1210,7 @@ TEST_F(SenderTest, ResendsMissingFrames) {
   }
   SimulateExecution(kTargetPlayoutDelay);
   Mock::VerifyAndClearExpectations(receiver());
-  EXPECT_EQ(0, sender()->GetInFlightFrameCount());
+  EXPECT_EQ(0u, sender()->GetInFlightFrameCount());
 
   // The Sender should not be transmitting anything from now on since all frames
   // are known to have been completely received.

@@ -128,9 +128,9 @@ void StreamingAv1Encoder::EncodeAndSend(
     work_unit.rtp_timestamp = RtpTimeTicks();
   } else {
     work_unit.rtp_timestamp = RtpTimeTicks::FromTimeSinceOrigin(
-        reference_time - start_time_, sender_->rtp_timebase());
+        reference_time - start_time_, sender_->config().rtp_timebase);
     if (work_unit.rtp_timestamp <= last_enqueued_rtp_timestamp_) {
-      OSP_LOG_WARN << "VIDEO[" << sender_->ssrc()
+      OSP_LOG_WARN << "VIDEO[" << sender_->config().sender_ssrc
                    << "] Dropping: RTP timestamp is not monotonically "
                       "increasing from last frame.";
       return;
@@ -138,7 +138,7 @@ void StreamingAv1Encoder::EncodeAndSend(
   }
   if (sender_->GetInFlightMediaDuration(work_unit.rtp_timestamp) >
       sender_->GetMaxInFlightMediaDuration()) {
-    OSP_LOG_WARN << "VIDEO[" << sender_->ssrc()
+    OSP_LOG_WARN << "VIDEO[" << sender_->config().sender_ssrc
                  << "] Dropping: In-flight media duration would be too high.";
     return;
   }
@@ -155,7 +155,7 @@ void StreamingAv1Encoder::EncodeAndSend(
       // a prediction for the next frame's duration.
       frame_duration =
           (work_unit.rtp_timestamp - last_enqueued_rtp_timestamp_)
-              .ToDuration<Clock::duration>(sender_->rtp_timebase());
+              .ToDuration<Clock::duration>(sender_->config().rtp_timebase);
     }
   }
   work_unit.duration =

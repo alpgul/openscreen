@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef CAST_STREAMING_IMPL_SESSION_CONFIG_H_
-#define CAST_STREAMING_IMPL_SESSION_CONFIG_H_
+#ifndef CAST_STREAMING_PUBLIC_SESSION_CONFIG_H_
+#define CAST_STREAMING_PUBLIC_SESSION_CONFIG_H_
 
 #include <array>
 #include <chrono>
@@ -68,4 +68,4 @@ struct SessionConfig final {
 
 }  // namespace openscreen::cast
 
-#endif  // CAST_STREAMING_IMPL_SESSION_CONFIG_H_
+#endif  // CAST_STREAMING_PUBLIC_SESSION_CONFIG_H_
