@@ -90,6 +90,24 @@ void StatisticsDispatcher::DispatchAckEvent(StreamType stream_type,
   environment_.statistics_collector()->CollectFrameEvent(std::move(ack_event));
 }
 
+void StatisticsDispatcher::DispatchFrameDropEvent(StreamType stream_type,
+                                                  FrameId frame_id,
+                                                  RtpTimeTicks rtp_timestamp,
+                                                  Clock::time_point drop_time) {
+  if (!environment_.statistics_collector()) {
+    return;
+  }
+
+  FrameEvent drop_event;
+  drop_event.timestamp = drop_time;
+  drop_event.type = StatisticsEvent::Type::kFrameDroppedByEncoder;
+  drop_event.media_type = StatisticsEvent::ToMediaType(stream_type);
+  drop_event.rtp_timestamp = rtp_timestamp;
+  drop_event.frame_id = frame_id;
+
+  environment_.statistics_collector()->CollectFrameEvent(std::move(drop_event));
+}
+
 void StatisticsDispatcher::DispatchFrameLogMessages(
     StreamType stream_type,
     const std::vector<RtcpReceiverFrameLogMessage>& messages) {

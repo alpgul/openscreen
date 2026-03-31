@@ -224,6 +224,13 @@ void SenderImpl::CancelInFlightData() {
   DispatchCancellations();
 }
 
+void SenderImpl::ReportFrameDropEvent(FrameId frame_id,
+                                      RtpTimeTicks rtp_timestamp,
+                                      Clock::time_point drop_time) {
+  statistics_dispatcher_.DispatchFrameDropEvent(config_.stream_type, frame_id,
+                                                rtp_timestamp, drop_time);
+}
+
 void SenderImpl::OnReceivedRtcpPacket(Clock::time_point arrival_time,
                                       ByteView packet) {
   rtcp_packet_arrival_time_ = arrival_time;

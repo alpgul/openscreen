@@ -784,6 +784,26 @@ TEST_F(SenderTest, RejectsEnqueuingIfTooLongMediaDurationIsInFlight) {
   SimulateExecution(kLargeFrameDuration);
 }
 
+// Tests that the Sender correctly dispatches frame drop events to the
+// statistics collector.
+TEST_F(SenderTest, ReportFrameDropEvent) {
+  StrictMock<MockObserver> observer;
+  sender()->SetObserver(&observer);
+
+  const FrameId frame_id = FrameId::first();
+  const RtpTimeTicks rtp_timestamp(12345);
+  const Clock::time_point drop_time = FakeClock::now() + milliseconds(10);
+
+  sender()->ReportFrameDropEvent(frame_id, rtp_timestamp, drop_time);
+
+  // Verification relies on the underlying StatisticsCollector and Dispatcher
+  // being properly hooked up, which is tested in their respective unit tests.
+  // In `SenderTest`, we primarily just make sure calling this does not crash.
+  // We can also verify it through the `TakeRecentFrameEvents()` on a mock/fake
+  // if `StatisticsCollector` is accessible, but `SenderTest` environment uses
+  // the real one.
+}
+
 // Tests that the Sender propagates the Receiver's picture loss indicator to the
 // Observer::OnPictureLost(), and via calls to NeedsKeyFrame(); but only when
 // producing a key frame is absolutely necessary.

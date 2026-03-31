@@ -160,6 +160,12 @@ class Sender {
   // later. This will notify observers by invoking OnFrameCanceled() for each
   // canceled frame.
   virtual void CancelInFlightData() = 0;
+
+  // May be called by the consumer to report that a frame has been dropped. This
+  // is used to report drop statistics to the sender's statistics collector.
+  virtual void ReportFrameDropEvent(FrameId frame_id,
+                                    RtpTimeTicks rtp_timestamp,
+                                    Clock::time_point drop_time) = 0;
 };
 
 }  // namespace openscreen::cast

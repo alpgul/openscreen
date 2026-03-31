@@ -66,6 +66,9 @@ class SenderImpl final : public Sender,
   [[nodiscard]] EnqueueFrameResult EnqueueFrame(
       const EncodedFrame& frame) override;
   void CancelInFlightData() override;
+  void ReportFrameDropEvent(FrameId frame_id,
+                            RtpTimeTicks rtp_timestamp,
+                            Clock::time_point drop_time) override;
 
  private:
   // Tracking/Storage for frames that are ready-to-send, and until they are
