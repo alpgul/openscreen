@@ -19,6 +19,7 @@
 #include "cast/sender/channel/message_util.h"
 #include "gtest/gtest.h"
 #include "platform/test/paths.h"
+#include "util/no_destructor.h"
 #include "util/read_file.h"
 
 namespace openscreen::cast {
@@ -30,8 +31,9 @@ using proto::DeviceAuthMessage;
 using ::testing::_;
 
 const std::string& GetSpecificTestDataPath() {
-  static std::string data_path = GetTestDataPath() + "cast/receiver/channel/";
-  return data_path;
+  static const NoDestructor<std::string> data_path(GetTestDataPath() +
+                                                   "cast/receiver/channel/");
+  return *data_path;
 }
 
 class DeviceAuthTest : public ::testing::Test {

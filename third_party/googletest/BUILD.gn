@@ -29,10 +29,7 @@ if (build_with_chromium) {
     visibility = [ ":*" ]
     cflags_cc = []
     if (is_clang) {
-      cflags_cc += [
-        "-Wno-exit-time-destructors",
-        "-Wno-sign-compare",
-      ]
+      cflags_cc += [ "-Wno-sign-compare" ]
     }
   }
 
@@ -44,9 +41,6 @@ if (build_with_chromium) {
   config("gtest_warnings") {
     visibility = [ ":*" ]
     cflags_cc = []
-    if (is_clang) {
-      cflags_cc += [ "-Wno-exit-time-destructors" ]
-    }
 
     if (is_win) {
       cflags_cc += [ "-Wno-sign-compare" ]

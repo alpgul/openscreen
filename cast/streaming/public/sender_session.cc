@@ -33,39 +33,40 @@ namespace openscreen::cast {
 namespace {
 // Default error message for a bad CAPABILITIES_RESPONSE message.
 const Error& InvalidCapabilitiesResponseError() {
-  static const Error kError(
+  static const Error* const kError = new Error(
       Error::Code::kRemotingNotSupported,
       "Invalid CAPABILITIES_RESPONSE message, assuming remoting is not "
       "supported");
-  return kError;
+  return *kError;
 }
 
 // Default error message for a bad ANSWER message.
 const Error& InvalidAnswerError() {
-  static const Error kError(Error::Code::kInvalidAnswer,
-                            "Invalid ANSWER message.");
-  return kError;
+  static const Error* const kError =
+      new Error(Error::Code::kInvalidAnswer, "Invalid ANSWER message.");
+  return *kError;
 }
 
 // Error message for an ANSWER timeout.
 const Error& AnswerTimeoutError() {
-  static const Error kError(Error::Code::kAnswerTimeout,
-                            "Didn't receive an ANSWER message before timeout.");
-  return kError;
+  static const Error* const kError =
+      new Error(Error::Code::kAnswerTimeout,
+                "Didn't receive an ANSWER message before timeout.");
+  return *kError;
 }
 
 // Default error message for a bad RPC message.
 const Error& InvalidRpcError() {
-  static const Error kError(Error::Code::kJsonParseError,
-                            "Invalid RPC message.");
-  return kError;
+  static const Error* const kError =
+      new Error(Error::Code::kJsonParseError, "Invalid RPC message.");
+  return *kError;
 }
 
 // Default error message for a bad INPUT message.
 const Error& InvalidInputError() {
-  static const Error kError(Error::Code::kJsonParseError,
-                            "Invalid INPUT message.");
-  return kError;
+  static const Error* const kError =
+      new Error(Error::Code::kJsonParseError, "Invalid INPUT message.");
+  return *kError;
 }
 
 // Returns DSCP suggestions based on Table 1 in RFC 8837.

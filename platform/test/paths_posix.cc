@@ -32,7 +32,7 @@ std::string ReadTestDataPath() {
 }  // namespace
 
 const std::string& GetTestDataPath() {
-  static std::string data_path = ReadTestDataPath();
+  static const std::string& data_path = *new std::string(ReadTestDataPath());
   return data_path;
 }
 

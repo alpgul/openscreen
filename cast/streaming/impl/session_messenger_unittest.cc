@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 #include "platform/test/fake_clock.h"
 #include "platform/test/fake_task_runner.h"
+#include "util/no_destructor.h"
 
 namespace openscreen::cast {
 
@@ -25,43 +26,48 @@ constexpr char kReceiverId[] = "receiver-12345";
 
 // Generally the messages are inlined below, with the exception of the Offer,
 // simply because it is massive.
-Offer kExampleOffer{
-    CastMode::kMirroring,
-    {AudioStream{Stream{0,
-                        Stream::Type::kAudioSource,
-                        2,
-                        RtpPayloadType::kAudioOpus,
-                        12344442,
-                        std::chrono::milliseconds{2000},
-                        {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-                        {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-                        false,
-                        std::nullopt,
-                        48000,
-                        "",
-                        {kInputEventsRtpExtension}},
-                 AudioCodec::kOpus, 1400}},
-    {VideoStream{Stream{1,
-                        Stream::Type::kVideoSource,
-                        1,
-                        RtpPayloadType::kVideoVp8,
-                        12344444,
-                        std::chrono::milliseconds{2000},
-                        {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-                        {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-                        false,
-                        std::nullopt,
-                        90000,
-                        "",
-                        {kInputEventsRtpExtension}},
-                 VideoCodec::kVp8,
-                 SimpleFraction{30, 1},
-                 3000000,
+const Offer& GetExampleOffer() {
+  static const NoDestructor<Offer> kExampleOffer(
+      CastMode::kMirroring,
+      std::vector<AudioStream>{AudioStream{
+          Stream{0,
+                 Stream::Type::kAudioSource,
+                 2,
+                 RtpPayloadType::kAudioOpus,
+                 12344442,
+                 std::chrono::milliseconds{2000},
+                 {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+                 {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+                 false,
+                 std::nullopt,
+                 48000,
                  "",
+                 {kInputEventsRtpExtension}},
+          AudioCodec::kOpus, 1400}},
+      std::vector<VideoStream>{VideoStream{
+          Stream{1,
+                 Stream::Type::kVideoSource,
+                 1,
+                 RtpPayloadType::kVideoVp8,
+                 12344444,
+                 std::chrono::milliseconds{2000},
+                 {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+                 {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+                 false,
+                 std::nullopt,
+                 90000,
                  "",
-                 "",
-                 {Resolution{640, 480}},
-                 ""}}};
+                 {kInputEventsRtpExtension}},
+          VideoCodec::kVp8,
+          SimpleFraction{30, 1},
+          3000000,
+          "",
+          "",
+          "",
+          {Resolution{640, 480}},
+          ""}});
+  return *kExampleOffer;
+}
 
 struct SessionMessageStore {
  public:
@@ -135,9 +141,9 @@ class SessionMessengerTest : public ::testing::Test {
 };
 
 TEST_F(SessionMessengerTest, RpcMessaging) {
-  static const std::vector<uint8_t> kSenderMessage = {1, 2, 3, 4, 5};
-  static const std::vector<uint8_t> kSenderMessageTwo = {11, 12, 13};
-  static const std::vector<uint8_t> kReceiverResponse = {6, 7, 8, 9};
+  const std::vector<uint8_t> kSenderMessage = {1, 2, 3, 4, 5};
+  const std::vector<uint8_t> kSenderMessageTwo = {11, 12, 13};
+  const std::vector<uint8_t> kReceiverResponse = {6, 7, 8, 9};
   ASSERT_TRUE(
       sender_messenger_
           ->SendOutboundMessage(SenderMessage{SenderMessage::Type::kRpc, 123,
@@ -179,9 +185,9 @@ TEST_F(SessionMessengerTest, RpcMessaging) {
 }
 
 TEST_F(SessionMessengerTest, InputMessaging) {
-  static const std::vector<uint8_t> kSenderMessage = {1, 2, 3, 4, 5};
-  static const std::vector<uint8_t> kSenderMessageTwo = {11, 12, 13};
-  static const std::vector<uint8_t> kReceiverResponse = {6, 7, 8, 9};
+  const std::vector<uint8_t> kSenderMessage = {1, 2, 3, 4, 5};
+  const std::vector<uint8_t> kSenderMessageTwo = {11, 12, 13};
+  const std::vector<uint8_t> kReceiverResponse = {6, 7, 8, 9};
 
   sender_messenger_->SetHandler(ReceiverMessage::Type::kInput,
                                 message_store_.GetReplyCallback());
@@ -260,12 +266,13 @@ TEST_F(SessionMessengerTest, CapabilitiesMessaging) {
 }
 
 TEST_F(SessionMessengerTest, OfferAnswerMessaging) {
-  ASSERT_TRUE(sender_messenger_
-                  ->SendRequest(SenderMessage{SenderMessage::Type::kOffer, 42,
-                                              true /* valid */, kExampleOffer},
-                                ReceiverMessage::Type::kAnswer,
-                                message_store_.GetReplyCallback())
-                  .ok());
+  ASSERT_TRUE(
+      sender_messenger_
+          ->SendRequest(SenderMessage{SenderMessage::Type::kOffer, 42,
+                                      true /* valid */, GetExampleOffer()},
+                        ReceiverMessage::Type::kAnswer,
+                        message_store_.GetReplyCallback())
+          .ok());
 
   ASSERT_EQ(1u, message_store_.sender_messages.size());
   ASSERT_TRUE(message_store_.receiver_messages.empty());
@@ -307,12 +314,13 @@ TEST_F(SessionMessengerTest, OfferAnswerMessaging) {
 }
 
 TEST_F(SessionMessengerTest, OfferAndReceiverError) {
-  ASSERT_TRUE(sender_messenger_
-                  ->SendRequest(SenderMessage{SenderMessage::Type::kOffer, 42,
-                                              true /* valid */, kExampleOffer},
-                                ReceiverMessage::Type::kAnswer,
-                                message_store_.GetReplyCallback())
-                  .ok());
+  ASSERT_TRUE(
+      sender_messenger_
+          ->SendRequest(SenderMessage{SenderMessage::Type::kOffer, 42,
+                                      true /* valid */, GetExampleOffer()},
+                        ReceiverMessage::Type::kAnswer,
+                        message_store_.GetReplyCallback())
+          .ok());
 
   ASSERT_EQ(1u, message_store_.sender_messages.size());
   ASSERT_TRUE(message_store_.receiver_messages.empty());
@@ -352,12 +360,13 @@ TEST_F(SessionMessengerTest, UnknownSenderMessageTypesDontGetSent) {
 }
 
 TEST_F(SessionMessengerTest, UnknownReceiverMessageTypesDontGetSent) {
-  ASSERT_TRUE(sender_messenger_
-                  ->SendRequest(SenderMessage{SenderMessage::Type::kOffer, 42,
-                                              true /* valid */, kExampleOffer},
-                                ReceiverMessage::Type::kAnswer,
-                                message_store_.GetReplyCallback())
-                  .ok());
+  ASSERT_TRUE(
+      sender_messenger_
+          ->SendRequest(SenderMessage{SenderMessage::Type::kOffer, 42,
+                                      true /* valid */, GetExampleOffer()},
+                        ReceiverMessage::Type::kAnswer,
+                        message_store_.GetReplyCallback())
+          .ok());
 
   EXPECT_DEATH_IF_SUPPORTED(
       receiver_messenger_
@@ -381,12 +390,13 @@ TEST_F(SessionMessengerTest, SenderHandlesUnknownMessageType) {
   // test elsewhere that messages with the wrong sequence number are ignored,
   // here if the type is unknown but the message contains a valid sequence
   // number we just treat it as a bad response/same as a timeout.
-  ASSERT_TRUE(sender_messenger_
-                  ->SendRequest(SenderMessage{SenderMessage::Type::kOffer, 42,
-                                              true /* valid */, kExampleOffer},
-                                ReceiverMessage::Type::kAnswer,
-                                message_store_.GetReplyCallback())
-                  .ok());
+  ASSERT_TRUE(
+      sender_messenger_
+          ->SendRequest(SenderMessage{SenderMessage::Type::kOffer, 42,
+                                      true /* valid */, GetExampleOffer()},
+                        ReceiverMessage::Type::kAnswer,
+                        message_store_.GetReplyCallback())
+          .ok());
   sender_pipe_end().ReceiveMessage(kCastWebrtcNamespace, R"({
     "type": "ANSWER_VERSION_2",
     "seqNum": 42
