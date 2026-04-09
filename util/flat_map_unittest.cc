@@ -65,11 +65,8 @@ TEST(FlatMapTest, ErasureAndEmplacement) {
   mutable_vector.emplace_back(-1, "bar");
   EXPECT_NE(mutable_vector.find(-1), mutable_vector.end());
 
-  // We absolutely should fail to erase something that's not there.
-#if defined(GTEST_HAS_DEATH_TEST)
-  EXPECT_DEATH(mutable_vector.erase_key(12345),
-               ".*failed to erase: element not found.*");
-#endif
+  // We shouldn't crash when erasing something that's not there.
+  EXPECT_EQ(mutable_vector.erase_key(12345), mutable_vector.end());
 }
 
 TEST(FlatMapTest, Mutation) {

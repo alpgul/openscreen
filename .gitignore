@@ -3,6 +3,7 @@
 LASTCHANGE
 LASTCHANGE.committime
 build/
+build/mac_files/
 gclient_args.gni
 
 # Tools & Dependencies
