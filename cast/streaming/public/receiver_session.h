@@ -172,6 +172,12 @@ class ReceiverSession final : public Environment::SocketSubscriber {
   // Sends an input message to the currently negotiated sender.
   void SendInputMessage(const InputMessage& message);
 
+  void SetCustomMessageHandler(
+      std::string_view message_namespace,
+      ReceiverSessionMessenger::CustomMessageCallback cb);
+
+  ReceiverSessionMessenger* messenger() { return messenger_.get(); }
+
   // Environment::SocketSubscriber event callbacks.
   void OnSocketReady() override;
   void OnSocketInvalid(const Error& error) override;

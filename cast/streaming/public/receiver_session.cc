@@ -170,6 +170,12 @@ void ReceiverSession::SetInputCallback(
   }
 }
 
+void ReceiverSession::SetCustomMessageHandler(
+    std::string_view message_namespace,
+    ReceiverSessionMessenger::CustomMessageCallback cb) {
+  messenger_->SetCustomMessageHandler(message_namespace, std::move(cb));
+}
+
 void ReceiverSession::SendInputMessage(const InputMessage& message) {
   if (negotiated_sender_id_.empty()) {
     OSP_DLOG_WARN << "Can't send an INPUT message without a currently "

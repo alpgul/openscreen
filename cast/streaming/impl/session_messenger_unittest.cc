@@ -659,4 +659,98 @@ TEST_F(SessionMessengerTest, UnknownNamespaceMessagesGetDropped) {
   ASSERT_TRUE(message_store_.receiver_messages.empty());
 }
 
+TEST_F(SessionMessengerTest, CustomNamespaceMessaging) {
+  constexpr char kCustomNamespace[] = "urn:x-cast:com.google.custom";
+  constexpr char kMessage[] = "Hello from the Custom Sender!";
+  std::string received_source_id;
+  std::string received_namespace;
+  std::string received_message;
+
+  receiver_messenger_->SetCustomMessageHandler(
+      kCustomNamespace,
+      [&](const std::string& source_id, const std::string& message_namespace,
+          const std::string& message) {
+        received_source_id = source_id;
+        received_namespace = message_namespace;
+        received_message = message;
+      });
+
+  receiver_pipe_end().ReceiveMessage(kSenderId, kCustomNamespace, kMessage);
+
+  EXPECT_EQ(kSenderId, received_source_id);
+  EXPECT_EQ(kCustomNamespace, received_namespace);
+  EXPECT_EQ(kMessage, received_message);
+
+  constexpr char kReply[] = "Hello from the Custom Receiver!";
+  ASSERT_TRUE(
+      receiver_messenger_->SendMessage(kSenderId, kCustomNamespace, kReply)
+          .ok());
+}
+
+TEST_F(SessionMessengerTest, MultipleCustomNamespaceMessaging) {
+  constexpr char kNamespace1[] = "urn:x-cast:com.google.custom.1";
+  constexpr char kNamespace2[] = "urn:x-cast:com.google.custom.2";
+  constexpr char kMessage1[] = "Message for namespace 1";
+  constexpr char kMessage2[] = "Message for namespace 2";
+
+  std::string received_ns;
+  std::string received_msg;
+
+  auto handler1 = [&](const std::string& source_id,
+                      const std::string& message_namespace,
+                      const std::string& message) {
+    received_ns = message_namespace;
+    received_msg = message;
+  };
+
+  auto handler2 = [&](const std::string& source_id,
+                      const std::string& message_namespace,
+                      const std::string& message) {
+    received_ns = message_namespace;
+    received_msg = message;
+  };
+
+  receiver_messenger_->SetCustomMessageHandler(kNamespace1, handler1);
+  receiver_messenger_->SetCustomMessageHandler(kNamespace2, handler2);
+
+  // Send to namespace 1
+  receiver_pipe_end().ReceiveMessage(kSenderId, kNamespace1, kMessage1);
+  EXPECT_EQ(kNamespace1, received_ns);
+  EXPECT_EQ(kMessage1, received_msg);
+
+  // Send to namespace 2
+  receiver_pipe_end().ReceiveMessage(kSenderId, kNamespace2, kMessage2);
+  EXPECT_EQ(kNamespace2, received_ns);
+  EXPECT_EQ(kMessage2, received_msg);
+
+  // Attempt to update handler for namespace 1. This should be ignored.
+  constexpr char kMessage1Updated[] = "Updated message for namespace 1";
+  receiver_messenger_->SetCustomMessageHandler(
+      kNamespace1,
+      [&](const std::string& source_id, const std::string& message_namespace,
+          const std::string& message) {
+        received_ns = "updated-" + message_namespace;
+        received_msg = message;
+      });
+
+  receiver_pipe_end().ReceiveMessage(kSenderId, kNamespace1, kMessage1Updated);
+  // Verify the original handler still handles the message.
+  EXPECT_EQ(kNamespace1, received_ns);
+  EXPECT_EQ(kMessage1Updated, received_msg);
+
+  // Remove handler for namespace 2
+  received_ns = "";
+  received_msg = "";
+  receiver_messenger_->SetCustomMessageHandler(kNamespace2, nullptr);
+  receiver_pipe_end().ReceiveMessage(kSenderId, kNamespace2, kMessage2);
+  EXPECT_EQ("", received_ns);
+  EXPECT_EQ("", received_msg);
+
+  // Verify SendMessage for multiple namespaces
+  EXPECT_TRUE(
+      receiver_messenger_->SendMessage(kSenderId, kNamespace1, kMessage1).ok());
+  EXPECT_TRUE(
+      receiver_messenger_->SendMessage(kSenderId, kNamespace2, kMessage2).ok());
+}
+
 }  // namespace openscreen::cast
