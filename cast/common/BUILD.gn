@@ -56,7 +56,7 @@ openscreen_source_set("certificate_boringssl") {
     "../standalone_receiver:cast_receiver",
     "../standalone_sender:cast_sender",
     "../test:*",
-    "//components/media_router/common/providers/cast/channel:openscreen_cast_auth_util_fuzzer",
+    "//components/media_router/common/providers/cast/channel:*",
   ]
   public = []
   sources = [
