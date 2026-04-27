@@ -353,7 +353,9 @@ SenderSession::SenderSession(Configuration config)
                         });
 }
 
-SenderSession::~SenderSession() = default;
+SenderSession::~SenderSession() {
+  config_.environment->SetStatisticsCollector(nullptr);
+}
 
 Error SenderSession::Negotiate(std::vector<AudioCaptureConfig> audio_configs,
                                std::vector<VideoCaptureConfig> video_configs) {

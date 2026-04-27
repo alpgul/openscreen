@@ -151,6 +151,7 @@ ReceiverSession::ReceiverSession(Client& client,
 }
 
 ReceiverSession::~ReceiverSession() {
+  environment_.SetSocketSubscriber(nullptr);
   // messenger_ must be destroyed before OnReceiversDestroying runs, since it
   // calls message_port_.ResetClient(). That MessagePort is destroyed before
   // OnReceiversDestroying returns. See crbug.com/374199735 for more details.
