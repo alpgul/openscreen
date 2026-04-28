@@ -27,7 +27,7 @@ class ScopedWakeLockMac : public ScopedWakeLock {
   static void AcquireWakeLock();
   static void ReleaseWakeLock();
 
-  static LockState* lock_state_;
+  static LockState lock_state_;
 };
 
 ScopedWakeLockPtr ScopedWakeLock::Create(TaskRunner& task_runner) {
@@ -38,7 +38,7 @@ ScopedWakeLockPtr ScopedWakeLock::Create(TaskRunner& task_runner) {
 ScopedWakeLockMac::ScopedWakeLockMac(TaskRunner& task_runner)
     : ScopedWakeLock(), task_runner_(task_runner) {
   task_runner_.PostTask([] {
-    if (lock_state_->reference_count++ == 0) {
+    if (lock_state_.reference_count++ == 0) {
       AcquireWakeLock();
     }
   });
@@ -46,7 +46,7 @@ ScopedWakeLockMac::ScopedWakeLockMac(TaskRunner& task_runner)
 
 ScopedWakeLockMac::~ScopedWakeLockMac() {
   task_runner_.PostTask([] {
-    if (--lock_state_->reference_count == 0) {
+    if (--lock_state_.reference_count == 0) {
       ReleaseWakeLock();
     }
   });
@@ -66,17 +66,16 @@ void ScopedWakeLockMac::AcquireWakeLock() {
                        CFSTR("Open Screen ScopedWakeLock"));
 
   const IOReturn result = IOPMAssertionCreateWithProperties(
-      assertion_properties, &lock_state_->assertion_id);
+      assertion_properties, &lock_state_.assertion_id);
   OSP_CHECK_EQ(result, kIOReturnSuccess);
 }
 
 // static
 void ScopedWakeLockMac::ReleaseWakeLock() {
-  const IOReturn result = IOPMAssertionRelease(lock_state_->assertion_id);
+  const IOReturn result = IOPMAssertionRelease(lock_state_.assertion_id);
   OSP_CHECK_EQ(result, kIOReturnSuccess);
 }
 
-ScopedWakeLockMac::LockState* ScopedWakeLockMac::lock_state_ =
-    new ScopedWakeLockMac::LockState();
+ScopedWakeLockMac::LockState ScopedWakeLockMac::lock_state_;
 
 }  // namespace openscreen
