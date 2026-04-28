@@ -329,6 +329,17 @@ TEST(AnswerMessagesTest, ErrorOnEmptyAnswer) {
   ExpectFailureOnParse("{}");
 }
 
+TEST(AnswerMessagesTest, ErrorOnNonObjectAnswer) {
+  Json::Value array_val(Json::arrayValue);
+  EXPECT_TRUE(Answer::TryParse(array_val).is_error());
+
+  Json::Value string_val("string");
+  EXPECT_TRUE(Answer::TryParse(string_val).is_error());
+
+  Json::Value int_val(42);
+  EXPECT_TRUE(Answer::TryParse(int_val).is_error());
+}
+
 TEST(AnswerMessagesTest, ErrorOnMissingUdpPort) {
   ExpectFailureOnParse(R"({
     "sendIndexes": [1, 3],

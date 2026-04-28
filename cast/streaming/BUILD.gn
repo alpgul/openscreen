@@ -273,6 +273,7 @@ openscreen_source_set("unittests") {
     "impl/rtp_packet_parser_unittest.cc",
     "impl/rtp_packetizer_unittest.cc",
     "impl/sender_impl_unittest.cc",
+    "impl/sender_message_unittest.cc",
     "impl/sender_report_unittest.cc",
     "impl/sender_session_unittest.cc",
     "impl/session_messenger_unittest.cc",

@@ -188,7 +188,7 @@ void SenderSessionMessenger::OnMessage(const std::string& source_id,
   }
 
   ErrorOr<Json::Value> message_body = json::Parse(message);
-  if (!message_body) {
+  if (!message_body || !message_body.value().isObject()) {
     ReportError(message_body.error());
     OSP_DLOG_WARN << "Received an invalid message: " << message;
     return;
@@ -348,7 +348,7 @@ void ReceiverSessionMessenger::OnMessage(const std::string& source_id,
   // If the message is bad JSON, the sender is in a funky state so we
   // report an error.
   ErrorOr<Json::Value> message_body = json::Parse(message);
-  if (message_body.is_error()) {
+  if (message_body.is_error() || !message_body.value().isObject()) {
     ReportError(message_body.error());
     return;
   }
