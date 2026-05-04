@@ -26,6 +26,7 @@
 #include "util/json/json_helpers.h"
 #include "util/json/json_serialization.h"
 #include "util/osp_logging.h"
+#include "util/no_destructor.h"
 #include "util/stringprintf.h"
 
 namespace openscreen::cast {
@@ -33,7 +34,7 @@ namespace openscreen::cast {
 namespace {
 // Default error message for a bad CAPABILITIES_RESPONSE message.
 const Error& InvalidCapabilitiesResponseError() {
-  static const Error* const kError = new Error(
+  static const openscreen::NoDestructor<Error> kError(
       Error::Code::kRemotingNotSupported,
       "Invalid CAPABILITIES_RESPONSE message, assuming remoting is not "
       "supported");
@@ -42,30 +43,30 @@ const Error& InvalidCapabilitiesResponseError() {
 
 // Default error message for a bad ANSWER message.
 const Error& InvalidAnswerError() {
-  static const Error* const kError =
-      new Error(Error::Code::kInvalidAnswer, "Invalid ANSWER message.");
+  static const openscreen::NoDestructor<Error> kError(
+      Error::Code::kInvalidAnswer, "Invalid ANSWER message.");
   return *kError;
 }
 
 // Error message for an ANSWER timeout.
 const Error& AnswerTimeoutError() {
-  static const Error* const kError =
-      new Error(Error::Code::kAnswerTimeout,
-                "Didn't receive an ANSWER message before timeout.");
+  static const openscreen::NoDestructor<Error> kError(
+      Error::Code::kAnswerTimeout,
+      "Didn't receive an ANSWER message before timeout.");
   return *kError;
 }
 
 // Default error message for a bad RPC message.
 const Error& InvalidRpcError() {
-  static const Error* const kError =
-      new Error(Error::Code::kJsonParseError, "Invalid RPC message.");
+  static const openscreen::NoDestructor<Error> kError(
+      Error::Code::kJsonParseError, "Invalid RPC message.");
   return *kError;
 }
 
 // Default error message for a bad INPUT message.
 const Error& InvalidInputError() {
-  static const Error* const kError =
-      new Error(Error::Code::kJsonParseError, "Invalid INPUT message.");
+  static const openscreen::NoDestructor<Error> kError(
+      Error::Code::kJsonParseError, "Invalid INPUT message.");
   return *kError;
 }
 
