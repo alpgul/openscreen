@@ -66,7 +66,7 @@ is an example of a successful roll CL.
 
 ## Other special cases that are updated manually
 
-- `third_party/protobuf`: Run `tools/roll_protobuf.sh <version>`. (See
+- `third_party/protobuf`: Run `tools/roll_protobuf.py <version>`. (See
   `third_party/protobuf/README.chromium` for upstream manual instructions).
 - `third_party/boringssl/src`: See instructions in
   `third_party/boringssl/README.openscreen.md`

@@ -2,11 +2,10 @@
 # Copyright 2021 The Chromium Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""This script is intended to cover end to end testing for the standalone sender
+"""End-to-end tests for the standalone Cast sender and receiver executables.
 
-and receiver executables in cast. This ensures that the basic functionality of
-these executables is not impaired, such as the TLS/UDP connections and encoding
-and decoding video.
+This script ensures that the basic functionality of these executables is not
+impaired, such as the TLS/UDP connections and encoding and decoding video.
 """
 
 import argparse
@@ -389,7 +388,7 @@ class StandaloneCastTest(unittest.TestCase):
         self.check_logs(output, VideoCodec.AV1)
 
 
-def parse_args():
+def _parse_args():
     """Parses the command line arguments and sets up the logging module."""
     # NOTE for future developers: the `unittest` module will complain if it is
     # passed any args that it doesn't understand. If any Open Screen-specific
@@ -410,5 +409,5 @@ def parse_args():
 
 
 if __name__ == '__main__':
-    parse_args()
+    _parse_args()
     unittest.main()

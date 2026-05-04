@@ -13,9 +13,12 @@ Shipped: yes
 Steps used to create the current version (or roll a newer one):
 
 ** NOTE for Open Screen developers: **
-Please use the `tools/roll_protobuf.sh` script to automate all of these steps!
-It handles fetching the release, restoring files, applying patches, and updating version strings.
-Run `tools/roll_protobuf.sh <version>` from the repository root.
+Please use the `tools/roll_protobuf.py` script to automate all of these steps.
+
+It handles fetching the release, restoring files, applying patches, and updating
+version strings. Just run `tools/roll_protobuf.py <version>` from the
+repository root. Invoking the script without any arguments will output a list
+of supported versions from the protobuf tree.
 
 
 0. Nuke third_party/protobuf from orbit (rm -rf `third_party/protobuf`). Note

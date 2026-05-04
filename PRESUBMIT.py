@@ -27,7 +27,8 @@ sys.path.extend(os.path.join(_REPO_PATH, p) for p in _IMPORT_SUBFOLDERS)
 from checkdeps import DepsChecker  # pylint: disable=wrong-import-position
 import licenses  # pylint: disable=wrong-import-position
 
-def _CheckLicenses(input_api, output_api):
+
+def _check_licenses(input_api, output_api):
     """Checks third party licenses and returns a list of violations."""
     # NOTE: the licenses check is confused by the fact that we don't actually
     # check ou the libraries in buildtools/third_party, so explicitly exclude
@@ -49,7 +50,7 @@ def _CheckLicenses(input_api, output_api):
     return []
 
 
-def _CheckGeneratedInfraFiles(input_api, output_api):
+def _check_generated_infra_files(input_api, output_api):
     files = input_api.UnixLocalPaths()
     if (any(f.endswith('.star') for f in files)
             and all(not f.endswith('.cfg') for f in files)):
@@ -61,7 +62,8 @@ def _CheckGeneratedInfraFiles(input_api, output_api):
 
     return []
 
-def _CheckDeps(input_api, output_api):
+
+def _check_deps(input_api, output_api):
     """Checks DEPS rules and returns a list of violations."""
     deps_checker = DepsChecker(input_api.PresubmitLocalPath())
     deps_checker.CheckDirectory(input_api.PresubmitLocalPath())
@@ -76,7 +78,10 @@ CpplintArgs = namedtuple("CpplintArgs", "filename clean_lines linenum error")
 Error = namedtuple("Error", "type message")
 
 
-def _CheckNoRegexMatches(regex, cpplint_args, error, include_cpp_files=True):
+def _check_no_regex_matches(regex,
+                            cpplint_args,
+                            error,
+                            include_cpp_files=True):
     """Checks that there are no matches for a specific regex.
 
   Args:
@@ -101,7 +106,7 @@ _RE_PATTERN_VALUE_CHECK = re.compile(
     r'\s*OSP_D?CHECK\([^)]*\.is_value\(\)\);\s*')
 
 
-def _CheckNoValueDchecks(filename, clean_lines, linenum, error):
+def _check_no_value_dchecks(filename, clean_lines, linenum, error):
     """Checks that there are no OSP_DCHECK(foo.is_value()) instances.
 
     filename: The name of the current file.
@@ -113,8 +118,8 @@ def _CheckNoValueDchecks(filename, clean_lines, linenum, error):
     error_to_return = Error('runtime/is_value_dchecks',
                             'Unnecessary CHECK for ErrorOr::is_value()')
 
-    _CheckNoRegexMatches(_RE_PATTERN_VALUE_CHECK, cpplint_args,
-                         error_to_return)
+    _check_no_regex_matches(_RE_PATTERN_VALUE_CHECK, cpplint_args,
+                            error_to_return)
 
 
 # Matches Foo(Foo&&) when not followed by noexcept.
@@ -122,7 +127,7 @@ _RE_PATTERN_MOVE_WITHOUT_NOEXCEPT = re.compile(
     r'\s*(?P<classname>\w+)\((?P=classname)&&[^)]*\)\s*(?!noexcept)\s*[{;=]')
 
 
-def _CheckNoexceptOnMove(filename, clean_lines, linenum, error):
+def _check_noexcept_on_move(filename, clean_lines, linenum, error):
     """Checks that move constructors are declared with 'noexcept'.
 
     filename: The name of the current file.
@@ -136,8 +141,8 @@ def _CheckNoexceptOnMove(filename, clean_lines, linenum, error):
 
     # We only check headers as noexcept is meaningful on declarations, not
     # definitions.  This may skip some definitions in .cc files though.
-    _CheckNoRegexMatches(_RE_PATTERN_MOVE_WITHOUT_NOEXCEPT, cpplint_args,
-                         error_to_return, False)
+    _check_no_regex_matches(_RE_PATTERN_MOVE_WITHOUT_NOEXCEPT, cpplint_args,
+                            error_to_return, False)
 
 
 # Matches "namespace <foo> {". Since we only check one line at a time, we
@@ -146,7 +151,7 @@ _RE_PATTERN_UNNESTED_NAMESPACE = re.compile(
     r'namespace +\w+ +\{')
 
 
-def _CheckUnnestedNamespaces(filename, clean_lines, linenum, error):
+def _check_unnested_namespaces(filename, clean_lines, linenum, error):
     """Checks that nestable namespaces are nested.
 
     filename: The name of the current file.
@@ -162,7 +167,7 @@ def _CheckUnnestedNamespaces(filename, clean_lines, linenum, error):
         cpplint_args = CpplintArgs(filename, clean_lines, linenum + 1, error)
         error_to_return = Error('runtime/nested_namespace',
                                 'Please nest namespaces when possible.')
-        _CheckNoRegexMatches(re, cpplint_args, error_to_return)
+        _check_no_regex_matches(re, cpplint_args, error_to_return)
 
 
 # Gives additional debug information whenever a linting error occurs.
@@ -174,7 +179,7 @@ _CPPLINT_VERBOSE_LEVEL = 4
 # - There are some false positives with 'explicit' checks, but it's useful
 #   enough to keep.
 # - We add a custom check for 'noexcept' usage.
-def _CheckChangeLintsClean(input_api, output_api):
+def _check_change_lints_clean(input_api, output_api):
     """Checks that all '.cc' and '.h' files pass cpplint.py."""
     cpplint = input_api.cpplint
     # Directive that allows access to a protected member _XX of a client class.
@@ -188,8 +193,8 @@ def _CheckChangeLintsClean(input_api, output_api):
 
     for file_name in files:
         cpplint.ProcessFile(file_name, _CPPLINT_VERBOSE_LEVEL, [
-            _CheckNoexceptOnMove, _CheckNoValueDchecks,
-            _CheckUnnestedNamespaces
+            _check_noexcept_on_move, _check_no_value_dchecks,
+            _check_unnested_namespaces
         ])
 
     if cpplint._cpplint_state.error_count:
@@ -202,7 +207,7 @@ def _CheckChangeLintsClean(input_api, output_api):
     return []
 
 
-def _CheckLuciCfgLint(input_api, output_api):
+def _check_luci_cfg_lint(input_api, output_api):
     """Check that the luci configs pass the linter."""
     path = os.path.join('infra', 'config', 'global', 'main.star')
     if not input_api.AffectedSourceFiles(
@@ -225,7 +230,7 @@ def _CheckLuciCfgLint(input_api, output_api):
     return result
 
 
-def _CommonChecks(input_api, output_api):
+def _common_checks(input_api, output_api):
     """Performs a list of checks that should be used for both presubmission and
        upload validation.
     """
@@ -257,7 +262,7 @@ def _CommonChecks(input_api, output_api):
         input_api.canned_checks.CheckChangeTodoHasOwner(input_api, output_api))
 
     # Ensure code change passes linter cleanly.
-    results.extend(_CheckChangeLintsClean(input_api, output_api))
+    results.extend(_check_change_lints_clean(input_api, output_api))
 
     # Ensure code change has already had clang-format ran.
     results.extend(
@@ -270,15 +275,15 @@ def _CommonChecks(input_api, output_api):
         input_api.canned_checks.CheckGNFormatted(input_api, output_api))
 
     # Run buildtools/checkdeps on code change.
-    results.extend(_CheckDeps(input_api, output_api))
+    results.extend(_check_deps(input_api, output_api))
 
     # Ensure the LUCI configs pass the linter.
-    results.extend(_CheckLuciCfgLint(input_api, output_api))
+    results.extend(_check_luci_cfg_lint(input_api, output_api))
 
     # Run tools/licenses on code change.
-    results.extend(_CheckLicenses(input_api, output_api))
+    results.extend(_check_licenses(input_api, output_api))
 
-    results.extend(_CheckGeneratedInfraFiles(input_api, output_api))
+    results.extend(_check_generated_infra_files(input_api, output_api))
 
     return results
 
@@ -294,4 +299,4 @@ def CheckChangeOnUpload(input_api, output_api):
 
 def CheckChangeOnCommit(input_api, output_api):
     """Checks the changelist whenever there is commit (`git cl commit`)"""
-    return _CommonChecks(input_api, output_api)
+    return _common_checks(input_api, output_api)
