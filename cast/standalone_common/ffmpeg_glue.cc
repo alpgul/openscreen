@@ -1,8 +1,8 @@
-// Copyright 2020 The Chromium Authors
+// Copyright 2026 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "cast/standalone_sender/ffmpeg_glue.h"
+#include "cast/standalone_common/ffmpeg_glue.h"
 
 #include <libavcodec/version.h>
 
