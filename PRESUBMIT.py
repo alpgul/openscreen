@@ -14,7 +14,11 @@ import sys
 
 
 _REPO_PATH = os.path.dirname(os.path.realpath('__file__'))
-_IMPORT_SUBFOLDERS = ['tools', os.path.join('buildtools', 'checkdeps')]
+_IMPORT_SUBFOLDERS = [
+    'tools',
+    os.path.join('tools', 'licenses'),
+    os.path.join('buildtools', 'checkdeps')
+]
 
 # git-cl upload is not compatible with __init__.py based subfolder imports, so
 # we extend the system path instead.
@@ -27,6 +31,18 @@ sys.path.extend(os.path.join(_REPO_PATH, p) for p in _IMPORT_SUBFOLDERS)
 from checkdeps import DepsChecker  # pylint: disable=wrong-import-position
 import licenses  # pylint: disable=wrong-import-position
 
+
+class _LicensesArgs:
+    extra_third_party_dirs = None
+    extra_allowed_dirs = None
+    exclude_dirs = None
+    scan_root = _REPO_PATH
+    target_os = None
+    gn_out_dir = None
+    gn_target = None
+    enable_warnings = True
+    shipped_only = False
+    verbose = False
 
 def _check_licenses(input_api, output_api):
     """Checks third party licenses and returns a list of violations."""
@@ -43,10 +59,20 @@ def _check_licenses(input_api, output_api):
 
     if any(s.LocalPath().startswith('third_party')
            for s in input_api.change.AffectedFiles()):
-        return [
-            output_api.PresubmitError(v)
-            for v in licenses.ScanThirdPartyDirs()
-        ]
+        try:
+            _, had_errors = licenses._DiscoverMetadatas(_LicensesArgs())
+            if had_errors:
+                return [
+                    output_api.PresubmitError(
+                        "Third party license scan failed. Please check your " +
+                        "third_party metadata or licenses.py SPECIAL_CASES."
+                    )
+                ]
+        except Exception as e:
+            return [
+                output_api.PresubmitError(
+                    "License check failed with exception: %s" % e)
+            ]
     return []
 
 
