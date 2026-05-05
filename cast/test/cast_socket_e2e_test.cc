@@ -234,6 +234,11 @@ class CastSocketE2ETest : public ::testing::Test {
     // TODO(issuetracker.google.com/169967989): Would like to have a symmetric
     // OnClose check.
     EXPECT_CALL(*client, OnCloseMock(client->socket()));
+    // Verification of SSL_shutdown (issuetracker.google.com/169966671):
+    // If the peer does not call SSL_shutdown during socket closure, BoringSSL
+    // will report a protocol error (missing close notify) resulting in
+    // Error::Code::kFatalSSLError. The expectation of kSocketClosedFailure
+    // here explicitly verifies that SSL_shutdown was called and succeeded.
     EXPECT_CALL(*peer_client, OnErrorMock(peer_client->socket(), _))
         .WillOnce([](CastSocket* socket, const Error& error) {
           EXPECT_EQ(error.code(), Error::Code::kSocketClosedFailure);
