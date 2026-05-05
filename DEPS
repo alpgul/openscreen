@@ -427,11 +427,39 @@ hooks = [
     'name': 'clang_update_script',
     'pattern': '.',
     'condition': 'not build_with_chromium',
-    'action': [ 'python3', 'tools/download-clang-update-script.py',
+    'action': [ 'python3', 'tools/download-chromium-file.py',
                 '--revision', Var('chrome_version'),
+                '--path', 'tools/clang/scripts/update.py',
                 '--output', 'tools/clang/scripts/update.py' ],
     # NOTE: This file appears in .gitignore, as it is not a part of the
     # openscreen repo.
+  },
+  {
+    'name': 'licenses_script',
+    'pattern': '.',
+    'condition': 'not build_with_chromium',
+    'action': [ 'python3', 'tools/download-chromium-file.py',
+                '--revision', Var('chrome_version'),
+                '--path', 'tools/licenses/licenses.py',
+                '--output', 'tools/licenses/licenses.py' ],
+  },
+  {
+    'name': 'licenses_spdx_writer',
+    'pattern': '.',
+    'condition': 'not build_with_chromium',
+    'action': [ 'python3', 'tools/download-chromium-file.py',
+                '--revision', Var('chrome_version'),
+                '--path', 'tools/licenses/spdx_writer.py',
+                '--output', 'tools/licenses/spdx_writer.py' ],
+  },
+  {
+    'name': 'protoc_wrapper_script',
+    'pattern': '.',
+    'condition': 'not build_with_chromium',
+    'action': [ 'python3', 'tools/download-chromium-file.py',
+                '--revision', Var('chrome_version'),
+                '--path', 'tools/protoc_wrapper/protoc_wrapper.py',
+                '--output', 'tools/protoc_wrapper/protoc_wrapper.py' ],
   },
 ]
 

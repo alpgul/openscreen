@@ -42,3 +42,5 @@ generated_root_cast_receiver*
 .gemini/
 GEMINI.md
 claude.json
+tools/licenses/
+tools/protoc_wrapper/
