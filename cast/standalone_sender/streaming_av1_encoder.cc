@@ -85,7 +85,7 @@ StreamingAv1Encoder::StreamingAv1Encoder(const Parameters& params,
 
 StreamingAv1Encoder::~StreamingAv1Encoder() {
   {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     target_bitrate_ = 0;
     cv_.notify_one();
   }
@@ -93,8 +93,7 @@ StreamingAv1Encoder::~StreamingAv1Encoder() {
 }
 
 int StreamingAv1Encoder::GetTargetBitrate() const {
-  // Note: No need to lock the `mutex_` since this method should be called on
-  // the same thread as SetTargetBitrate().
+  std::lock_guard<std::mutex> lock(mutex_);
   return target_bitrate_;
 }
 
@@ -103,7 +102,7 @@ void StreamingAv1Encoder::SetTargetBitrate(int new_bitrate) {
   // bitrate will not be zero.
   new_bitrate = std::max(new_bitrate, kBytesPerKilobyte);
 
-  std::unique_lock<std::mutex> lock(mutex_);
+  std::lock_guard<std::mutex> lock(mutex_);
   // Only assign the new target bitrate if `target_bitrate_` has not yet been
   // used to signal the `encode_thread_` to end.
   if (target_bitrate_ > 0) {
@@ -168,7 +167,7 @@ void StreamingAv1Encoder::EncodeAndSend(
   work_unit.stats_callback = std::move(stats_callback);
   const bool force_key_frame = sender_->NeedsKeyFrame();
   {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     needs_key_frame_ |= force_key_frame;
     encode_queue_.push(std::move(work_unit));
     cv_.notify_one();
@@ -389,7 +388,7 @@ void StreamingAv1Encoder::SendEncodedFrame(WorkUnitWithResults results) {
   if (sender_->EnqueueFrame(frame) != Sender::OK) {
     // Since the frame will not be sent, the encoder's frame dependency chain
     // has been broken. Force a key frame for the next frame.
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     needs_key_frame_ = true;
   }
 
