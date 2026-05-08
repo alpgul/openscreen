@@ -287,6 +287,7 @@ openscreen_source_set("unittests") {
         "impl/socket_address_posix_unittest.cc",
         "impl/socket_handle_waiter_posix_unittest.cc",
         "impl/timeval_posix_unittest.cc",
+        "impl/tls_connection_factory_posix_unittest.cc",
         "impl/tls_data_router_posix_unittest.cc",
         "impl/tls_write_buffer_unittest.cc",
         "impl/udp_socket_reader_posix_unittest.cc",
