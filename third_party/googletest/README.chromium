@@ -1,0 +1,5 @@
+Name: googletest
+URL: https://github.com/google/googletest
+License: BSD-3-Clause
+License File: src/LICENSE
+Shipped: no

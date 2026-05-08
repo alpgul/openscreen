@@ -47,15 +47,23 @@ class _LicensesArgs:
 def _check_licenses(input_api, output_api):
     """Checks third party licenses and returns a list of violations."""
     # NOTE: the licenses check is confused by the fact that we don't actually
-    # check ou the libraries in buildtools/third_party, so explicitly exclude
+    # check out the libraries in buildtools/third_party, so explicitly exclude
     # that folder. See https://crbug.com/1215335 for more info.
     licenses.PRUNE_PATHS.update([
         os.path.join('buildtools', 'third_party'),
         os.path.join('third_party', 'libc++'),
         os.path.join('third_party', 'libc++abi'),
         os.path.join('third_party', 'rust-toolchain'),
-        os.path.join('third_party', 'depot_tools')
-        ])
+        os.path.join('third_party', 'depot_tools'),
+        os.path.join('third_party', 'boringssl', 'src', 'third_party'),
+        os.path.join('third_party', 'googleurl', 'src', 'polyfills',
+                     'third_party'),
+        os.path.join('third_party', 'instrumented_libs', 'binaries'),
+        os.path.join('third_party', 'perfetto', 'src', 'protos',
+                     'third_party'),
+        os.path.join('third_party', 'protobuf', 'third_party'),
+        os.path.join('third_party', 'valijson', 'src', 'thirdparty'),
+    ])
 
     if any(s.LocalPath().startswith('third_party')
            for s in input_api.change.AffectedFiles()):
