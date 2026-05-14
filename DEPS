@@ -179,7 +179,7 @@ deps = {
   # maintainers may be needed for some breaking changes.
   'third_party/quiche/src': {
     'url': Var('quiche_git') + '/quiche.git' +
-      '@' + 'd54ca111b1085b9fea302560b41e371df349061c',  # 2025-12-19
+      '@' + 'a849d35c908d800de783c7434ffcdb44378af823',  # 2026-05-07
     'condition': 'not build_with_chromium',
   },
 
@@ -199,7 +199,7 @@ deps = {
   'third_party/abseil/src': {
     'url': Var('chromium_git') +
       '/external/github.com/abseil/abseil-cpp.git' + '@' +
-      '987c57f325f7fa8472fa84e1f885f7534d391b0d',  # 2025-11-11
+      '8a6b6ae902ac1eb7d9d8db810ecabc9c3cf88cf5',  # 2026-04-21
     'condition': 'not build_with_chromium',
   },
 
