@@ -77,6 +77,8 @@ group("gn_all") {
   if (is_linux || is_mac || is_chromeos || is_android) {
     deps += [ "cast/standalone_receiver:cast_receiver" ]
   }
+
+  visibility = []
 }
 
 openscreen_source_set("openscreen_unittests_all") {
