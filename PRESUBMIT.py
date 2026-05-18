@@ -56,6 +56,7 @@ def _check_licenses(input_api, output_api):
         os.path.join('third_party', 'rust-toolchain'),
         os.path.join('third_party', 'depot_tools'),
         os.path.join('third_party', 'boringssl', 'src', 'third_party'),
+        os.path.join('third_party', 'getopt'),
         os.path.join('third_party', 'googleurl', 'src', 'polyfills',
                      'third_party'),
         os.path.join('third_party', 'instrumented_libs', 'binaries'),
