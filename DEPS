@@ -179,7 +179,7 @@ deps = {
   # maintainers may be needed for some breaking changes.
   'third_party/quiche/src': {
     'url': Var('quiche_git') + '/quiche.git' +
-      '@' + 'a849d35c908d800de783c7434ffcdb44378af823',  # 2026-05-07
+      '@' + 'b8a4aa531a029737bcd741f85314e89775b923b2',  # 2026-05-07
     'condition': 'not build_with_chromium',
   },
 
