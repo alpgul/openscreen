@@ -101,9 +101,11 @@ openscreen_source_set("openscreen_unittests_all") {
       "discovery:unittests",
     ]
   }
-  public_deps += [ "osp/msgs:unittests" ]
-  if (!is_win) {
-    public_deps += [ "osp:unittests" ]
+  if (!build_with_chromium) {
+    public_deps += [ "osp/msgs:unittests" ]
+    if (!is_win) {
+      public_deps += [ "osp:unittests" ]
+    }
   }
 }
 if (!build_with_chromium) {
