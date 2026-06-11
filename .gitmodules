@@ -21,6 +21,10 @@
 	path = third_party/jsoncpp/src
 	url = https://chromium.googlesource.com/external/github.com/open-source-parsers/jsoncpp
 	gclient-condition = not build_with_chromium
+[submodule "third_party/pybind11/src"]
+	path = third_party/pybind11/src
+	url = https://github.com/pybind/pybind11
+	gclient-condition = not build_with_chromium
 [submodule "third_party/googletest/src"]
 	path = third_party/googletest/src
 	url = https://chromium.googlesource.com/external/github.com/google/googletest

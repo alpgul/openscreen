@@ -157,6 +157,13 @@ deps = {
     'condition': 'not build_with_chromium',
   },
 
+  'third_party/pybind11/src': {
+    'url': Var('github') +
+      '/pybind/pybind11.git' +
+      '@' + 'd03662f0984f652b60e7ddce53d3868002275197', # 3.0.4
+    'condition': 'not build_with_chromium',
+  },
+
   # googletest now recommends "living at head," which is a bit of a crapshoot
   # because regressions land upstream frequently.  This is a known good revision.
   'third_party/googletest/src': {
