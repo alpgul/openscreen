@@ -70,6 +70,14 @@ class SenderImpl final : public Sender,
                             RtpTimeTicks rtp_timestamp,
                             Clock::time_point drop_time) override;
 
+  // Smooths a new round-trip-time `measurement` into the running `estimate`
+  // using an asymmetric "fast attack, slow decay" filter: the estimate climbs
+  // quickly on an upward spike (so the Sender notices congestion onset) but
+  // decays slowly (so a single low sample does not collapse it). A zero
+  // `estimate` adopts the measurement directly. Static and exposed for testing.
+  static Clock::duration SmoothRoundTripTime(Clock::duration estimate,
+                                             Clock::duration measurement);
+
  private:
   // Tracking/Storage for frames that are ready-to-send, and until they are
   // fully received at the other end.

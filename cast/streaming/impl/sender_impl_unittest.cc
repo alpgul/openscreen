@@ -740,6 +740,35 @@ TEST_F(SenderTest, EnforcesMinimumInFlightForSmallPlayoutDelays) {
   EXPECT_EQ(kMinSenderInFlight, MaxInFlightForPlayoutDelay(milliseconds(90)));
 }
 
+// Tests the asymmetric "fast attack, slow decay" round-trip-time smoothing
+// filter directly. See crbug.com/498036656.
+TEST(SenderRoundTripTimeSmoothingTest, ReactsQuicklyToSpikesAndDecaysSlowly) {
+  // A zero estimate adopts the first measurement directly.
+  EXPECT_EQ(Clock::to_duration(milliseconds(20)),
+            SenderImpl::SmoothRoundTripTime(Clock::duration::zero(),
+                                            milliseconds(20)));
+
+  // Fast attack: an upward spike pulls the estimate halfway to the measurement
+  // in a single step: (20 + 120) / 2 == 70ms.
+  const Clock::duration baseline = milliseconds(20);
+  const Clock::duration after_spike =
+      SenderImpl::SmoothRoundTripTime(baseline, milliseconds(120));
+  EXPECT_EQ(Clock::to_duration(milliseconds(70)), after_spike);
+
+  // Slow decay: a downward measurement only moves the estimate an eighth of the
+  // way: (7 * 70 + 20) / 8 == 63.75ms.
+  const Clock::duration after_recovery =
+      SenderImpl::SmoothRoundTripTime(after_spike, milliseconds(20));
+  EXPECT_EQ((7 * after_spike + Clock::to_duration(milliseconds(20))) / 8,
+            after_recovery);
+
+  // The upward reaction is far larger than the downward reaction.
+  EXPECT_GT(after_spike - baseline, after_spike - after_recovery);
+
+  // An equal measurement leaves the estimate unchanged.
+  EXPECT_EQ(baseline, SenderImpl::SmoothRoundTripTime(baseline, baseline));
+}
+
 // Tests that the Sender rejects frames if too large a span of FrameIds would be
 // in-flight at once.
 TEST_F(SenderTest, RejectsEnqueuingBeforeProtocolDesignLimit) {

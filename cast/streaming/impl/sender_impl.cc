@@ -338,6 +338,30 @@ void SenderImpl::OnReceiverReferenceTimeAdvanced(
   // Not used.
 }
 
+// static
+Clock::duration SenderImpl::SmoothRoundTripTime(Clock::duration estimate,
+                                                Clock::duration measurement) {
+  // Measurements typically have high variance, so smooth them with an
+  // exponentially-weighted moving average. The filter is asymmetric ("fast
+  // attack, slow decay"): it reacts quickly to upward spikes so the Sender
+  // notices congestion onset promptly and backs off, but decays slowly on the
+  // way down so a single low sample doesn't collapse the estimate. See
+  // crbug.com/498036656.
+  if (estimate == Clock::duration::zero()) {
+    return measurement;
+  }
+  if (measurement > estimate) {
+    // Spike / congestion onset: give the new measurement half the weight so the
+    // estimate climbs quickly.
+    return (estimate + measurement) / 2;
+  }
+  // Recovery: give the new measurement 1/8 weight (and the old estimate 7/8) to
+  // de-noise, since downward measurements are typically the network settling
+  // rather than a sustained improvement.
+  constexpr int kInertia = 7;
+  return (kInertia * estimate + measurement) / (kInertia + 1);
+}
+
 void SenderImpl::OnReceiverReport(const RtcpReportBlock& receiver_report) {
   OSP_CHECK_NE(rtcp_packet_arrival_time_, SenderPacketRouter::kNever);
 
@@ -377,18 +401,7 @@ void SenderImpl::OnReceiverReport(const RtcpReportBlock& receiver_report) {
     clamped_measurement = target_playout_delay_;
   }
 
-  // Measurements will typically have high variance. Use a simple smoothing
-  // filter to track a short-term average that changes less drastically.
-  if (round_trip_time_ == Clock::duration::zero()) {
-    round_trip_time_ = clamped_measurement;
-  } else {
-    // Arbitrary constant, to provide 1/8 weight to the new measurement, and 7/8
-    // weight to the old estimate, which seems to work well for de-noising the
-    // estimate.
-    constexpr int kInertia = 7;
-    round_trip_time_ =
-        (kInertia * round_trip_time_ + clamped_measurement) / (kInertia + 1);
-  }
+  round_trip_time_ = SmoothRoundTripTime(round_trip_time_, clamped_measurement);
   TRACE_SCOPED1(TraceCategory::kSender, "UpdatedRoundTripTime",
                 "round_trip_time", ToString(round_trip_time_));
 }
