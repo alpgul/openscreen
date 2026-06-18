@@ -21,6 +21,12 @@ config("include_dirs") {
   ]
 }
 
+config("public_features") {
+  if (build_with_chromium) {
+    defines = [ "BUILD_WITH_CHROMIUM" ]
+  }
+}
+
 # Put defines here that are only used in our internal files and NEVER in
 # external headers that embedders (such as chromium and node) might include.
 config("features") {
