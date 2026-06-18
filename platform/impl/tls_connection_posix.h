@@ -13,6 +13,8 @@
 #include "platform/impl/platform_client_posix.h"
 #include "platform/impl/stream_socket_posix.h"
 #include "platform/impl/tls_write_buffer.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 #include "util/weak_ptr.h"
 
 namespace openscreen {
@@ -70,10 +72,10 @@ class TlsConnectionPosix : public TlsConnection {
   // has occurred.
   void DispatchError(Error error);
 
-  TaskRunner& task_runner_;
-  PlatformClientPosix* platform_client_ = nullptr;
+  const raw_ref<TaskRunner> task_runner_;
+  raw_ptr<PlatformClientPosix> platform_client_ = nullptr;
 
-  Client* client_ = nullptr;
+  raw_ptr<Client> client_ = nullptr;
 
   std::unique_ptr<StreamSocket> socket_;
   bssl::UniquePtr<SSL> ssl_;

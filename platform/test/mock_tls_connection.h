@@ -10,6 +10,7 @@
 
 #include "gmock/gmock.h"
 #include "platform/api/tls_connection.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen {
 
@@ -41,7 +42,7 @@ class MockTlsConnection : public TlsConnection {
   }
 
  private:
-  Client* client_;
+  raw_ptr<Client> client_;
   const IPEndpoint local_address_;
   const IPEndpoint remote_address_;
 };

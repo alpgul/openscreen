@@ -75,10 +75,10 @@ void TlsConnectionPosix::TryReceiveMessage() {
 
   block.resize(bytes_read);
 
-  task_runner_.PostTask([weak_this = weak_factory_.GetWeakPtr(),
-                         moved_block = std::move(block)]() mutable {
+  task_runner_->PostTask([weak_this = weak_factory_.GetWeakPtr(),
+                          moved_block = std::move(block)]() mutable {
     if (auto* self = weak_this.get()) {
-      if (auto* client = self->client_) {
+      if (auto* client = self->client_.get()) {
         client->OnRead(self, std::move(moved_block));
       }
     }
@@ -86,17 +86,17 @@ void TlsConnectionPosix::TryReceiveMessage() {
 }
 
 void TlsConnectionPosix::SetClient(Client* client) {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
   client_ = client;
 }
 
 bool TlsConnectionPosix::Send(ByteView data) {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
   return buffer_.Push(data);
 }
 
 IPEndpoint TlsConnectionPosix::GetRemoteEndpoint() const {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
 
   std::optional<IPEndpoint> endpoint = socket_->remote_address();
   OSP_CHECK(endpoint.has_value());
@@ -138,10 +138,10 @@ void TlsConnectionPosix::SendAvailableBytes() {
 }
 
 void TlsConnectionPosix::DispatchError(Error error) {
-  task_runner_.PostTask([weak_this = weak_factory_.GetWeakPtr(),
-                         moved_error = std::move(error)]() mutable {
+  task_runner_->PostTask([weak_this = weak_factory_.GetWeakPtr(),
+                          moved_error = std::move(error)]() mutable {
     if (auto* self = weak_this.get()) {
-      if (auto* client = self->client_) {
+      if (auto* client = self->client_.get()) {
         client->OnError(self, std::move(moved_error));
       }
     }

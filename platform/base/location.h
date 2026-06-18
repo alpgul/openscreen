@@ -48,6 +48,9 @@ class Location {
   static Location CreateFromHere();
 
  private:
+#if defined(__clang__)
+  [[clang::annotate("raw_ptr_exclusion")]]
+#endif
   const void* program_counter_ = nullptr;
 };
 

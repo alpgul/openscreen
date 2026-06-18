@@ -14,6 +14,7 @@
 #include "platform/impl/socket_handle.h"
 #include "platform/impl/socket_handle_waiter.h"
 #include "platform/impl/udp_socket_posix.h"
+#include "util/raw_ref.h"
 #include "util/thread_annotations.h"
 
 namespace openscreen {
@@ -70,7 +71,7 @@ class UdpSocketReaderPosix : public SocketHandleWaiter::Subscriber {
   mutable std::mutex mutex_;
 
   // NetworkWaiter watching this NetworkReader.
-  SocketHandleWaiter& waiter_;
+  const raw_ref<SocketHandleWaiter> waiter_;
 
   friend class TestingUdpSocketReader;
 };

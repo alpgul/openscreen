@@ -16,6 +16,7 @@
 #include "platform/test/fake_clock.h"
 #include "util/chrono_helpers.h"
 #include "util/no_destructor.h"
+#include "util/raw_ptr.h"
 namespace openscreen {
 namespace {
 
@@ -62,7 +63,7 @@ class FakeTaskWaiter final : public TaskRunnerImpl::TaskWaiter {
 
  private:
   const ClockNowFunctionPtr now_function_;
-  TaskRunnerImpl* task_runner_;
+  raw_ptr<TaskRunnerImpl> task_runner_;
   std::atomic<bool> has_event_{false};
   std::atomic<bool> waiting_{false};
 };

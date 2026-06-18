@@ -53,6 +53,9 @@ struct TaskRunnerDeleter {
         TaskRunnerDeleter(task_runner));  // NOLINT
   }
 
+#if defined(__clang__)
+  [[clang::annotate("raw_ptr_exclusion")]]
+#endif
   TaskRunner* task_runner_ = nullptr;
 };
 

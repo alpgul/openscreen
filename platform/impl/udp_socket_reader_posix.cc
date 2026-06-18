@@ -18,7 +18,7 @@ UdpSocketReaderPosix::UdpSocketReaderPosix(SocketHandleWaiter& waiter)
     : waiter_(waiter) {}
 
 UdpSocketReaderPosix::~UdpSocketReaderPosix() {
-  waiter_.UnsubscribeAll(this);
+  waiter_->UnsubscribeAll(this);
 }
 
 void UdpSocketReaderPosix::ProcessReadyHandle(SocketHandleRef handle,
@@ -46,8 +46,8 @@ void UdpSocketReaderPosix::OnCreate(UdpSocket* socket) {
     sockets_.push_back(read_socket);
   }
   // We only care about read events.
-  waiter_.Subscribe(this, std::cref(read_socket->GetHandle()),
-                    SocketHandleWaiter::kReadable);
+  waiter_->Subscribe(this, std::cref(read_socket->GetHandle()),
+                     SocketHandleWaiter::kReadable);
 }
 
 void UdpSocketReaderPosix::OnDestroy(UdpSocket* socket) {
@@ -65,8 +65,8 @@ void UdpSocketReaderPosix::OnDelete(UdpSocketPosix* socket,
     }
   }
 
-  waiter_.OnHandleDeletion(this, std::cref(socket->GetHandle()),
-                           disable_locking_for_testing);
+  waiter_->OnHandleDeletion(this, std::cref(socket->GetHandle()),
+                            disable_locking_for_testing);
 }
 
 bool UdpSocketReaderPosix::IsMappedReadForTesting(

@@ -13,6 +13,7 @@
 #include "platform/api/time.h"
 #include "platform/impl/socket_handle_waiter.h"
 #include "util/osp_logging.h"
+#include "util/raw_ptr.h"
 #include "util/thread_annotations.h"
 
 namespace openscreen {
@@ -88,7 +89,7 @@ class TlsDataRouterPosix : public SocketHandleWaiter::Subscriber {
   bool disable_locking_for_testing_ = false;
 
  private:
-  SocketHandleWaiter* waiter_;
+  raw_ptr<SocketHandleWaiter> waiter_;
 
   // Mutex guarding connections_ vector.
   mutable std::mutex connections_mutex_;

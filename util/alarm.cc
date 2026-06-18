@@ -57,7 +57,7 @@ class Alarm::CancelableFunctor {
   }
 
  private:
-  Alarm* alarm_;
+  raw_ptr<Alarm> alarm_;
 };
 
 Alarm::Alarm(ClockNowFunctionPtr now_function, TaskRunner& task_runner)
@@ -100,7 +100,7 @@ void Alarm::InvokeLater(Clock::time_point now, Clock::time_point fire_time) {
   OSP_CHECK(!queued_fire_);
   next_fire_time_ = fire_time;
   // Note: Instantiating the CancelableFunctor below sets |this->queued_fire_|.
-  task_runner_.PostTaskWithDelay(CancelableFunctor(this), fire_time - now);
+  task_runner_->PostTaskWithDelay(CancelableFunctor(this), fire_time - now);
 }
 
 void Alarm::TryInvoke() {

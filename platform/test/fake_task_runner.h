@@ -11,6 +11,7 @@
 #include "platform/api/task_runner.h"
 #include "platform/api/time.h"
 #include "platform/test/fake_clock.h"
+#include "util/raw_ref.h"
 
 namespace openscreen {
 
@@ -63,7 +64,7 @@ class FakeTaskRunner : public TaskRunner {
   Clock::time_point GetResumeTime() const;
 
  private:
-  FakeClock& clock_;
+  const raw_ref<FakeClock> clock_;
 
   std::vector<Task> ready_to_run_tasks_;
   std::multimap<Clock::time_point, Task> delayed_tasks_;

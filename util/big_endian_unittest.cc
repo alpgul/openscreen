@@ -180,9 +180,8 @@ TEST(BigEndianReaderTest, ReadValues) {
   EXPECT_TRUE(reader.Read<uint64_t>(&u64));
   EXPECT_EQ(u64, UINT64_C(0x090A0B0C0D0E0F10));
 
-  EXPECT_EQ(reader.begin(), data);
-  EXPECT_EQ(reader.current(), data + 17);
-  EXPECT_EQ(reader.end(), data + 17);
+  EXPECT_EQ(reader.buffer().data(), data);
+  EXPECT_EQ(reader.remaining_span().data(), data + 17);
   EXPECT_EQ(reader.offset(), 17u);
   EXPECT_EQ(reader.remaining(), 0u);
   EXPECT_EQ(reader.length(), 17u);
@@ -218,9 +217,8 @@ TEST(BigEndianReaderTest, RespectLength) {
   uint8_t u8;
   EXPECT_FALSE(reader.Read<uint8_t>(&u8));
 
-  EXPECT_EQ(reader.begin(), data);
-  EXPECT_EQ(reader.current(), data + 8);
-  EXPECT_EQ(reader.end(), data + 8);
+  EXPECT_EQ(reader.buffer().data(), data);
+  EXPECT_EQ(reader.remaining_span().data(), data + 8);
   EXPECT_EQ(reader.offset(), 8u);
   EXPECT_EQ(reader.remaining(), 0u);
   EXPECT_EQ(reader.length(), 8u);
@@ -252,15 +250,13 @@ TEST(BigEndianBufferCursorTest, CursorCommit) {
 
     EXPECT_FALSE(reader.Skip(2));
     EXPECT_EQ(cursor.delta(), 15u);
-    EXPECT_EQ(static_cast<size_t>(reader.current() - cursor.origin()),
-              cursor.delta());
+    EXPECT_EQ(reader.offset() - cursor.origin_offset(), cursor.delta());
 
     cursor.Commit();
   }
 
-  EXPECT_EQ(reader.begin(), data);
-  EXPECT_EQ(reader.current(), data + 15);
-  EXPECT_EQ(reader.end(), data + 16);
+  EXPECT_EQ(reader.buffer().data(), data);
+  EXPECT_EQ(reader.remaining_span().data(), data + 15);
   EXPECT_EQ(reader.offset(), 15u);
   EXPECT_EQ(reader.remaining(), 1u);
   EXPECT_EQ(reader.length(), 16u);
@@ -277,9 +273,8 @@ TEST(BigEndianBufferCursorTest, CursorRollback) {
     EXPECT_EQ(cursor.delta(), 4u);
   }
 
-  EXPECT_EQ(reader.begin(), data);
-  EXPECT_EQ(reader.current(), data);
-  EXPECT_EQ(reader.end(), data + 16u);
+  EXPECT_EQ(reader.buffer().data(), data);
+  EXPECT_EQ(reader.remaining_span().data(), data);
   EXPECT_EQ(reader.offset(), 0u);
   EXPECT_EQ(reader.remaining(), 16u);
   EXPECT_EQ(reader.length(), 16u);
@@ -289,9 +284,8 @@ TEST(BigEndianWriterTest, ConstructWithValidBuffer) {
   uint8_t data[64];
   BigEndianWriter writer(data, sizeof(data));
 
-  EXPECT_EQ(writer.begin(), data);
-  EXPECT_EQ(writer.current(), data);
-  EXPECT_EQ(writer.end(), data + 64u);
+  EXPECT_EQ(writer.buffer().data(), data);
+  EXPECT_EQ(writer.remaining_span().data(), data);
   EXPECT_EQ(writer.offset(), 0u);
   EXPECT_EQ(writer.remaining(), 64u);
   EXPECT_EQ(writer.length(), 64u);
@@ -303,9 +297,8 @@ TEST(BigEndianWriterTest, SkipLessThanRemaining) {
 
   EXPECT_TRUE(writer.Skip(16));
 
-  EXPECT_EQ(writer.begin(), data);
-  EXPECT_EQ(writer.current(), data + 16u);
-  EXPECT_EQ(writer.end(), data + 64);
+  EXPECT_EQ(writer.buffer().data(), data);
+  EXPECT_EQ(writer.remaining_span().data(), data + 16u);
   EXPECT_EQ(writer.offset(), 16u);
   EXPECT_EQ(writer.remaining(), 48u);
   EXPECT_EQ(writer.length(), 64u);
@@ -319,9 +312,8 @@ TEST(BigEndianWriterTest, SkipMoreThanRemaining) {
   EXPECT_FALSE(writer.Skip(64));
 
   // Check that failed Skip does not modify any pointers or offsets.
-  EXPECT_EQ(writer.begin(), data);
-  EXPECT_EQ(writer.current(), data + 16u);
-  EXPECT_EQ(writer.end(), data + 64u);
+  EXPECT_EQ(writer.buffer().data(), data);
+  EXPECT_EQ(writer.remaining_span().data(), data + 16u);
   EXPECT_EQ(writer.offset(), 16u);
   EXPECT_EQ(writer.remaining(), 48u);
   EXPECT_EQ(writer.length(), 64u);
@@ -331,9 +323,8 @@ TEST(BigEndianWriterTest, ConstructWithZeroLengthBuffer) {
   uint8_t data[8];
   BigEndianWriter writer(data, 0);
 
-  EXPECT_EQ(writer.begin(), data);
-  EXPECT_EQ(writer.current(), data);
-  EXPECT_EQ(writer.end(), data);
+  EXPECT_EQ(writer.buffer().data(), data);
+  EXPECT_EQ(writer.remaining_span().data(), data);
   EXPECT_EQ(writer.offset(), 0u);
   EXPECT_EQ(writer.remaining(), 0u);
   EXPECT_EQ(writer.length(), 0u);
@@ -357,9 +348,8 @@ TEST(BigEndianWriterTest, WriteValues) {
   EXPECT_TRUE(writer.Write<uint64_t>(UINT64_C(0x090A0B0C0D0E0F10)));
   EXPECT_THAT(data, testing::ElementsAreArray(expected));
 
-  EXPECT_EQ(writer.begin(), data);
-  EXPECT_EQ(writer.current(), data + 17);
-  EXPECT_EQ(writer.end(), data + 17);
+  EXPECT_EQ(writer.buffer().data(), data);
+  EXPECT_EQ(writer.remaining_span().data(), data + 17);
   EXPECT_EQ(writer.offset(), 17u);
   EXPECT_EQ(writer.remaining(), 0u);
   EXPECT_EQ(writer.length(), 17u);
@@ -392,9 +382,8 @@ TEST(BigEndianWriterTest, RespectLength) {
   EXPECT_FALSE(writer.Write<uint8_t>(0));
   EXPECT_EQ(0u, writer.remaining());
 
-  EXPECT_EQ(writer.begin(), data);
-  EXPECT_EQ(writer.current(), data + 8);
-  EXPECT_EQ(writer.end(), data + 8);
+  EXPECT_EQ(writer.buffer().data(), data);
+  EXPECT_EQ(writer.remaining_span().data(), data + 8);
   EXPECT_EQ(writer.offset(), 8u);
   EXPECT_EQ(writer.remaining(), 0u);
   EXPECT_EQ(writer.length(), 8u);

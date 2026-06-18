@@ -13,6 +13,7 @@
 #include "platform/api/udp_socket.h"
 #include "platform/test/fake_clock.h"
 #include "util/osp_logging.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen {
 
@@ -75,7 +76,7 @@ class FakeUdpSocket : public UdpSocket {
  private:
   void ProcessConfigurationMethod(std::queue<Error>* errors);
 
-  Client* const client_;
+  const raw_ptr<Client> client_;
   Version version_;
 
   // Queues for the response to calls above

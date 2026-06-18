@@ -15,6 +15,7 @@
 #include "platform/api/time.h"
 #include "platform/base/error.h"
 #include "platform/impl/socket_handle.h"
+#include "util/raw_ptr.h"
 #include "util/thread_annotations.h"
 
 namespace openscreen {
@@ -109,7 +110,7 @@ class SocketHandleWaiter {
 
  private:
   struct SocketSubscription {
-    Subscriber* subscriber = nullptr;
+    raw_ptr<Subscriber> subscriber = nullptr;
     // Subscribers are only informed of flags that they are interested in.
     uint32_t flags = 0;
     Clock::time_point last_updated = Clock::time_point::min();
@@ -119,7 +120,7 @@ class SocketHandleWaiter {
     HandleWithFlags ready_handle;
     // Reference to the original subscription in the unordered map, so
     // we can keep track of when we updated this socket handle.
-    SocketSubscription* subscription;
+    raw_ptr<SocketSubscription> subscription;
   };
 
   // Call the subscriber associated with each changed handle.  Handles are only

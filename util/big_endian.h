@@ -7,8 +7,12 @@
 
 #include <stdint.h>
 
+#include <algorithm>
 #include <cstring>
 #include <type_traits>
+
+#include "platform/base/span.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen {
 
@@ -151,83 +155,99 @@ class BigEndianBuffer {
   class Cursor {
    public:
     explicit Cursor(BigEndianBuffer* buffer)
-        : buffer_(buffer), origin_(buffer_->current_) {}
+        : buffer_(buffer), origin_offset_(buffer_->offset()) {}
     Cursor(const Cursor& other) = delete;
     Cursor(Cursor&& other) noexcept = delete;
-    ~Cursor() { buffer_->current_ = origin_; }
+    ~Cursor() { buffer_->set_offset(origin_offset_); }
 
     Cursor& operator=(const Cursor& other) = delete;
     Cursor& operator=(Cursor&& other) noexcept = delete;
 
-    void Commit() { origin_ = buffer_->current_; }
+    void Commit() { origin_offset_ = buffer_->offset(); }
 
-    T* origin() { return origin_; }
-    size_t delta() { return buffer_->current_ - origin_; }
+    size_t origin_offset() const { return origin_offset_; }
+    T* origin() const { return buffer_->begin() + origin_offset_; }
+    size_t delta() const { return buffer_->offset() - origin_offset_; }
 
    private:
-    BigEndianBuffer* buffer_;
-    T* origin_;
+    raw_ptr<BigEndianBuffer<T>> buffer_;
+    size_t origin_offset_;
   };
 
   bool Skip(size_t length) {
-    if (current_ + length > end_) {
+    if (length > remaining()) {
       return false;
     }
-    current_ += length;
+    offset_ += length;
     return true;
   }
 
-  T* begin() const { return begin_; }
-  T* current() const { return current_; }
-  T* end() const { return end_; }
-  size_t length() const { return end_ - begin_; }
-  size_t remaining() const { return end_ - current_; }
-  size_t offset() const { return current_ - begin_; }
+  Span<T> buffer() const { return buffer_; }
+  Span<T> remaining_span() const { return buffer_.subspan(offset_); }
+  // TODO(crbug.com/520101123): Remove unsafe raw pointer and length methods.
+  T* begin() const { return buffer_.data(); }
+  T* current() const { return buffer_.data() + offset_; }
+  T* end() const { return buffer_.data() + buffer_.size(); }
+  size_t length() const { return buffer_.size(); }
+  size_t remaining() const { return buffer_.size() - offset_; }
+  size_t offset() const { return offset_; }
 
-  BigEndianBuffer(T* buffer, size_t length)
-      : begin_(buffer), current_(buffer), end_(buffer + length) {}
+  explicit BigEndianBuffer(Span<T> buffer) : buffer_(buffer) {}
+  // TODO(crbug.com/520101123): Remove unsafe raw pointer and length methods.
+  BigEndianBuffer(T* buffer, size_t length) : buffer_(buffer, length) {}
   BigEndianBuffer(const BigEndianBuffer&) = delete;
   BigEndianBuffer& operator=(const BigEndianBuffer&) = delete;
 
+ protected:
+  void set_offset(size_t offset) { offset_ = offset; }
+
  private:
-  T* begin_;
-  T* current_;
-  T* end_;
+  Span<T> buffer_;
+  size_t offset_ = 0;
 };
 
-// TODO(mfoltz): Use ByteBuffer here instead of pointer-and-length.
 class BigEndianReader : public BigEndianBuffer<const uint8_t> {
  public:
+  explicit BigEndianReader(ByteView buffer);
+  // TODO(crbug.com/520101123): Remove unsafe raw pointer and length methods.
   BigEndianReader(const uint8_t* buffer, size_t length);
 
   template <typename T>
   bool Read(T* out) {
-    const uint8_t* read_position = current();
-    if (Skip(sizeof(T))) {
-      *out = ReadBigEndian<T>(read_position);
+    ByteView view = remaining_span();
+    if (view.size() >= sizeof(T)) {
+      *out = ReadBigEndian<T>(view.data());
+      Skip(sizeof(T));
       return true;
     }
     return false;
   }
 
+  // TODO(crbug.com/520101123): Remove unsafe raw pointer and length methods.
   bool Read(size_t length, void* out);
+  bool Read(ByteBuffer out);
 };
 
 class BigEndianWriter : public BigEndianBuffer<uint8_t> {
  public:
+  explicit BigEndianWriter(ByteBuffer buffer);
+  // TODO(crbug.com/520101123): Remove unsafe raw pointer and length methods.
   BigEndianWriter(uint8_t* buffer, size_t length);
 
   template <typename T>
   bool Write(T value) {
-    uint8_t* write_position = current();
-    if (Skip(sizeof(T))) {
-      WriteBigEndian<T>(value, write_position);
+    ByteBuffer view = remaining_span();
+    if (view.size() >= sizeof(T)) {
+      WriteBigEndian<T>(value, view.data());
+      Skip(sizeof(T));
       return true;
     }
     return false;
   }
 
+  // TODO(crbug.com/520101123): Remove unsafe raw pointer and length methods.
   bool Write(const void* buffer, size_t length);
+  bool Write(ByteView buffer);
 };
 
 }  // namespace openscreen

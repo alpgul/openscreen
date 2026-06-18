@@ -18,6 +18,8 @@
 #include "platform/impl/platform_client_posix.h"
 #include "platform/impl/tls_data_router_posix.h"
 #include "util/flat_map.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 #include "util/weak_ptr.h"
 
 namespace openscreen {
@@ -108,9 +110,9 @@ class TlsConnectionFactoryPosix : public TlsConnectionFactory,
   // from the SSL_CTX is non-trivial, so we store a property instead.
   bool listen_credentials_set_ = false;
 
-  Client& client_;
-  TaskRunner& task_runner_;
-  PlatformClientPosix* const platform_client_;
+  const raw_ref<Client> client_;
+  const raw_ref<TaskRunner> task_runner_;
+  const raw_ptr<PlatformClientPosix> platform_client_;
 
   // SSL context, for creating SSL Connections via BoringSSL.
   bssl::UniquePtr<SSL_CTX> ssl_context_;

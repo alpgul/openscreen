@@ -8,6 +8,8 @@
 #include "platform/api/udp_socket.h"
 #include "platform/impl/platform_client_posix.h"
 #include "platform/impl/socket_handle_posix.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 #include "util/weak_ptr.h"
 
 namespace openscreen {
@@ -63,11 +65,11 @@ class UdpSocketPosix : public UdpSocket {
   void Close();
 
   // Task runner to use for queuing `client_` callbacks.
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
 
   // Client to use for callbacks. This can be nullptr if the user does not want
   // any callbacks (for example, in the send-only case).
-  Client* const client_;
+  const raw_ptr<Client> client_;
 
   // Holds the POSIX file descriptor, or -1 if the socket is closed.
   SocketHandle handle_;
@@ -80,7 +82,7 @@ class UdpSocketPosix : public UdpSocket {
 
   WeakPtrFactory<UdpSocketPosix> weak_factory_{this};
 
-  PlatformClientPosix* const platform_client_;
+  const raw_ptr<PlatformClientPosix> platform_client_;
 };
 
 }  // namespace openscreen

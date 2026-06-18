@@ -168,7 +168,7 @@ IPEndpoint UdpSocketPosix::GetLocalEndpoint() const {
 }
 
 void UdpSocketPosix::Bind() {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
   if (is_closed()) {
     OnError(Error::Code::kSocketClosedFailure);
     return;
@@ -221,7 +221,7 @@ void UdpSocketPosix::Bind() {
 
 void UdpSocketPosix::SetMulticastOutboundInterface(
     NetworkInterfaceIndex ifindex) {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
   if (is_closed()) {
     OnError(Error::Code::kSocketClosedFailure);
     return;
@@ -258,7 +258,7 @@ void UdpSocketPosix::SetMulticastOutboundInterface(
 
 void UdpSocketPosix::JoinMulticastGroup(const IPAddress& address,
                                         NetworkInterfaceIndex ifindex) {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
   if (is_closed()) {
     OnError(Error::Code::kSocketClosedFailure);
     return;
@@ -479,9 +479,9 @@ void UdpSocketPosix::ReceiveMessage() {
   // calling into all the other methods.
 
   if (is_closed()) {
-    task_runner_.PostTask([weak_this = weak_factory_.GetWeakPtr()] {
+    task_runner_->PostTask([weak_this = weak_factory_.GetWeakPtr()] {
       if (auto* self = weak_this.get()) {
-        if (auto* client = self->client_) {
+        if (auto* client = self->client_.get()) {
           client->OnRead(self, Error::Code::kSocketClosedFailure);
         }
       }
@@ -505,10 +505,10 @@ void UdpSocketPosix::ReceiveMessage() {
     }
   }
 
-  task_runner_.PostTask([weak_this = weak_factory_.GetWeakPtr(),
-                         result = std::move(read_result)]() mutable {
+  task_runner_->PostTask([weak_this = weak_factory_.GetWeakPtr(),
+                          result = std::move(read_result)]() mutable {
     if (auto* self = weak_this.get()) {
-      if (auto* client = self->client_) {
+      if (auto* client = self->client_.get()) {
         client->OnRead(self, std::move(result));
       }
     }
@@ -516,7 +516,7 @@ void UdpSocketPosix::ReceiveMessage() {
 }
 
 void UdpSocketPosix::SendMessage(ByteView data, const IPEndpoint& dest) {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
   if (is_closed()) {
     if (client_) {
       client_->OnSendError(this, Error::Code::kSocketClosedFailure);
@@ -576,7 +576,7 @@ void UdpSocketPosix::SendMessage(ByteView data, const IPEndpoint& dest) {
 }
 
 void UdpSocketPosix::SetDscp(UdpSocket::DscpMode mode) {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
   if (is_closed()) {
     OnError(Error::Code::kSocketClosedFailure);
     return;

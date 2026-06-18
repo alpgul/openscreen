@@ -47,6 +47,9 @@ class CurrentTracingDestination {
 
   // The destination at the time this class was constructed, and is valid for
   // the lifetime of this class. This is nullptr if tracing was inactive.
+#if defined(__clang__)
+  [[clang::annotate("raw_ptr_exclusion")]]
+#endif
   TraceLoggingPlatform* const destination_;
 };
 

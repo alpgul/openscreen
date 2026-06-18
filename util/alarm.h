@@ -9,6 +9,8 @@
 
 #include "platform/api/task_runner.h"
 #include "platform/api/time.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen {
 
@@ -85,7 +87,7 @@ class Alarm {
   void TryInvoke();
 
   const ClockNowFunctionPtr now_function_;
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
 
   // This is the task the client wants to have run at a specific point-in-time.
   // This is NOT the task that Alarm provides to the TaskRunner.
@@ -95,7 +97,7 @@ class Alarm {
   // When non-null, there is a task in the TaskRunner's queue that will call
   // TryInvoke() some time in the future. This member is exclusively maintained
   // by the CancelableFunctor class methods.
-  CancelableFunctor* queued_fire_ = nullptr;
+  raw_ptr<CancelableFunctor> queued_fire_;
 
   // When the CancelableFunctor is scheduled to run. It may possibly execute
   // later than this, if the TaskRunner is falling behind.
