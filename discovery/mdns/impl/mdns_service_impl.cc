@@ -68,17 +68,17 @@ MdnsServiceImpl::MdnsServiceImpl(TaskRunner& task_runner,
   OSP_CHECK(socket_ptr);
   sender_ = std::make_unique<MdnsSender>(*socket_ptr);
   if (config.enable_querying) {
-    querier_ = std::make_unique<MdnsQuerier>(*sender_, receiver_, task_runner_,
+    querier_ = std::make_unique<MdnsQuerier>(*sender_, receiver_, *task_runner_,
                                              now_function_, random_delay_,
-                                             reporting_client_, config);
+                                             *reporting_client_, config);
   }
   if (config.enable_publication) {
     probe_manager_ = std::make_unique<MdnsProbeManagerImpl>(
-        *sender_, receiver_, random_delay_, task_runner_, now_function_);
+        *sender_, receiver_, random_delay_, *task_runner_, now_function_);
     publisher_ = std::make_unique<MdnsPublisher>(
-        *sender_, *probe_manager_, task_runner_, now_function_, config);
+        *sender_, *probe_manager_, *task_runner_, now_function_, config);
     responder_ = std::make_unique<MdnsResponder>(
-        *publisher_, *probe_manager_, *sender_, receiver_, task_runner_,
+        *publisher_, *probe_manager_, *sender_, receiver_, *task_runner_,
         now_function_, random_delay_, config);
   }
 
@@ -137,7 +137,7 @@ Error MdnsServiceImpl::UnregisterRecord(const MdnsRecord& record) {
 }
 
 void MdnsServiceImpl::OnError(UdpSocket* socket, const Error& error) {
-  reporting_client_.OnFatalError(error);
+  reporting_client_->OnFatalError(error);
 }
 
 void MdnsServiceImpl::OnSendError(UdpSocket* socket, const Error& error) {

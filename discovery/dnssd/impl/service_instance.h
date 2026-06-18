@@ -12,6 +12,7 @@
 #include "discovery/dnssd/impl/querier_impl.h"
 #include "discovery/dnssd/public/dns_sd_service.h"
 #include "platform/base/interface_info.h"
+#include "util/raw_ref.h"
 
 namespace openscreen {
 
@@ -43,7 +44,7 @@ class ServiceInstance final : public DnsSdService {
   DnsSdPublisher* GetPublisher() override { return publisher_.get(); }
 
  private:
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
 
   std::unique_ptr<MdnsService> mdns_service_;
 

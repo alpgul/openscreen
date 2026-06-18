@@ -14,6 +14,7 @@
 #include "discovery/dnssd/public/dns_sd_service.h"
 #include "platform/base/error.h"
 #include "util/osp_logging.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::discovery {
 
@@ -49,7 +50,7 @@ class DnsSdServicePublisher : public DnsSdPublisher::Client {
     }
 
     DnsSdInstance instance = conversion_(service);
-    return publisher_.Register(instance, this);
+    return publisher_->Register(instance, this);
   }
 
   Error UpdateRegistration(const T& service) {
@@ -58,11 +59,11 @@ class DnsSdServicePublisher : public DnsSdPublisher::Client {
     }
 
     DnsSdInstance instance = conversion_(service);
-    return publisher_.UpdateRegistration(instance);
+    return publisher_->UpdateRegistration(instance);
   }
 
   ErrorOr<int> DeregisterAll() {
-    return publisher_.DeregisterAll(service_name_);
+    return publisher_->DeregisterAll(service_name_);
   }
 
  protected:
@@ -84,7 +85,7 @@ class DnsSdServicePublisher : public DnsSdPublisher::Client {
  private:
   ServiceInstanceConverter conversion_;
   std::string service_name_;
-  DnsSdPublisher& publisher_;
+  const raw_ref<DnsSdPublisher> publisher_;
 };
 
 }  // namespace openscreen::discovery

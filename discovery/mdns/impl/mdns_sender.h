@@ -8,6 +8,7 @@
 #include "platform/api/udp_socket.h"
 #include "platform/base/error.h"
 #include "platform/base/ip_address.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::discovery {
 
@@ -32,7 +33,7 @@ class MdnsSender {
   void OnSendError(UdpSocket* socket, const Error& error);
 
  private:
-  UdpSocket& socket_;
+  const raw_ref<UdpSocket> socket_;
 };
 
 }  // namespace openscreen::discovery

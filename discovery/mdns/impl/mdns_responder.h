@@ -13,6 +13,7 @@
 #include "discovery/mdns/public/mdns_records.h"
 #include "platform/api/time.h"
 #include "util/alarm.h"
+#include "util/raw_ref.h"
 
 namespace openscreen {
 
@@ -121,7 +122,7 @@ class MdnsResponder {
     const int max_allowed_messages_;
     const int max_allowed_records_;
     const IPEndpoint src_;
-    MdnsResponder& responder_;
+    const raw_ref<MdnsResponder> responder_;
 
     std::vector<MdnsQuestion> questions_;
     std::vector<MdnsRecord> known_answers_;
@@ -155,13 +156,13 @@ class MdnsResponder {
   // NOTE: unique_ptrs used because TruncatedQuery is not movable.
   std::map<IPEndpoint, std::unique_ptr<TruncatedQuery>> truncated_queries_;
 
-  RecordHandler& record_handler_;
-  MdnsProbeManager& ownership_handler_;
-  MdnsSender& sender_;
-  MdnsReceiver& receiver_;
-  TaskRunner& task_runner_;
+  const raw_ref<RecordHandler> record_handler_;
+  const raw_ref<MdnsProbeManager> ownership_handler_;
+  const raw_ref<MdnsSender> sender_;
+  const raw_ref<MdnsReceiver> receiver_;
+  const raw_ref<TaskRunner> task_runner_;
   const ClockNowFunctionPtr now_function_;
-  MdnsRandom& random_delay_;
+  const raw_ref<MdnsRandom> random_delay_;
   Config config_;
 
   friend class MdnsResponderTest;

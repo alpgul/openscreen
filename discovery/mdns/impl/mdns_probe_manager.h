@@ -14,6 +14,8 @@
 #include "discovery/mdns/public/mdns_records.h"
 #include "platform/base/error.h"
 #include "platform/base/ip_address.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen {
 
@@ -96,8 +98,8 @@ class MdnsProbeManagerImpl : public MdnsProbe::Observer,
 
   virtual std::unique_ptr<MdnsProbe> CreateProbe(DomainName name,
                                                  IPAddress address) {
-    return std::make_unique<MdnsProbeImpl>(sender_, receiver_, random_delay_,
-                                           task_runner_, now_function_, *this,
+    return std::make_unique<MdnsProbeImpl>(*sender_, *receiver_, *random_delay_,
+                                           *task_runner_, now_function_, *this,
                                            std::move(name), std::move(address));
   }
 
@@ -115,7 +117,7 @@ class MdnsProbeManagerImpl : public MdnsProbe::Observer,
     // holding this object is resized.
     std::unique_ptr<MdnsProbe> probe;
     DomainName requested_name;
-    MdnsDomainConfirmedProvider* callback;
+    raw_ptr<MdnsDomainConfirmedProvider> callback;
     int num_probes_failed = 0;
   };
 
@@ -129,10 +131,10 @@ class MdnsProbeManagerImpl : public MdnsProbe::Observer,
   std::vector<OngoingProbe>::iterator FindOngoingProbe(const DomainName& name);
   std::vector<OngoingProbe>::iterator FindOngoingProbe(MdnsProbe* probe);
 
-  MdnsSender& sender_;
-  MdnsReceiver& receiver_;
-  MdnsRandom& random_delay_;
-  TaskRunner& task_runner_;
+  const raw_ref<MdnsSender> sender_;
+  const raw_ref<MdnsReceiver> receiver_;
+  const raw_ref<MdnsRandom> random_delay_;
+  const raw_ref<TaskRunner> task_runner_;
   ClockNowFunctionPtr now_function_;
 
   // The set of all probes which have completed successfully. This set is

@@ -18,6 +18,7 @@
 #include "platform/base/error.h"
 #include "util/hashing.h"
 #include "util/osp_logging.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::discovery {
 
@@ -67,7 +68,7 @@ class DnsSdServiceWatcher : public DnsSdQuerier::Callback {
     OSP_CHECK(!is_running_);
     is_running_ = true;
 
-    querier_.StartQuery(service_name_, this);
+    querier_->StartQuery(service_name_, this);
   }
 
   // Stops service discovery.
@@ -75,7 +76,7 @@ class DnsSdServiceWatcher : public DnsSdQuerier::Callback {
     OSP_CHECK(is_running_);
     is_running_ = false;
 
-    querier_.StopQuery(service_name_, this);
+    querier_->StopQuery(service_name_, this);
   }
 
   // Returns whether or not discovery is currently ongoing.
@@ -91,7 +92,7 @@ class DnsSdServiceWatcher : public DnsSdQuerier::Callback {
       return Error::Code::kOperationInvalid;
     }
 
-    querier_.ReinitializeQueries(service_name_);
+    querier_->ReinitializeQueries(service_name_);
     records_.clear();
     return Error::None();
   }
@@ -106,7 +107,7 @@ class DnsSdServiceWatcher : public DnsSdQuerier::Callback {
       return Error::Code::kOperationInvalid;
     }
 
-    querier_.ReinitializeQueries(service_name_);
+    querier_->ReinitializeQueries(service_name_);
     return Error::None();
   }
 
@@ -209,7 +210,7 @@ class DnsSdServiceWatcher : public DnsSdQuerier::Callback {
 
   std::string service_name_;
   ServicesUpdatedCallback callback_;
-  DnsSdQuerier& querier_;
+  const raw_ref<DnsSdQuerier> querier_;
 };
 
 }  // namespace openscreen::discovery

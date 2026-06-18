@@ -343,7 +343,7 @@ void MdnsResponder::TruncatedQuery::RescheduleSend() {
     send_delay = Clock::duration(0);
   } else {
     // Reschedule to send after a random delay, per RFC 6762.
-    send_delay = responder_.random_delay_.GetTruncatedQueryResponseDelay();
+    send_delay = responder_->random_delay_->GetTruncatedQueryResponseDelay();
   }
 
   alarm_.ScheduleFromNow([this]() { SendResponse(); }, send_delay);
@@ -358,7 +358,7 @@ void MdnsResponder::TruncatedQuery::SendResponse() {
     return;
   }
 
-  responder_.RespondToTruncatedQuery(this);
+  responder_->RespondToTruncatedQuery(this);
 }
 
 MdnsResponder::MdnsResponder(RecordHandler& record_handler,
@@ -383,16 +383,16 @@ MdnsResponder::MdnsResponder(RecordHandler& record_handler,
   auto func = [this](const MdnsMessage& message, const IPEndpoint& src) {
     OnMessageReceived(message, src);
   };
-  receiver_.SetQueryCallback(std::move(func));
+  receiver_->SetQueryCallback(std::move(func));
 }
 
 MdnsResponder::~MdnsResponder() {
-  receiver_.SetQueryCallback(nullptr);
+  receiver_->SetQueryCallback(nullptr);
 }
 
 void MdnsResponder::OnMessageReceived(const MdnsMessage& message,
                                       const IPEndpoint& src) {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
   OSP_CHECK(message.type() == MessageType::Query);
 
   // Handle multi-packet known answer suppression.
@@ -416,7 +416,7 @@ void MdnsResponder::OnMessageReceived(const MdnsMessage& message,
   // If the query is a probe query, it will be handled separately by the
   // MdnsProbeManager. Ignore it here.
   if (message.IsProbeQuery()) {
-    ownership_handler_.RespondToProbeQuery(message, src);
+    ownership_handler_->RespondToProbeQuery(message, src);
     return;
   }
 
@@ -447,7 +447,7 @@ void MdnsResponder::ProcessMultiPacketTruncatedMessage(
   if (pair.second) {
     // Create a new query and swap it with the old one to save an extra lookup.
     auto new_query = std::make_unique<TruncatedQuery>(
-        *this, task_runner_, now_function_, src, message, config_);
+        *this, *task_runner_, now_function_, src, message, config_);
     stored_query.swap(new_query);
     return;
   }
@@ -484,7 +484,7 @@ void MdnsResponder::ProcessMultiPacketTruncatedMessage(
   //
   // Create a new query and swap it with the old one to save an extra lookup.
   auto new_query = std::make_unique<TruncatedQuery>(
-      *this, task_runner_, now_function_, src, message, config_);
+      *this, *task_runner_, now_function_, src, message, config_);
   stored_query.swap(new_query);
 
   // Now that the pointers have been swapped, process the previously stored
@@ -527,10 +527,10 @@ void MdnsResponder::ProcessQueries(
     // - The query is a service enumeration query.
     const bool is_service_enumeration = IsServiceTypeEnumerationQuery(question);
     const bool is_exclusive_owner =
-        ownership_handler_.IsDomainClaimed(question.name());
+        ownership_handler_->IsDomainClaimed(question.name());
     if (!is_service_enumeration && !is_exclusive_owner &&
-        !record_handler_.HasRecords(question.name(), question.dns_type(),
-                                    question.dns_class())) {
+        !record_handler_->HasRecords(question.name(), question.dns_type(),
+                                     question.dns_class())) {
       OSP_DVLOG << "\tmDNS Query processed and no relevant records found!";
       continue;
     } else if (is_service_enumeration) {
@@ -542,12 +542,12 @@ void MdnsResponder::ProcessQueries(
     std::function<void(const MdnsMessage&)> send_response;
     if (question.response_type() == ResponseType::kMulticast) {
       send_response = [this](const MdnsMessage& message) {
-        sender_.SendMulticast(message);
+        sender_->SendMulticast(message);
       };
     } else {
       OSP_CHECK(question.response_type() == ResponseType::kUnicast);
       send_response = [this, src](const MdnsMessage& message) {
-        sender_.SendMessage(message, src);
+        sender_->SendMessage(message, src);
       };
     }
 
@@ -557,13 +557,13 @@ void MdnsResponder::ProcessQueries(
     if (is_exclusive_owner) {
       SendResponse(question, known_answers, send_response, is_exclusive_owner);
     } else {
-      const auto delay = random_delay_.GetSharedRecordResponseDelay();
+      const auto delay = random_delay_->GetSharedRecordResponseDelay();
       std::function<void()> response = [this, question, known_answers,
                                         send_response, is_exclusive_owner]() {
         SendResponse(question, known_answers, send_response,
                      is_exclusive_owner);
       };
-      task_runner_.PostTaskWithDelay(response, delay);
+      task_runner_->PostTaskWithDelay(response, delay);
     }
   }
 }
@@ -573,14 +573,14 @@ void MdnsResponder::SendResponse(
     const std::vector<MdnsRecord>& known_answers,
     std::function<void(const MdnsMessage&)> send_response,
     bool is_exclusive_owner) {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
 
   MdnsMessage message(CreateMessageId(), MessageType::Response);
 
   if (IsServiceTypeEnumerationQuery(question)) {
     // This is a special case defined in RFC 6763 section 9, so handle it
     // separately.
-    ApplyServiceTypeEnumerationResults(&message, &record_handler_,
+    ApplyServiceTypeEnumerationResults(&message, &*record_handler_,
                                        question.name(), question.dns_class());
   } else {
     // NOTE: The exclusive ownership of this record cannot change before this
@@ -588,7 +588,7 @@ void MdnsResponder::SendResponse(
     // has previously been published, and if this host is the exclusive owner
     // then this method will have been called without any delay on the task
     // runner.
-    ApplyQueryResults(&message, &record_handler_, question.name(),
+    ApplyQueryResults(&message, &*record_handler_, question.name(),
                       known_answers, question.dns_type(), question.dns_class(),
                       is_exclusive_owner);
   }

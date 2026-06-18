@@ -9,6 +9,7 @@
 
 #include "discovery/mdns/public/mdns_records.h"
 #include "util/osp_logging.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::discovery {
 
@@ -25,7 +26,7 @@ struct PendingQueryChange {
   DomainName name;
   DnsType dns_type;
   DnsClass dns_class;
-  MdnsRecordChangedCallback* callback;
+  raw_ptr<MdnsRecordChangedCallback> callback;
   ChangeType change_type;
 };
 

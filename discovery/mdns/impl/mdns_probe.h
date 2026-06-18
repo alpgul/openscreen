@@ -12,6 +12,7 @@
 #include "platform/api/time.h"
 #include "platform/base/ip_address.h"
 #include "util/alarm.h"
+#include "util/raw_ref.h"
 
 namespace openscreen {
 
@@ -107,17 +108,17 @@ class MdnsProbeImpl : public MdnsProbe {
   // MdnsReceiver::ResponseClient overrides.
   void OnMessageReceived(const MdnsMessage& message) override;
 
-  MdnsRandom& random_delay_;
-  TaskRunner& task_runner_;
+  const raw_ref<MdnsRandom> random_delay_;
+  const raw_ref<TaskRunner> task_runner_;
   ClockNowFunctionPtr now_function_;
 
   Alarm alarm_;
 
   // NOTE: Access to all below variables should only be done from the task
   // runner thread.
-  MdnsSender& sender_;
-  MdnsReceiver& receiver_;
-  Observer& observer_;
+  const raw_ref<MdnsSender> sender_;
+  const raw_ref<MdnsReceiver> receiver_;
+  const raw_ref<Observer> observer_;
 
   int successful_probe_queries_ = 0;
   bool is_running_ = true;

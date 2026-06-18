@@ -21,6 +21,7 @@
 #include "discovery/mdns/public/mdns_record_changed_callback.h"
 #include "discovery/mdns/public/mdns_records.h"
 #include "discovery/mdns/public/mdns_service.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::discovery {
 
@@ -69,10 +70,10 @@ class QuerierImpl : public DnsSdQuerier, public MdnsRecordChangedCallback {
   // callbacks to call when new InstanceEndpoints are available.
   std::map<ServiceKey, std::vector<Callback*>> callback_map_;
 
-  MdnsService& mdns_querier_;
-  TaskRunner& task_runner_;
+  const raw_ref<MdnsService> mdns_querier_;
+  const raw_ref<TaskRunner> task_runner_;
 
-  ReportingClient& reporting_client_;
+  const raw_ref<ReportingClient> reporting_client_;
 };
 
 }  // namespace openscreen::discovery

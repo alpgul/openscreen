@@ -13,6 +13,8 @@
 #include "discovery/dnssd/impl/service_instance.h"
 #include "discovery/dnssd/public/dns_sd_querier.h"
 #include "discovery/dnssd/public/dns_sd_service.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen {
 
@@ -49,12 +51,12 @@ class ServiceDispatcher final : public DnsSdPublisher,
 
   std::vector<std::unique_ptr<ServiceInstance>> service_instances_;
 
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
 
   // Pointers either to this instance or to nullptr depending whether the below
   // types are supported.
-  DnsSdPublisher* const publisher_;
-  DnsSdQuerier* const querier_;
+  const raw_ptr<DnsSdPublisher> publisher_;
+  const raw_ptr<DnsSdQuerier> querier_;
 };
 
 }  // namespace discovery

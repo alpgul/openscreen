@@ -13,6 +13,7 @@
 #include "discovery/dnssd/public/dns_sd_publisher.h"
 #include "discovery/mdns/public/mdns_domain_confirmed_provider.h"
 #include "discovery/mdns/public/mdns_service.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::discovery {
 
@@ -49,10 +50,10 @@ class PublisherImpl : public DnsSdPublisher,
   // instances should be the instance name.
   std::map<DnsSdInstance, DnsSdInstanceEndpoint> published_instances_;
 
-  MdnsService& mdns_publisher_;
-  ReportingClient& reporting_client_;
-  TaskRunner& task_runner_;
-  const NetworkInterfaceConfig& network_config_;
+  const raw_ref<MdnsService> mdns_publisher_;
+  const raw_ref<ReportingClient> reporting_client_;
+  const raw_ref<TaskRunner> task_runner_;
+  const raw_ref<const NetworkInterfaceConfig> network_config_;
 
   friend class PublisherTesting;
 };

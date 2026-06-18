@@ -21,6 +21,7 @@
 #include "discovery/mdns/public/mdns_service.h"
 #include "discovery/mdns/public/mdns_writer.h"
 #include "platform/api/udp_socket.h"
+#include "util/raw_ref.h"
 
 namespace openscreen {
 
@@ -69,9 +70,9 @@ class MdnsServiceImpl : public MdnsService, public UdpSocket::Client {
   void OnBound(UdpSocket* socket) override;
 
  private:
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
   ClockNowFunctionPtr now_function_;
-  ReportingClient& reporting_client_;
+  const raw_ref<ReportingClient> reporting_client_;
 
   MdnsRandom random_delay_;
   MdnsReceiver receiver_;

@@ -8,6 +8,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "util/raw_ref.h"
 #include "util/std_util.h"
 
 using testing::_;
@@ -56,20 +57,20 @@ class MockDnsSdService : public DnsSdService {
 
     void StartQuery(const std::string& service,
                     DnsSdQuerier::Callback* cb) override {
-      mock_service_.StartQuery(service, cb);
+      mock_service_->StartQuery(service, cb);
     }
 
     void StopQuery(const std::string& service,
                    DnsSdQuerier::Callback* cb) override {
-      mock_service_.StopQuery(service, cb);
+      mock_service_->StopQuery(service, cb);
     }
 
     void ReinitializeQueries(const std::string& service) override {
-      mock_service_.ReinitializeQueries(service);
+      mock_service_->ReinitializeQueries(service);
     }
 
    private:
-    MockDnsSdService& mock_service_;
+    const raw_ref<MockDnsSdService> mock_service_;
   };
 
   MockQuerier querier_;

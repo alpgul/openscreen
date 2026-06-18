@@ -16,6 +16,8 @@
 #include "discovery/mdns/public/mdns_record_changed_callback.h"
 #include "discovery/mdns/public/mdns_records.h"
 #include "platform/api/task_runner.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::discovery {
 
@@ -70,7 +72,7 @@ class MdnsQuerier : public MdnsReceiver::ResponseClient {
 
  private:
   struct CallbackInfo {
-    MdnsRecordChangedCallback* const callback;
+    const raw_ptr<MdnsRecordChangedCallback> callback;
     const DnsType dns_type;
     const DnsClass dns_class;
   };
@@ -130,12 +132,12 @@ class MdnsQuerier : public MdnsReceiver::ResponseClient {
     void MoveToBeginning(RecordMap::iterator iterator);
     void MoveToEnd(RecordMap::iterator iterator);
 
-    MdnsQuerier& querier_;
-    MdnsSender& sender_;
-    MdnsRandom& random_delay_;
-    TaskRunner& task_runner_;
+    const raw_ref<MdnsQuerier> querier_;
+    const raw_ref<MdnsSender> sender_;
+    const raw_ref<MdnsRandom> random_delay_;
+    const raw_ref<TaskRunner> task_runner_;
     ClockNowFunctionPtr now_function_;
-    ReportingClient& reporting_client_;
+    const raw_ref<ReportingClient> reporting_client_;
     Config config_;
 
     // List of RecordTracker instances used by this instance where the least
@@ -205,12 +207,12 @@ class MdnsQuerier : public MdnsReceiver::ResponseClient {
   // Applies the supplied pending changes.
   void ApplyPendingChanges(std::vector<PendingQueryChange> pending_changes);
 
-  MdnsSender& sender_;
-  MdnsReceiver& receiver_;
-  TaskRunner& task_runner_;
+  const raw_ref<MdnsSender> sender_;
+  const raw_ref<MdnsReceiver> receiver_;
+  const raw_ref<TaskRunner> task_runner_;
   const ClockNowFunctionPtr now_function_;
-  MdnsRandom& random_delay_;
-  ReportingClient& reporting_client_;
+  const raw_ref<MdnsRandom> random_delay_;
+  const raw_ref<ReportingClient> reporting_client_;
   Config config_;
 
   // A collection of active question trackers, each is uniquely identified by

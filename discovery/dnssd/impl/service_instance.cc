@@ -25,17 +25,17 @@ ServiceInstance::ServiceInstance(TaskRunner& task_runner,
                       network_info.GetIpAddressV4(),
                       network_info.GetIpAddressV6()) {
   if (config.enable_querying) {
-    querier_ = std::make_unique<QuerierImpl>(*mdns_service_, task_runner_,
+    querier_ = std::make_unique<QuerierImpl>(*mdns_service_, *task_runner_,
                                              reporting_client, network_config_);
   }
   if (config.enable_publication) {
     publisher_ = std::make_unique<PublisherImpl>(
-        *mdns_service_, reporting_client, task_runner_, network_config_);
+        *mdns_service_, reporting_client, *task_runner_, network_config_);
   }
 }
 
 ServiceInstance::~ServiceInstance() {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
 }
 
 }  // namespace openscreen::discovery

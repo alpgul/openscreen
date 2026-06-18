@@ -84,7 +84,7 @@ MdnsTracker::~MdnsTracker() {
 
 bool MdnsTracker::AddAdjacentNode(const MdnsTracker* node) const {
   OSP_CHECK(node);
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
 
   if (Contains(adjacent_nodes_, node)) {
     return false;
@@ -97,7 +97,7 @@ bool MdnsTracker::AddAdjacentNode(const MdnsTracker* node) const {
 
 bool MdnsTracker::RemoveAdjacentNode(const MdnsTracker* node) const {
   OSP_CHECK(node);
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
 
   auto it = std::find(adjacent_nodes_.begin(), adjacent_nodes_.end(), node);
   if (it == adjacent_nodes_.end()) {
@@ -156,7 +156,7 @@ MdnsRecordTracker::~MdnsRecordTracker() = default;
 
 ErrorOr<MdnsRecordTracker::UpdateType> MdnsRecordTracker::Update(
     const MdnsRecord& new_record) {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
   const bool has_same_rdata = record_.dns_type() == new_record.dns_type() &&
                               record_.rdata() == new_record.rdata();
   const bool new_is_negative_response = new_record.dns_type() == DnsType::kNSEC;
@@ -218,7 +218,7 @@ bool MdnsRecordTracker::RemoveAssociatedQuery(
 }
 
 void MdnsRecordTracker::ExpireSoon() {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
 
   record_ =
       MdnsRecord(record_.name(), record_.dns_type(), record_.dns_class(),
@@ -274,7 +274,7 @@ Clock::time_point MdnsRecordTracker::GetNextSendTime() {
 
   // Do not add random variation to the expiration time (last fraction of TTL)
   if (attempt_count_ != countof(kTtlFractions)) {
-    ttl_fraction += random_delay_.GetRecordTtlVariation();
+    ttl_fraction += random_delay_->GetRecordTtlVariation();
   }
 
   const Clock::duration delay =
@@ -310,7 +310,7 @@ MdnsQuestionTracker::MdnsQuestionTracker(MdnsQuestion question,
     announcements_so_far_++;
 
     if (query_type_ == QueryType::kOneShot) {
-      task_runner_.PostTask([this] { MdnsQuestionTracker::SendQuery(); });
+      task_runner_->PostTask([this] { MdnsQuestionTracker::SendQuery(); });
     } else {
       OSP_CHECK(query_type_ == QueryType::kContinuous);
       send_alarm_.ScheduleFromNow(
@@ -318,7 +318,7 @@ MdnsQuestionTracker::MdnsQuestionTracker(MdnsQuestion question,
             MdnsQuestionTracker::SendQuery();
             ScheduleFollowUpQuery();
           },
-          random_delay_.GetInitialQueryDelay());
+          random_delay_->GetInitialQueryDelay());
     }
   }
 }
@@ -394,11 +394,11 @@ bool MdnsQuestionTracker::SendQuery() const {
       it++;
     } else {
       message.set_truncated();
-      sender_.SendMulticast(message);
+      sender_->SendMulticast(message);
       message = MdnsMessage(CreateMessageId(), MessageType::Query);
     }
   }
-  sender_.SendMulticast(message);
+  sender_->SendMulticast(message);
   return true;
 }
 

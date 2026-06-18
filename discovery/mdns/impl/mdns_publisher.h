@@ -14,6 +14,7 @@
 #include "discovery/mdns/impl/mdns_responder.h"
 #include "discovery/mdns/public/mdns_records.h"
 #include "util/alarm.h"
+#include "util/raw_ref.h"
 
 namespace openscreen {
 
@@ -123,8 +124,8 @@ class MdnsPublisher : public MdnsResponder::RecordHandler {
     void QueueGoodbye();
     void QueueAnnouncement();
 
-    MdnsPublisher& publisher_;
-    TaskRunner& task_runner_;
+    const raw_ref<MdnsPublisher> publisher_;
+    const raw_ref<TaskRunner> task_runner_;
     const ClockNowFunctionPtr now_function_;
 
     // Whether or not goodbye messages should be sent.
@@ -175,9 +176,9 @@ class MdnsPublisher : public MdnsResponder::RecordHandler {
                                                DnsClass clazz) override;
   std::vector<MdnsRecord::ConstRef> GetPtrRecords(DnsClass clazz) override;
 
-  MdnsSender& sender_;
-  MdnsProbeManager& ownership_manager_;
-  TaskRunner& task_runner_;
+  const raw_ref<MdnsSender> sender_;
+  const raw_ref<MdnsProbeManager> ownership_manager_;
+  const raw_ref<TaskRunner> task_runner_;
   ClockNowFunctionPtr now_function_;
 
   // Alarm to cancel batching of records when this class is destroyed, and

@@ -10,6 +10,7 @@
 
 #include "discovery/dnssd/impl/conversion_layer.h"
 #include "discovery/dnssd/impl/instance_key.h"
+#include "util/raw_ptr.h"
 #include "util/std_util.h"
 
 namespace openscreen::discovery {
@@ -147,7 +148,7 @@ class DnsDataGraphImpl : public DnsDataGraph {
     std::vector<Node*> children_;
 
     // Graph containing this node.
-    DnsDataGraphImpl* graph_;
+    raw_ptr<DnsDataGraphImpl> graph_;
   };
 
   // Wrapper to handle the creation and deletion callbacks. When the object is
@@ -172,7 +173,7 @@ class DnsDataGraphImpl : public DnsDataGraph {
    private:
     std::vector<DomainName> domains_changed;
 
-    DomainChangeCallback* callback_ptr_;
+    raw_ptr<DomainChangeCallback> callback_ptr_;
     DomainChangeCallback callback_;
   };
 

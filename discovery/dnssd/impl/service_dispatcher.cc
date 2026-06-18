@@ -71,12 +71,12 @@ ServiceDispatcher::ServiceDispatcher(TaskRunner& task_runner,
   service_instances_.reserve(config.network_info.size());
   for (const auto& network_info : config.network_info) {
     service_instances_.push_back(std::make_unique<ServiceInstance>(
-        task_runner_, reporting_client, config, network_info));
+        *task_runner_, reporting_client, config, network_info));
   }
 }
 
 ServiceDispatcher::~ServiceDispatcher() {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
 }
 
 // DnsSdQuerier overrides.
