@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <string_view>
 
+#include "util/raw_ptr.h"
+
 namespace openscreen::osp {
 
 class ProtocolConnectionClient;
@@ -52,7 +54,7 @@ class ConnectRequest final {
   void MarkComplete() { request_id_ = 0; }
 
  private:
-  ProtocolConnectionClient* parent_ = nullptr;
+  raw_ptr<ProtocolConnectionClient> parent_ = nullptr;
   // The `request_id_` of a valid ConnectRequest should be greater than 0.
   uint64_t request_id_ = 0;
 };

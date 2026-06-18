@@ -19,6 +19,7 @@
 #include "osp/public/service_info.h"
 #include "platform/api/time.h"
 #include "platform/base/error.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -130,7 +131,7 @@ class UrlAvailabilityRequester {
       std::vector<std::string> urls;
     };
 
-    UrlAvailabilityRequester& listener_;
+    const raw_ref<UrlAvailabilityRequester> listener_;
 
     uint64_t next_watch_id_ = 1;
     const std::string instance_name_;

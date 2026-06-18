@@ -14,6 +14,7 @@
 #include "osp/public/message_demuxer.h"
 #include "osp/public/presentation/presentation_common.h"
 #include "osp/public/presentation/presentation_connection.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -125,7 +126,7 @@ class Receiver final : public MessageDemuxer::MessageCallback,
 
   uint64_t GetNextConnectionId();
 
-  ReceiverDelegate* delegate_ = nullptr;
+  raw_ptr<ReceiverDelegate> delegate_ = nullptr;
 
   // TODO(jophba): scope requests by endpoint, not presentation. This doesn't
   // work properly for multiple controllers.

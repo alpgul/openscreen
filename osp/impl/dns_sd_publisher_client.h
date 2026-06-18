@@ -12,6 +12,7 @@
 #include "discovery/public/dns_sd_service_publisher.h"
 #include "osp/public/service_publisher.h"
 #include "platform/api/task_runner.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -43,7 +44,7 @@ class DnsSdPublisherClient final
   discovery::DnsSdServicePtr CreateDnsSdServiceInternal(
       const ServicePublisher::Config& config);
 
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
   discovery::DnsSdServicePtr dns_sd_service_;
 
   using OspDnsSdPublisher =

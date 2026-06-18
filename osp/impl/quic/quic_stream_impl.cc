@@ -51,7 +51,7 @@ void QuicStreamImpl::OnDataAvailable() {
   iovec iov;
   while (!reading_stopped() && sequencer()->GetReadableRegion(&iov)) {
     OSP_CHECK(!sequencer()->IsClosed());
-    delegate_.OnReceived(
+    delegate_->OnReceived(
         this,
         ByteView(reinterpret_cast<const uint8_t*>(iov.iov_base), iov.iov_len));
     sequencer()->MarkConsumed(iov.iov_len);
@@ -61,7 +61,7 @@ void QuicStreamImpl::OnDataAvailable() {
 void QuicStreamImpl::OnClose() {
   TRACE_SCOPED(TraceCategory::kQuic, "QuicStreamImpl::OnClose");
   quic::QuicStream::OnClose();
-  delegate_.OnClose(GetStreamId());
+  delegate_->OnClose(GetStreamId());
 }
 
 }  // namespace openscreen::osp

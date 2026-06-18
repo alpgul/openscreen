@@ -12,6 +12,7 @@
 #include "osp/public/service_info.h"
 #include "platform/base/error.h"
 #include "platform/base/interface_info.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -87,7 +88,7 @@ class ServiceListener final {
    protected:
     void SetState(State state);
 
-    ServiceListener* listener_ = nullptr;
+    raw_ptr<ServiceListener> listener_ = nullptr;
   };
 
   // `delegate` is used to implement state transitions.

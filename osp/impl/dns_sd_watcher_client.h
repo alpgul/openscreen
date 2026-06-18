@@ -14,6 +14,7 @@
 #include "osp/public/service_info.h"
 #include "osp/public/service_listener.h"
 #include "platform/api/task_runner.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -47,7 +48,7 @@ class DnsSdWatcherClient final : public ServiceListener::Delegate,
   using OspDnsSdWatcher = discovery::DnsSdServiceWatcher<ServiceInfo>;
   void OnDnsWatcherUpdated(std::vector<OspDnsSdWatcher::ConstRefT> all);
 
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
   discovery::DnsSdServicePtr dns_sd_service_;
 
   std::unique_ptr<OspDnsSdWatcher> dns_sd_watcher_;

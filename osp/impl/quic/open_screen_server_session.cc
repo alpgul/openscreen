@@ -56,7 +56,7 @@ quic::QuicSSLConfig OpenScreenServerSession::GetSSLConfig() const {
 std::unique_ptr<quic::QuicCryptoStream>
 OpenScreenServerSession::CreateCryptoStream() {
   return std::make_unique<TlsServerHandshakerImpl>(this,
-                                                   &crypto_server_config_);
+                                                   &*crypto_server_config_);
 }
 
 }  // namespace openscreen::osp

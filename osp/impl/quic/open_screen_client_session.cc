@@ -39,7 +39,7 @@ void OpenScreenClientSession::Initialize() {
 std::unique_ptr<quic::QuicCryptoStream>
 OpenScreenClientSession::CreateCryptoStream() {
   return std::make_unique<quic::QuicCryptoClientStream>(
-      server_id_, this, nullptr, &crypto_client_config_, this,
+      server_id_, this, nullptr, &*crypto_client_config_, this,
       /*has_application_state=*/true);
 }
 

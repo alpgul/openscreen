@@ -9,6 +9,7 @@
 
 #include "osp/impl/quic/quic_connection_factory_server.h"
 #include "quiche/quic/core/quic_dispatcher.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -45,7 +46,7 @@ class QuicDispatcherImpl : public quic::QuicDispatcher {
 
  private:
   std::unique_ptr<quic::QuicVersionManager> version_manager_;
-  QuicConnectionFactoryServer& parent_factory_;
+  const raw_ref<QuicConnectionFactoryServer> parent_factory_;
 };
 
 }  // namespace openscreen::osp

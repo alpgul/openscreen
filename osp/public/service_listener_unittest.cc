@@ -9,6 +9,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -71,7 +72,7 @@ class ServiceListenerTest : public ::testing::Test {
     service_listener_->SetConfig(config);
   }
 
-  NiceMock<MockMdnsDelegate>* mock_delegate_ = nullptr;
+  raw_ptr<NiceMock<MockMdnsDelegate>> mock_delegate_ = nullptr;
   std::unique_ptr<ServiceListener> service_listener_;
   ServiceListener::Config config;
 };

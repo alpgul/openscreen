@@ -7,6 +7,7 @@
 
 #include "platform/api/udp_socket.h"
 #include "quiche/quic/core/quic_packet_writer.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -43,7 +44,7 @@ class PacketWriterImpl final : public quic::QuicPacketWriter {
   UdpSocket* socket() { return socket_; }
 
  private:
-  UdpSocket* socket_ = nullptr;
+  raw_ptr<UdpSocket> socket_ = nullptr;
 };
 
 }  // namespace openscreen::osp

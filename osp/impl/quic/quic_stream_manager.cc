@@ -25,8 +25,8 @@ void QuicStreamManager::OnReceived(QuicStream* stream, ByteView bytes) {
     return;
   }
 
-  delegate_.OnDataReceived(quic_connection_->instance_id(),
-                           stream->GetStreamId(), bytes);
+  delegate_->OnDataReceived(quic_connection_->instance_id(),
+                            stream->GetStreamId(), bytes);
 }
 
 void QuicStreamManager::OnClose(uint64_t stream_id) {
@@ -37,7 +37,7 @@ void QuicStreamManager::OnClose(uint64_t stream_id) {
     return;
   }
 
-  delegate_.OnClose(quic_connection_->instance_id(), stream_id);
+  delegate_->OnClose(quic_connection_->instance_id(), stream_id);
   auto* protocol_connection = stream_entry->second;
   if (protocol_connection) {
     protocol_connection->OnClose();

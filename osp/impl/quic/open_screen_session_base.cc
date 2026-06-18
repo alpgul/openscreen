@@ -50,7 +50,7 @@ void OpenScreenSessionBase::Initialize() {
 
 void OpenScreenSessionBase::OnTlsHandshakeComplete() {
   QuicSession::OnTlsHandshakeComplete();
-  visitor_.OnCryptoHandshakeComplete();
+  visitor_->OnCryptoHandshakeComplete();
 }
 
 std::vector<std::string> OpenScreenSessionBase::GetAlpnsToOffer() const {
@@ -80,12 +80,12 @@ quic::QuicStream* OpenScreenSessionBase::CreateIncomingStream(
   OSP_CHECK(connection()->connected());
 
   auto stream = std::make_unique<QuicStreamImpl>(
-      visitor_.GetConnectionDelegate().GetStreamDelegate(
-          visitor_.GetInstanceID()),
+      visitor_->GetConnectionDelegate().GetStreamDelegate(
+          visitor_->GetInstanceID()),
       id, this, quic::READ_UNIDIRECTIONAL);
   auto* stream_ptr = stream.get();
   ActivateStream(std::move(stream));
-  visitor_.OnIncomingStream(stream_ptr);
+  visitor_->OnIncomingStream(stream_ptr);
   return stream_ptr;
 }
 

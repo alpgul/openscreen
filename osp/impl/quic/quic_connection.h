@@ -11,6 +11,7 @@
 
 #include "osp/impl/quic/quic_stream.h"
 #include "platform/base/udp_packet.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -71,7 +72,7 @@ class QuicConnection {
  protected:
   std::string instance_name_;
   uint64_t instance_id_ = 0u;
-  Delegate& delegate_;
+  const raw_ref<Delegate> delegate_;
 };
 
 }  // namespace openscreen::osp

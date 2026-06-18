@@ -15,6 +15,7 @@
 #include "osp/public/message_demuxer.h"
 #include "osp/public/protocol_connection.h"
 #include "platform/base/error.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -86,7 +87,7 @@ class AuthenticationBase : public MessageDemuxer::MessageCallback {
   uint64_t instance_id_;
   AgentFingerprint fingerprint_;
   AuthenticationData auth_data_;
-  Delegate& delegate_;
+  const raw_ref<Delegate> delegate_;
 
  private:
   MessageDemuxer::MessageWatch auth_handshake_watch_;

@@ -20,6 +20,7 @@
 #include "platform/base/span.h"
 #include "platform/test/fake_clock.h"
 #include "platform/test/fake_task_runner.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 namespace {
@@ -135,7 +136,7 @@ class QuicServerTest : public Test {
   FakeClock fake_clock_;
   FakeTaskRunner task_runner_;
   FakeQuicBridge quic_bridge_;
-  QuicServer* server_;
+  raw_ptr<QuicServer> server_;
   std::unique_ptr<ProtocolConnection> client_connection_;
 };
 

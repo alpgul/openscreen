@@ -15,6 +15,7 @@
 #include "osp/impl/quic/testing/fake_quic_connection.h"
 #include "osp/public/message_demuxer.h"
 #include "platform/api/task_runner.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -49,8 +50,8 @@ class FakeQuicConnectionFactoryBridge {
 
  private:
   struct ConnectionPair {
-    FakeQuicConnection* controller = nullptr;
-    FakeQuicConnection* receiver = nullptr;
+    raw_ptr<FakeQuicConnection> controller = nullptr;
+    raw_ptr<FakeQuicConnection> receiver = nullptr;
   };
 
   const IPEndpoint controller_endpoint_;
@@ -59,7 +60,7 @@ class FakeQuicConnectionFactoryBridge {
   bool server_idle_ = true;
   bool connections_pending_ = true;
   ConnectionPair connections_ = {};
-  QuicConnectionFactoryServer::ServerDelegate* delegate_ = nullptr;
+  raw_ptr<QuicConnectionFactoryServer::ServerDelegate> delegate_ = nullptr;
 };
 
 class FakeClientQuicConnectionFactory final
@@ -95,7 +96,7 @@ class FakeClientQuicConnectionFactory final
   std::unique_ptr<UdpSocket> socket_;
 
  private:
-  FakeQuicConnectionFactoryBridge* bridge_ = nullptr;
+  raw_ptr<FakeQuicConnectionFactoryBridge> bridge_ = nullptr;
   bool idle_ = true;
 };
 
@@ -127,7 +128,7 @@ class FakeServerQuicConnectionFactory final
   bool idle() const { return idle_; }
 
  private:
-  FakeQuicConnectionFactoryBridge* bridge_ = nullptr;
+  raw_ptr<FakeQuicConnectionFactoryBridge> bridge_ = nullptr;
   bool idle_ = true;
 };
 

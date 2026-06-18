@@ -36,6 +36,8 @@
 #include "platform/impl/text_trace_logging_platform.h"
 #include "third_party/getopt/getopt.h"
 #include "third_party/tinycbor/src/src/cbor.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 #include "util/trace_logging.h"
 
 namespace {
@@ -44,7 +46,7 @@ constexpr char const* kReceiverLogFilename = "_recv_fifo";
 constexpr char const* kControllerLogFilename = "_cntl_fifo";
 
 bool g_done = false;
-bool g_dump_services = false;
+[[maybe_unused]] bool g_dump_services = false;
 
 void sigusr1_dump_services(int) {
   g_dump_services = true;
@@ -191,7 +193,7 @@ class DemoConnectionServiceObserver final
     ~ConnectionObserver() override = default;
 
     void OnConnectionClosed(const ProtocolConnection& connection) override {
-      auto& connections = parent_.connections_;
+      auto& connections = parent_->connections_;
       connections.erase(
           std::remove_if(
               connections.begin(), connections.end(),
@@ -203,7 +205,7 @@ class DemoConnectionServiceObserver final
     }
 
    private:
-    DemoConnectionServiceObserver& parent_;
+    const raw_ref<DemoConnectionServiceObserver> parent_;
   };
 
   DemoConnectionServiceObserver() = default;
@@ -294,7 +296,7 @@ class DemoConnectionDelegate final : public Connection::Delegate {
   void set_connection(Connection* connection) { connection_ = connection; }
 
  private:
-  Connection* connection_ = nullptr;
+  raw_ptr<Connection> connection_ = nullptr;
 };
 
 class DemoReceiverDelegate final : public ReceiverDelegate {
@@ -355,7 +357,7 @@ class DemoReceiverDelegate final : public ReceiverDelegate {
   const std::string& presentation_id() { return presentation_id_; }
 
  private:
-  Receiver* receiver_;
+  raw_ptr<Receiver> receiver_;
   std::string presentation_id_;
   std::unique_ptr<Connection> connection_;
   DemoConnectionDelegate connection_delegate_;

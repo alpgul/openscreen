@@ -20,6 +20,7 @@
 #include "osp/public/service_listener.h"
 #include "platform/api/time.h"
 #include "platform/base/error.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -87,8 +88,8 @@ class Controller final : public ServiceListener::Observer,
     void StopWatching();
 
     std::vector<std::string> urls_;
-    ReceiverObserver* observer_ = nullptr;
-    Controller* controller_ = nullptr;
+    raw_ptr<ReceiverObserver> observer_ = nullptr;
+    raw_ptr<Controller> controller_ = nullptr;
   };
 
   class ConnectRequest {
@@ -115,7 +116,7 @@ class Controller final : public ServiceListener::Observer,
     std::string instance_name_;
     bool is_reconnect_ = false;
     uint64_t request_id_ = 0;
-    Controller* controller_ = nullptr;
+    raw_ptr<Controller> controller_ = nullptr;
   };
 
   explicit Controller(ClockNowFunctionPtr now_function);

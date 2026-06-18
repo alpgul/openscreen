@@ -17,6 +17,8 @@
 #include "osp/public/protocol_connection.h"
 #include "platform/base/error.h"
 #include "util/osp_logging.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -79,11 +81,11 @@ class RequestResponseHandler : public MessageDemuxer::MessageCallback {
   void Reset() {
     connection_ = nullptr;
     for (auto& message : to_send_) {
-      delegate_.OnError(&message.request, Error::Code::kRequestCancelled);
+      delegate_->OnError(&message.request, Error::Code::kRequestCancelled);
     }
     to_send_.clear();
     for (auto& message : sent_) {
-      delegate_.OnError(&message.request, Error::Code::kRequestCancelled);
+      delegate_->OnError(&message.request, Error::Code::kRequestCancelled);
     }
     sent_.clear();
     response_watch_.Reset();
@@ -153,7 +155,7 @@ class RequestResponseHandler : public MessageDemuxer::MessageCallback {
       if (result.ok()) {
         sent_.emplace_back(std::move(message));
       } else {
-        delegate_.OnError(&message.request, result);
+        delegate_->OnError(&message.request, result);
       }
     }
     if (!to_send_.empty()) {
@@ -188,8 +190,8 @@ class RequestResponseHandler : public MessageDemuxer::MessageCallback {
                  response.request_id;
         });
     if (it != sent_.end()) {
-      delegate_.OnMatchedResponse(&it->request, &response,
-                                  connection_->GetInstanceID());
+      delegate_->OnMatchedResponse(&it->request, &response,
+                                   connection_->GetInstanceID());
       sent_.erase(it);
       if (sent_.empty()) {
         response_watch_.Reset();
@@ -224,8 +226,8 @@ class RequestResponseHandler : public MessageDemuxer::MessageCallback {
         .GetNextRequestId(instance_id);
   }
 
-  ProtocolConnection* connection_ = nullptr;
-  Delegate& delegate_;
+  raw_ptr<ProtocolConnection> connection_ = nullptr;
+  const raw_ref<Delegate> delegate_;
   std::vector<RequestWithId> to_send_;
   std::vector<RequestWithId> sent_;
   MessageDemuxer::MessageWatch response_watch_;

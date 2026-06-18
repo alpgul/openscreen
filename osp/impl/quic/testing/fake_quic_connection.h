@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "osp/impl/quic/quic_connection.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -32,7 +33,7 @@ class FakeQuicStream final : public QuicStream {
   std::vector<uint8_t> TakeWrittenData();
 
   bool is_closed() const { return is_closed_; }
-  Delegate& delegate() { return delegate_; }
+  Delegate& delegate() { return *delegate_; }
 
   uint64_t GetStreamId() override { return stream_id_; }
   void Write(ByteView bytes) override;
@@ -56,7 +57,7 @@ class FakeQuicConnection final : public QuicConnection {
   FakeQuicConnection& operator=(FakeQuicConnection&&) noexcept = delete;
   ~FakeQuicConnection() override;
 
-  Delegate& delegate() { return delegate_; }
+  Delegate& delegate() { return *delegate_; }
   std::map<uint64_t, std::unique_ptr<FakeQuicStream>>& streams() {
     return streams_;
   }
@@ -70,7 +71,7 @@ class FakeQuicConnection final : public QuicConnection {
   void Close() override;
 
  private:
-  FakeQuicConnectionFactoryBridge& parent_factory_;
+  const raw_ref<FakeQuicConnectionFactoryBridge> parent_factory_;
   uint64_t next_stream_id_ = 1;
   std::map<uint64_t, std::unique_ptr<FakeQuicStream>> streams_;
 };

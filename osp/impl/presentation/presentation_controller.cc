@@ -15,6 +15,7 @@
 #include "osp/public/network_service_manager.h"
 #include "osp/public/request_response_handler.h"
 #include "util/osp_logging.h"
+#include "util/raw_ptr.h"
 #include "util/std_util.h"
 
 namespace openscreen::osp {
@@ -34,16 +35,16 @@ struct StartRequest {
   DECLARE_MSG_REQUEST_RESPONSE(Start);
 
   msgs::PresentationStartRequest request;
-  RequestDelegate* delegate;
-  Connection::Delegate* presentation_connection_delegate;
+  raw_ptr<RequestDelegate> delegate;
+  raw_ptr<Connection::Delegate> presentation_connection_delegate;
 };
 
 struct ConnectionOpenRequest {
   DECLARE_MSG_REQUEST_RESPONSE(ConnectionOpen);
 
   msgs::PresentationConnectionOpenRequest request;
-  RequestDelegate* delegate;
-  Connection::Delegate* presentation_connection_delegate;
+  raw_ptr<RequestDelegate> delegate;
+  raw_ptr<Connection::Delegate> presentation_connection_delegate;
   std::unique_ptr<Connection> connection;
 };
 
@@ -96,7 +97,7 @@ class Controller::MessageGroupStreams final
 
   void CreateProtocolConnection(bool is_initiation);
 
-  Controller* const controller_;
+  const raw_ptr<Controller> controller_;
   const std::string instance_name_;
   const uint64_t instance_id_;
   uint64_t next_internal_request_id_ = 1;
@@ -319,7 +320,7 @@ class Controller::TerminationListener final
                                   Clock::time_point now) override;
 
  private:
-  Controller* const controller_;
+  const raw_ptr<Controller> controller_;
   std::string presentation_id_;
   MessageDemuxer::MessageWatch event_watch_;
 };

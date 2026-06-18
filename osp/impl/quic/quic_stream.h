@@ -9,6 +9,7 @@
 #include <cstdint>
 
 #include "platform/base/span.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -39,7 +40,7 @@ class QuicStream {
   virtual void Close() = 0;
 
  protected:
-  Delegate& delegate_;
+  const raw_ref<Delegate> delegate_;
 };
 
 }  // namespace openscreen::osp

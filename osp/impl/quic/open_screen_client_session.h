@@ -9,6 +9,7 @@
 
 #include "osp/impl/quic/open_screen_session_base.h"
 #include "quiche/quic/core/quic_crypto_client_stream.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -44,7 +45,7 @@ class OpenScreenClientSession
       const quic::ProofVerifyDetails& verify_details) override;
 
  private:
-  quic::QuicCryptoClientConfig& crypto_client_config_;
+  const raw_ref<quic::QuicCryptoClientConfig> crypto_client_config_;
   quic::QuicServerId server_id_;
 };
 

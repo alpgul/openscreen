@@ -13,6 +13,7 @@
 #include "platform/api/time.h"
 #include "platform/base/error.h"
 #include "platform/base/span.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -66,7 +67,7 @@ class MessageDemuxer {
     // no-op.
     void StopWatching();
 
-    MessageDemuxer* parent_ = nullptr;
+    raw_ptr<MessageDemuxer> parent_ = nullptr;
     bool is_default_ = false;
     uint64_t instance_id_ = 0u;
     msgs::Type message_type_ = msgs::Type::kUnknown;

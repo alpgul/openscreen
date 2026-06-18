@@ -19,6 +19,7 @@
 #include "osp/public/testing/message_demuxer_test_support.h"
 #include "platform/test/fake_clock.h"
 #include "platform/test/fake_task_runner.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -304,7 +305,7 @@ class ControllerTest : public ::testing::Test {
   MessageDemuxer::MessageWatch availability_watch_;
   MockMessageCallback mock_callback_;
   FakeQuicBridge quic_bridge_;
-  MockServiceListenerDelegate* mock_listener_delegate_;
+  raw_ptr<MockServiceListenerDelegate> mock_listener_delegate_;
   std::unique_ptr<Controller> controller_;
   ServiceInfo receiver_info1;
   MockReceiverObserver mock_receiver_observer_;

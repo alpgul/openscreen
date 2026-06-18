@@ -12,6 +12,8 @@
 #include "osp/impl/quic/quic_connection.h"
 #include "osp/impl/quic/quic_protocol_connection.h"
 #include "osp/impl/quic/quic_stream.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -55,9 +57,9 @@ class QuicStreamManager final : public QuicStream::Delegate {
   }
 
  private:
-  Delegate& delegate_;
+  const raw_ref<Delegate> delegate_;
   // This class manages all QuicStreams for `quic_connection_`;
-  QuicConnection* quic_connection_ = nullptr;
+  raw_ptr<QuicConnection> quic_connection_ = nullptr;
   std::map<uint64_t, QuicProtocolConnection*> streams_by_id_;
 };
 

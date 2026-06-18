@@ -12,6 +12,7 @@
 
 #include "platform/base/error.h"
 #include "platform/base/interface_info.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -94,7 +95,7 @@ class ServicePublisher final {
    protected:
     void SetState(State state);
 
-    ServicePublisher* publisher_ = nullptr;
+    raw_ptr<ServicePublisher> publisher_ = nullptr;
   };
 
   // `delegate` is required and is used to implement state transitions.

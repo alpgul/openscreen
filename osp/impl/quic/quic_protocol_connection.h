@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "osp/public/protocol_connection.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -40,7 +41,7 @@ class QuicProtocolConnection final : public ProtocolConnection {
 
  private:
   uint64_t instance_id_ = 0u;
-  QuicStream* stream_ = nullptr;
+  raw_ptr<QuicStream> stream_ = nullptr;
 };
 
 }  // namespace openscreen::osp

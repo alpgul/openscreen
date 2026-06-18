@@ -12,6 +12,7 @@
 #include "platform/base/error.h"
 #include "platform/base/span.h"
 #include "util/osp_logging.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -80,7 +81,7 @@ class ProtocolConnection {
   virtual void Close() = 0;
 
  protected:
-  Observer* observer_ = nullptr;
+  raw_ptr<Observer> observer_ = nullptr;
 };
 
 }  // namespace openscreen::osp

@@ -17,6 +17,8 @@
 #include "quiche/quic/core/quic_config.h"
 #include "quiche/quic/core/quic_connection.h"
 #include "quiche/quic/core/quic_versions.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -25,8 +27,9 @@ namespace openscreen::osp {
 class QuicConnectionFactoryBase : public UdpSocket::Client {
  public:
   struct OpenConnection {
-    QuicConnection* connection = nullptr;
-    UdpSocket* socket = nullptr;  // References one of the owned `sockets_`.
+    raw_ptr<QuicConnection> connection = nullptr;
+    raw_ptr<UdpSocket> socket =
+        nullptr;  // References one of the owned `sockets_`.
   };
 
   explicit QuicConnectionFactoryBase(TaskRunner& task_runner);
@@ -61,7 +64,7 @@ class QuicConnectionFactoryBase : public UdpSocket::Client {
 
   std::map<IPEndpoint, OpenConnection> connections_;
 
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
 };
 
 }  // namespace openscreen::osp

@@ -9,6 +9,8 @@
 #include "quiche/quic/core/quic_alarm.h"
 #include "quiche/quic/core/quic_alarm_factory.h"
 #include "quiche/quic/core/quic_clock.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -28,8 +30,8 @@ class QuicAlarmFactoryImpl : public quic::QuicAlarmFactory {
       quic::QuicConnectionArena* arena) override;
 
  private:
-  TaskRunner& task_runner_;
-  const quic::QuicClock* clock_;
+  const raw_ref<TaskRunner> task_runner_;
+  raw_ptr<const quic::QuicClock> clock_;
 };
 
 }  // namespace openscreen::osp

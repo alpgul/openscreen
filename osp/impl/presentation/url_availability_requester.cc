@@ -223,7 +223,7 @@ void UrlAvailabilityRequester::ReceiverRequester::RequestUrlAvailabilities(
                            Request{watch_id_or_error.value(), std::move(urls)});
   } else {
     for (const auto& url : urls) {
-      for (auto& observer : listener_.observers_by_url_[url]) {
+      for (auto& observer : listener_->observers_by_url_[url]) {
         observer->OnRequestFailed(url, instance_name_);
       }
     }
@@ -249,7 +249,7 @@ ErrorOr<uint64_t> UrlAvailabilityRequester::ReceiverRequester::SendRequest(
     OSP_VLOG << "writing presentation-url-availability-request";
     connection_->Write(ByteView(buffer.data(), buffer.size()));
     watch_by_id_.emplace(
-        watch_id, Watch{listener_.now_function_() + kWatchDuration, urls});
+        watch_id, Watch{listener_->now_function_() + kWatchDuration, urls});
     if (!event_watch_) {
       event_watch_ = GetClientDemuxer().WatchMessageType(
           instance_id_, msgs::Type::kPresentationUrlAvailabilityEvent, this);
@@ -303,8 +303,8 @@ Error::Code UrlAvailabilityRequester::ReceiverRequester::UpdateAvailabilities(
   }
 
   for (const auto& url : urls) {
-    auto observer_entry = listener_.observers_by_url_.find(url);
-    if (observer_entry == listener_.observers_by_url_.end()) {
+    auto observer_entry = listener_->observers_by_url_.find(url);
+    if (observer_entry == listener_->observers_by_url_.end()) {
       continue;
     }
 
@@ -371,7 +371,7 @@ void UrlAvailabilityRequester::ReceiverRequester::RemoveUnobservedRequests(
                            Request{watch_id_or_error.value(), std::move(urls)});
     } else {
       for (const auto& url : urls) {
-        for (auto& observer : listener_.observers_by_url_[url]) {
+        for (auto& observer : listener_->observers_by_url_[url]) {
           observer->OnRequestFailed(url, instance_name_);
         }
       }
@@ -420,7 +420,7 @@ void UrlAvailabilityRequester::ReceiverRequester::RemoveReceiver() {
   for (const auto& availability : known_availability_by_url_) {
     if (availability.second == msgs::UrlAvailability::kAvailable) {
       const std::string& url = availability.first;
-      for (auto& observer : listener_.observers_by_url_[url]) {
+      for (auto& observer : listener_->observers_by_url_[url]) {
         observer->OnReceiverUnavailable(url, instance_name_);
       }
     }

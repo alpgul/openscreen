@@ -11,6 +11,7 @@
 
 #include "osp/impl/quic/open_screen_session_base.h"
 #include "quiche/quic/core/tls_server_handshaker.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -61,7 +62,7 @@ class OpenScreenServerSession : public OpenScreenSessionBase {
   std::unique_ptr<quic::QuicCryptoStream> CreateCryptoStream() override;
 
  private:
-  const quic::QuicCryptoServerConfig& crypto_server_config_;
+  const raw_ref<const quic::QuicCryptoServerConfig> crypto_server_config_;
 };
 
 }  // namespace openscreen::osp

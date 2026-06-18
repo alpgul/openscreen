@@ -15,6 +15,7 @@
 #include "quiche/quic/core/quic_crypto_stream.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/quic/core/quic_types.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -61,7 +62,7 @@ class OpenScreenSessionBase : public quic::QuicSession {
       const std::vector<std::string_view>& alpns) const override;
 
   QuicStream* CreateOutgoingStream(QuicStream::Delegate& delegate);
-  Visitor& visitor() { return visitor_; }
+  Visitor& visitor() { return *visitor_; }
 
  protected:
   virtual std::unique_ptr<quic::QuicCryptoStream> CreateCryptoStream() = 0;
@@ -81,7 +82,7 @@ class OpenScreenSessionBase : public quic::QuicSession {
  private:
   // Used for the crypto handshake.
   std::unique_ptr<quic::QuicCryptoStream> crypto_stream_;
-  Visitor& visitor_;
+  const raw_ref<Visitor> visitor_;
 };
 
 }  // namespace openscreen::osp

@@ -56,7 +56,7 @@ ErrorOr<std::unique_ptr<QuicConnection>> QuicConnectionFactoryClient::Connect(
     const IPEndpoint& remote_endpoint,
     const ConnectData& connect_data,
     QuicConnection::Delegate* connection_delegate) {
-  auto create_result = UdpSocket::Create(task_runner_, this, local_endpoint);
+  auto create_result = UdpSocket::Create(*task_runner_, this, local_endpoint);
   if (!create_result) {
     return create_result.error();
   }

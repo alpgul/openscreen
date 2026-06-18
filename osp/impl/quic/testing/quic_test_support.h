@@ -23,6 +23,7 @@
 #include "platform/test/fake_clock.h"
 #include "platform/test/fake_task_runner.h"
 #include "platform/test/fake_udp_socket.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -90,7 +91,7 @@ class FakeQuicBridge {
   // means QuicClient and QuicServer are owned by NetworkServiceManager.
   // Otherwise, they are owned by this class.
   bool use_network_service_manager_ = false;
-  FakeTaskRunner& task_runner_;
+  const raw_ref<FakeTaskRunner> task_runner_;
   std::unique_ptr<QuicClient> quic_client_;
   std::unique_ptr<QuicServer> quic_server_;
   std::unique_ptr<FakeQuicConnectionFactoryBridge> fake_bridge_;

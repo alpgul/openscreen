@@ -31,7 +31,7 @@ void QuicConnectionImpl::OnPacketReceived(const UdpPacket& packet) {
   TRACE_SCOPED(TraceCategory::kQuic, "QuicConnectionImpl::OnPacketReceived");
   quic::QuicReceivedPacket quic_packet(
       reinterpret_cast<const char*>(packet.data()), packet.size(),
-      clock_.Now());
+      clock_->Now());
   session_->ProcessUdpPacket(ToQuicSocketAddress(packet.destination()),
                              ToQuicSocketAddress(packet.source()), quic_packet);
 }
@@ -57,7 +57,7 @@ void QuicConnectionImpl::OnConnectionClosed(
     const std::string& error_details,
     quic::ConnectionCloseSource source) {
   TRACE_SCOPED(TraceCategory::kQuic, "QuicConnectionImpl::OnConnectionClosed");
-  delegate_.OnConnectionClosed(instance_name_);
+  delegate_->OnConnectionClosed(instance_name_);
   if (dispatcher_) {
     dispatcher_->OnConnectionClosed(server_connection_id, error_code,
                                     error_details, source);
@@ -117,7 +117,7 @@ void QuicConnectionImpl::OnConfigNegotiated(const quic::QuicConfig& config) {}
 void QuicConnectionImpl::OnCryptoHandshakeComplete() {
   TRACE_SCOPED(TraceCategory::kQuic,
                "QuicConnectionImpl::OnCryptoHandshakeComplete");
-  instance_id_ = delegate_.OnCryptoHandshakeComplete(instance_name_);
+  instance_id_ = delegate_->OnCryptoHandshakeComplete(instance_name_);
   OSP_VLOG_IF(instance_id_ > 0)
       << "QUIC connection handshake complete for instance: " << instance_name_
       << ", the corresponding instance ID is: " << instance_id_;
@@ -125,14 +125,14 @@ void QuicConnectionImpl::OnCryptoHandshakeComplete() {
 
 void QuicConnectionImpl::OnIncomingStream(QuicStream* stream) {
   TRACE_SCOPED(TraceCategory::kQuic, "QuicConnectionImpl::OnIncomingStream");
-  delegate_.OnIncomingStream(instance_id_, stream);
+  delegate_->OnIncomingStream(instance_id_, stream);
 }
 
 void QuicConnectionImpl::OnClientCertificates(
     const std::vector<std::string_view>& certs) {
   TRACE_SCOPED(TraceCategory::kQuic,
                "QuicConnectionImpl::OnClientCertificates");
-  delegate_.OnClientCertificates(instance_name_, certs);
+  delegate_->OnClientCertificates(instance_name_, certs);
 }
 
 }  // namespace openscreen::osp

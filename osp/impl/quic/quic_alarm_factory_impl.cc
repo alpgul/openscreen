@@ -10,6 +10,7 @@
 #include "util/alarm.h"
 #include "util/chrono_helpers.h"
 #include "util/osp_logging.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::osp {
 
@@ -49,7 +50,7 @@ class QuicAlarmImpl : public quic::QuicAlarm {
     Fire();
   }
 
-  const quic::QuicClock* clock_;
+  raw_ptr<const quic::QuicClock> clock_;
   std::unique_ptr<Alarm> alarm_;
 };
 
@@ -65,17 +66,18 @@ quic::QuicArenaScopedPtr<quic::QuicAlarm> QuicAlarmFactoryImpl::CreateAlarm(
     quic::QuicArenaScopedPtr<quic::QuicAlarm::Delegate> delegate,
     quic::QuicConnectionArena* arena) {
   if (arena) {
-    return arena->New<QuicAlarmImpl>(clock_, task_runner_, std::move(delegate));
+    return arena->New<QuicAlarmImpl>(clock_, *task_runner_,
+                                     std::move(delegate));
   } else {
     return quic::QuicArenaScopedPtr<quic::QuicAlarm>(
-        new QuicAlarmImpl(clock_, task_runner_, std::move(delegate)));
+        new QuicAlarmImpl(clock_, *task_runner_, std::move(delegate)));
   }
 }
 
 quic::QuicAlarm* QuicAlarmFactoryImpl::CreateAlarm(
     quic::QuicAlarm::Delegate* delegate) {
   return new QuicAlarmImpl(
-      clock_, task_runner_,
+      clock_, *task_runner_,
       quic::QuicArenaScopedPtr<quic::QuicAlarm::Delegate>(delegate));
 }
 

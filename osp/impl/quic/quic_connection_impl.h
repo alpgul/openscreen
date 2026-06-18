@@ -18,6 +18,8 @@
 #include "platform/base/error.h"
 #include "quiche/quic/core/quic_clock.h"
 #include "quiche/quic/core/quic_connection.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -62,7 +64,7 @@ class QuicConnectionImpl final : public QuicConnection,
   void OnIncomingStream(QuicStream* QuicStream) override;
   void OnClientCertificates(
       const std::vector<std::string_view>& certs) override;
-  Delegate& GetConnectionDelegate() override { return delegate_; }
+  Delegate& GetConnectionDelegate() override { return *delegate_; }
   uint64_t GetInstanceID() override { return instance_id_; }
 
   void set_dispacher(QuicDispatcherImpl* dispatcher) {
@@ -75,10 +77,10 @@ class QuicConnectionImpl final : public QuicConnection,
   }
 
  private:
-  const quic::QuicClock& clock_;  // Not owned.
+  const raw_ref<const quic::QuicClock> clock_;  // Not owned.
   // `dispatcher_` is only needed for QuicServer side.
-  QuicDispatcherImpl* dispatcher_ = nullptr;
-  OpenScreenSessionBase* session_ = nullptr;
+  raw_ptr<QuicDispatcherImpl> dispatcher_ = nullptr;
+  raw_ptr<OpenScreenSessionBase> session_ = nullptr;
   // On QuicClient side, `owns_session_` is true and `session_` is owned by
   // this class.
   // On QuicServer side, `owns_session_` is false and `session_` is owned by

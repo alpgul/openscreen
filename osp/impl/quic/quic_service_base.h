@@ -26,6 +26,7 @@
 #include "platform/api/time.h"
 #include "platform/base/ip_address.h"
 #include "util/alarm.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::osp {
 
@@ -153,8 +154,8 @@ class QuicServiceBase : public QuicConnection::Delegate,
   std::map<std::string, std::unique_ptr<Alarm>> cleanup_alarms_;
 
   const ClockNowFunctionPtr now_function_;
-  TaskRunner& task_runner_;
-  ProtocolConnectionServiceObserver& observer_;
+  const raw_ref<TaskRunner> task_runner_;
+  const raw_ref<ProtocolConnectionServiceObserver> observer_;
 };
 
 }  // namespace openscreen::osp

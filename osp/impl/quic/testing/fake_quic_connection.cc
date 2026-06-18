@@ -39,7 +39,7 @@ void FakeQuicStream::Write(ByteView bytes) {
 
 void FakeQuicStream::Close() {
   is_closed_ = true;
-  delegate_.OnClose(stream_id_);
+  delegate_->OnClose(stream_id_);
 }
 
 FakeQuicConnection::FakeQuicConnection(
@@ -52,7 +52,7 @@ FakeQuicConnection::FakeQuicConnection(
 FakeQuicConnection::~FakeQuicConnection() = default;
 
 void FakeQuicConnection::OnCryptoHandshakeComplete() {
-  instance_id_ = delegate_.OnCryptoHandshakeComplete(instance_name_);
+  instance_id_ = delegate_->OnCryptoHandshakeComplete(instance_name_);
 }
 
 FakeQuicStream* FakeQuicConnection::MakeIncomingStream() {
@@ -73,7 +73,7 @@ QuicStream* FakeQuicConnection::MakeOutgoingStream(
   auto result = std::make_unique<FakeQuicStream>(delegate, next_stream_id_++);
   auto* stream_ptr = result.get();
   streams_.emplace(result->GetStreamId(), std::move(result));
-  parent_factory_.OnOutgoingStream(this, stream_ptr);
+  parent_factory_->OnOutgoingStream(this, stream_ptr);
   return stream_ptr;
 }
 
