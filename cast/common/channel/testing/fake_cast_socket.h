@@ -13,6 +13,7 @@
 #include "cast/common/public/cast_socket.h"
 #include "gmock/gmock.h"
 #include "platform/test/mock_tls_connection.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 
@@ -45,7 +46,7 @@ struct FakeCastSocket {
   IPEndpoint local_endpoint;
   IPEndpoint remote_endpoint;
   std::unique_ptr<MockTlsConnection> moved_connection;
-  MockTlsConnection* connection;
+  raw_ptr<MockTlsConnection> connection;
   MockCastSocketClient mock_client;
   CastSocket socket;
 };
@@ -90,11 +91,11 @@ struct FakeCastSocketPair {
   IPEndpoint local_endpoint;
   IPEndpoint remote_endpoint;
 
-  ::testing::NiceMock<MockTlsConnection>* connection;
+  raw_ptr<::testing::NiceMock<MockTlsConnection>> connection;
   MockCastSocketClient mock_client;
   std::unique_ptr<CastSocket> socket;
 
-  ::testing::NiceMock<MockTlsConnection>* peer_connection;
+  raw_ptr<::testing::NiceMock<MockTlsConnection>> peer_connection;
   MockCastSocketClient mock_peer_client;
   std::unique_ptr<CastSocket> peer_socket;
 };

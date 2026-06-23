@@ -13,6 +13,7 @@
 #include "cast/streaming/message_fields.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 
@@ -60,7 +61,7 @@ class SimpleMessagePort : public MessagePort {
   void clear() { posted_messages_.clear(); }
 
  private:
-  MessagePort::Client* client_ = nullptr;
+  raw_ptr<MessagePort::Client> client_;
   std::string destination_id_;
   std::vector<std::string> posted_messages_;
 };

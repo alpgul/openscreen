@@ -13,6 +13,8 @@
 #include "cast/common/channel/virtual_connection_router.h"
 #include "cast/common/public/cast_socket.h"
 #include "cast/common/public/message_port.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 #include "util/weak_ptr.h"
 
 namespace openscreen::cast {
@@ -44,9 +46,9 @@ class CastSocketMessagePort : public MessagePort, public CastMessageHandler {
                  proto::CastMessage message) override;
 
  private:
-  VirtualConnectionRouter& router_;
+  const raw_ref<VirtualConnectionRouter> router_;
   std::string source_id_;
-  MessagePort::Client* client_ = nullptr;
+  raw_ptr<MessagePort::Client> client_ = nullptr;
   WeakPtr<CastSocket> socket_;
 };
 

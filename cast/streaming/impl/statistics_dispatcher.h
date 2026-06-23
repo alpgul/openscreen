@@ -10,6 +10,7 @@
 #include "cast/streaming/impl/statistics_common.h"
 #include "platform/api/time.h"
 #include "platform/base/span.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -49,7 +50,7 @@ class StatisticsDispatcher {
                               Clock::time_point drop_time);
 
  private:
-  Environment& environment_;
+  const raw_ref<Environment> environment_;
 };
 
 }  // namespace openscreen::cast

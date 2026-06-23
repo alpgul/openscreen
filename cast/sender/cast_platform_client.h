@@ -16,6 +16,7 @@
 #include "cast/sender/channel/message_util.h"
 #include "util/alarm.h"
 #include "util/json/json_value.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -80,13 +81,13 @@ class CastPlatformClient final : public CastMessageHandler {
   static int next_request_id_;
 
   const std::string sender_id_;
-  VirtualConnectionRouter& virtual_conn_router_;
+  const raw_ref<VirtualConnectionRouter> virtual_conn_router_;
   std::map<std::string /* receiver_id */, int> socket_id_by_receiver_id_;
   std::map<std::string /* receiver_id */, PendingRequests>
       pending_requests_by_receiver_id_;
 
   const ClockNowFunctionPtr clock_;
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
 };
 
 }  // namespace openscreen::cast

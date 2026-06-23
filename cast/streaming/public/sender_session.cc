@@ -411,7 +411,7 @@ void SenderSession::SetStatsClient(SenderStatsClient* client) {
 
   // Create a StatisticsAnalyzer which can call the given stats_client_.
   stats_analyzer_ = std::make_unique<StatisticsAnalyzer>(
-      stats_client_, config_.environment->now_function(),
+      stats_client_.get(), config_.environment->now_function(),
       config_.environment->task_runner(), ClockOffsetEstimator::Create());
 
   // Instantiating StatisticsAnalyzer will create a StatisticsCollector, which
@@ -513,6 +513,7 @@ void SenderSession::OnCapabilitiesResponse(ErrorOr<ReceiverMessage> message) {
                                        message.error().message()));
     return;
   }
+
   if (!message.value().valid ||
       message.value().type != ReceiverMessage::Type::kCapabilitiesResponse) {
     HandleErrorMessage(message.value(), InvalidCapabilitiesResponseError());

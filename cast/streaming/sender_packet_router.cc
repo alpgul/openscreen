@@ -42,7 +42,7 @@ SenderPacketRouter::SenderPacketRouter(Environment& environment,
       max_burst_bitrate_(ComputeMaxBurstBitrate(packet_buffer_size_,
                                                 max_packets_per_burst_,
                                                 burst_interval_)),
-      alarm_(environment_.now_function(), environment_.task_runner()) {
+      alarm_(environment_->now_function(), environment_->task_runner()) {
   OSP_CHECK_GT(packet_buffer_size_, kRequiredNetworkPacketSize);
 }
 
@@ -55,7 +55,7 @@ void SenderPacketRouter::OnSenderCreated(Ssrc receiver_ssrc, Sender* sender) {
   senders_.push_back(SenderEntry{receiver_ssrc, sender, kNever, kNever});
 
   if (senders_.size() == 1) {
-    environment_.ConsumeIncomingPackets(this);
+    environment_->ConsumeIncomingPackets(this);
   } else {
     // Sort the list of Senders so that they are iterated in priority order.
     std::sort(senders_.begin(), senders_.end());
@@ -69,7 +69,7 @@ void SenderPacketRouter::OnSenderDestroyed(Ssrc receiver_ssrc) {
 
   // If there are no longer any Senders, suspend receiving RTCP packets.
   if (senders_.empty()) {
-    environment_.DropIncomingPackets();
+    environment_->DropIncomingPackets();
   }
 }
 
@@ -92,7 +92,7 @@ void SenderPacketRouter::OnReceivedPacket(const IPEndpoint& source,
                                           std::vector<uint8_t> packet) {
   // If the packet did not come from the expected endpoint, ignore it.
   OSP_CHECK_NE(source.port, uint16_t{0});
-  if (source != environment_.remote_endpoint()) {
+  if (source != environment_->remote_endpoint()) {
     return;
   }
 
@@ -157,7 +157,7 @@ void SenderPacketRouter::SendBurstOfPackets() {
   // Treat RTCP packets as "critical priority," and so there is no upper limit
   // on the number to send. Practically, this will always be limited by the
   // number of Senders; so, this won't be a huge number of packets.
-  const Clock::time_point burst_time = environment_.now();
+  const Clock::time_point burst_time = environment_->now();
   const int num_rtcp_packets_sent = SendJustTheRtcpPackets(burst_time);
   // Now send all the RTP packets, up to the maximum number allowed in a burst.
   // Higher priority Senders' RTP packets are sent first.
@@ -186,7 +186,7 @@ int SenderPacketRouter::SendJustTheRtcpPackets(Clock::time_point send_time) {
     const ByteBuffer packet = entry.sender->GetRtcpPacketForImmediateSend(
         send_time, ByteBuffer(packet_buffer_.get(), packet_buffer_size_));
     if (!packet.empty()) {
-      environment_.SendPacket(
+      environment_->SendPacket(
           ByteView(packet.data(), packet.size()),
           PacketMetadata{.stream_type = entry.sender->GetStreamType(),
                          .rtp_timestamp = entry.sender->GetLastRtpTimestamp()});
@@ -215,7 +215,7 @@ int SenderPacketRouter::SendJustTheRtpPackets(Clock::time_point send_time,
       if (packet.empty()) {
         break;
       }
-      environment_.SendPacket(
+      environment_->SendPacket(
           ByteView(packet.data(), packet.size()),
           PacketMetadata{.stream_type = entry.sender->GetStreamType(),
                          .rtp_timestamp = entry.sender->GetLastRtpTimestamp()});

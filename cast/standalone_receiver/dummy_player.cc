@@ -17,24 +17,24 @@ namespace openscreen::cast {
 using clock_operators::operator<<;
 
 DummyPlayer::DummyPlayer(Receiver& receiver) : receiver_(receiver) {
-  receiver_.SetConsumer(this);
+  receiver_->SetConsumer(this);
 }
 
 DummyPlayer::~DummyPlayer() {
-  receiver_.SetConsumer(nullptr);
+  receiver_->SetConsumer(nullptr);
 }
 
 void DummyPlayer::OnFramesReady(size_t buffer_size) {
   // Consume the next frame.
   buffer_.resize(buffer_size);
-  const EncodedFrame frame = receiver_.ConsumeNextFrame(buffer_);
+  const EncodedFrame frame = receiver_->ConsumeNextFrame(buffer_);
 
   // Convert the RTP timestamp to a human-readable timestamp (in µs) and log
   // some short information about the frame.
   const auto media_timestamp =
       frame.rtp_timestamp.ToTimeSinceOrigin<microseconds>(
-          receiver_.config().rtp_timebase);
-  OSP_LOG_INFO << "[SSRC " << receiver_.config().receiver_ssrc << "] "
+          receiver_->config().rtp_timebase);
+  OSP_LOG_INFO << "[SSRC " << receiver_->config().receiver_ssrc << "] "
                << (frame.dependency == EncodedFrame::Dependency::kKeyFrame
                        ? "KEY "
                        : "")

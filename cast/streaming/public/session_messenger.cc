@@ -57,11 +57,11 @@ SessionMessenger::SessionMessenger(MessagePort& message_port,
       source_id_(source_id),
       error_callback_(std::move(cb)) {
   OSP_CHECK(!source_id_.empty());
-  message_port_.SetClient(*this);
+  message_port_->SetClient(*this);
 }
 
 SessionMessenger::~SessionMessenger() {
-  message_port_.ResetClient();
+  message_port_->ResetClient();
 }
 
 Error SessionMessenger::SendMessage(const std::string& destination_id,
@@ -76,7 +76,7 @@ Error SessionMessenger::SendMessage(const std::string& destination_id,
   OSP_VLOG << "Sending message: DESTINATION[" << destination_id
            << "], NAMESPACE[" << namespace_ << "], BODY:\n"
            << body_or_error.value();
-  message_port_.PostMessage(destination_id, namespace_, body_or_error.value());
+  message_port_->PostMessage(destination_id, namespace_, body_or_error.value());
   return Error::None();
 }
 
@@ -160,7 +160,7 @@ Error SenderSessionMessenger::SendRequest(SenderMessage message,
   OSP_DCHECK(awaiting_replies_.find(message.sequence_number) ==
              awaiting_replies_.end());
   awaiting_replies_.emplace_back(message.sequence_number, std::move(cb));
-  task_runner_.PostTaskWithDelay(
+  task_runner_->PostTaskWithDelay(
       [self = weak_factory_.GetWeakPtr(), seq_num = message.sequence_number] {
         if (self) {
           ReplyIfTimedOut(seq_num, &self->awaiting_replies_);

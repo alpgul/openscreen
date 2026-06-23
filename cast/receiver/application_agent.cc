@@ -41,7 +41,7 @@ ApplicationAgent::ApplicationAgent(
 }
 
 ApplicationAgent::~ApplicationAgent() {
-  OSP_CHECK(task_runner_.IsRunningOnTaskRunner());
+  OSP_CHECK(task_runner_->IsRunningOnTaskRunner());
 
   idle_screen_app_ = nullptr;  // Prevent re-launching the idle screen app.
   SwitchToApplication({}, {}, nullptr);
@@ -334,7 +334,7 @@ Error ApplicationAgent::SwitchToApplication(std::string app_id,
     if (it != registered_applications_.end()) {
       desired_app = it->second;
       if (desired_app != idle_screen_app_) {
-        fallback_app = idle_screen_app_;
+        fallback_app = idle_screen_app_.get();
       }
     } else {
       return Error(Error::Code::kItemNotFound, kMessageValueNotFound);
@@ -381,7 +381,7 @@ Error ApplicationAgent::SwitchToApplication(std::string app_id,
 void ApplicationAgent::GoIdle() {
   std::string app_id;
   if (idle_screen_app_) {
-    app_id = GetFirstAppId(idle_screen_app_);
+    app_id = GetFirstAppId(idle_screen_app_.get());
   }
   SwitchToApplication(app_id, {}, nullptr);
 }

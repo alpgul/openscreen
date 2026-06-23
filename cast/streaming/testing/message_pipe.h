@@ -16,6 +16,7 @@
 #include "cast/streaming/message_fields.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 
@@ -61,8 +62,8 @@ class MessagePipeEnd : public MessagePort {
  private:
   std::string source_id_;
   std::string destination_id_;
-  MessagePort::Client* client_ = nullptr;
-  MessagePipeEnd* other_end_ = nullptr;
+  raw_ptr<MessagePort::Client> client_ = nullptr;
+  raw_ptr<MessagePipeEnd> other_end_ = nullptr;
 };
 
 class MessagePipe {

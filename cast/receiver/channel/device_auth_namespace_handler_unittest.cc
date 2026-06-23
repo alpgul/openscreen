@@ -19,6 +19,8 @@
 #include "gtest/gtest.h"
 #include "platform/test/paths.h"
 #include "util/no_destructor.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 #include "util/read_file.h"
 
 namespace openscreen::cast {
@@ -48,10 +50,10 @@ class DeviceAuthNamespaceHandlerTest : public ::testing::Test {
   }
 
  protected:
-  const std::string& data_path_{GetSpecificTestDataPath()};
+  const raw_ref<const std::string> data_path_{GetSpecificTestDataPath()};
   FakeCastSocketPair fake_cast_socket_pair_;
   MockSocketErrorHandler mock_error_handler_;
-  CastSocket* socket_;
+  raw_ptr<CastSocket> socket_;
 
   StaticCredentialsProvider creds_;
   VirtualConnectionRouter router_;
@@ -76,14 +78,14 @@ class DeviceAuthNamespaceHandlerTest : public ::testing::Test {
 
 TEST_F(DeviceAuthNamespaceHandlerTest, AuthResponse) {
   InitStaticCredentialsFromFiles(
-      &creds_, nullptr, nullptr, data_path_ + "device_key.pem",
-      data_path_ + "device_chain.pem", data_path_ + "device_tls.pem");
+      &creds_, nullptr, nullptr, (*data_path_) + "device_key.pem",
+      (*data_path_) + "device_chain.pem", (*data_path_) + "device_tls.pem");
 
   // Send an auth challenge.  `auth_handler_` will automatically respond via
   // `router_` and we will catch the result in `challenge_reply`.
   CastMessage auth_challenge;
   const std::string auth_challenge_string =
-      ReadEntireFileToString(data_path_ + "auth_challenge.pb");
+      ReadEntireFileToString((*data_path_) + "auth_challenge.pb");
   ASSERT_TRUE(auth_challenge.ParseFromString(auth_challenge_string));
 
   CastMessage challenge_reply;
@@ -95,7 +97,7 @@ TEST_F(DeviceAuthNamespaceHandlerTest, AuthResponse) {
       fake_cast_socket_pair_.peer_socket->Send(std::move(auth_challenge)).ok());
 
   const std::string auth_response_string =
-      ReadEntireFileToString(data_path_ + "auth_response.pb");
+      ReadEntireFileToString((*data_path_) + "auth_response.pb");
   AuthResponse expected_auth_response;
   ASSERT_TRUE(expected_auth_response.ParseFromString(auth_response_string));
 
@@ -125,14 +127,14 @@ TEST_F(DeviceAuthNamespaceHandlerTest, AuthResponse) {
 
 TEST_F(DeviceAuthNamespaceHandlerTest, BadNonce) {
   InitStaticCredentialsFromFiles(
-      &creds_, nullptr, nullptr, data_path_ + "device_key.pem",
-      data_path_ + "device_chain.pem", data_path_ + "device_tls.pem");
+      &creds_, nullptr, nullptr, (*data_path_) + "device_key.pem",
+      (*data_path_) + "device_chain.pem", (*data_path_) + "device_tls.pem");
 
   // Send an auth challenge.  `auth_handler_` will automatically respond via
   // `router_` and we will catch the result in `challenge_reply`.
   CastMessage auth_challenge;
   const std::string auth_challenge_string =
-      ReadEntireFileToString(data_path_ + "auth_challenge.pb");
+      ReadEntireFileToString((*data_path_) + "auth_challenge.pb");
   ASSERT_TRUE(auth_challenge.ParseFromString(auth_challenge_string));
 
   // Change the nonce to be different from what was used to record the correct
@@ -157,7 +159,7 @@ TEST_F(DeviceAuthNamespaceHandlerTest, BadNonce) {
       fake_cast_socket_pair_.peer_socket->Send(std::move(auth_challenge)).ok());
 
   const std::string auth_response_string =
-      ReadEntireFileToString(data_path_ + "auth_response.pb");
+      ReadEntireFileToString((*data_path_) + "auth_response.pb");
   AuthResponse expected_auth_response;
   ASSERT_TRUE(expected_auth_response.ParseFromString(auth_response_string));
 
@@ -176,14 +178,14 @@ TEST_F(DeviceAuthNamespaceHandlerTest, BadNonce) {
 
 TEST_F(DeviceAuthNamespaceHandlerTest, UnsupportedSignatureAlgorithm) {
   InitStaticCredentialsFromFiles(
-      &creds_, nullptr, nullptr, data_path_ + "device_key.pem",
-      data_path_ + "device_chain.pem", data_path_ + "device_tls.pem");
+      &creds_, nullptr, nullptr, (*data_path_) + "device_key.pem",
+      (*data_path_) + "device_chain.pem", (*data_path_) + "device_tls.pem");
 
   // Send an auth challenge.  `auth_handler_` will automatically respond via
   // `router_` and we will catch the result in `challenge_reply`.
   CastMessage auth_challenge;
   const std::string auth_challenge_string =
-      ReadEntireFileToString(data_path_ + "auth_challenge.pb");
+      ReadEntireFileToString((*data_path_) + "auth_challenge.pb");
   ASSERT_TRUE(auth_challenge.ParseFromString(auth_challenge_string));
 
   // Change the signature algorithm an unsupported value.

@@ -36,11 +36,11 @@ MirroringApplication::MirroringApplication(TaskRunner& task_runner,
       agent_(agent),
       enable_dscp_(enable_dscp),
       enable_input_events_(enable_input_events) {
-  agent_.RegisterApplication(this);
+  agent_->RegisterApplication(this);
 }
 
 MirroringApplication::~MirroringApplication() {
-  agent_.UnregisterApplication(this);  // ApplicationAgent may call Stop().
+  agent_->UnregisterApplication(this);  // ApplicationAgent may call Stop().
   OSP_CHECK(!current_session_);
 }
 
@@ -56,14 +56,14 @@ bool MirroringApplication::Launch(const std::string& app_id,
   }
 
 #if BUILDFLAG(IS_APPLE)
-  wake_lock_ = ScopedWakeLock::Create(task_runner_);
+  wake_lock_ = ScopedWakeLock::Create(*task_runner_);
 #endif  // BUILDFLAG(IS_APPLE)
   environment_ = std::make_unique<Environment>(
-      &Clock::now, task_runner_,
+      &Clock::now, *task_runner_,
       IPEndpoint{interface_address_, kDefaultCastStreamingPort});
 #if defined(CAST_STANDALONE_RECEIVER_HAVE_EXTERNAL_LIBS)
   controller_ = std::make_unique<StreamingPlaybackController>(
-      task_runner_, this, enable_input_events_);
+      *task_runner_, this, enable_input_events_);
 #else
   controller_ =
       std::make_unique<StreamingPlaybackController>(this, enable_input_events_);
@@ -115,7 +115,7 @@ void MirroringApplication::Stop() {
 void MirroringApplication::OnPlaybackError(StreamingPlaybackController*,
                                            const Error& error) {
   OSP_LOG_ERROR << "[MirroringApplication] " << error;
-  agent_.StopApplicationIfRunning(this);  // ApplicationAgent calls Stop().
+  agent_->StopApplicationIfRunning(this);  // ApplicationAgent calls Stop().
 }
 
 void MirroringApplication::AddCustomNamespace(

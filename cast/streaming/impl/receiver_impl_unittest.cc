@@ -44,6 +44,8 @@
 #include "platform/test/fake_task_runner.h"
 #include "util/chrono_helpers.h"
 #include "util/osp_logging.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 using testing::_;
 using testing::AllOf;
@@ -200,7 +202,7 @@ class MockSender : public CompoundRtcpParser::Client {
     UdpPacket packet_to_send(packet_and_report_id.first.begin(),
                              packet_and_report_id.first.end());
     packet_to_send.set_source(sender_endpoint_);
-    task_runner_.PostTaskWithDelay(
+    task_runner_->PostTaskWithDelay(
         [receiver = receiver_, packet = std::move(packet_to_send)]() mutable {
           receiver->OnRead(nullptr, ErrorOr<UdpPacket>(std::move(packet)));
         },
@@ -245,7 +247,7 @@ class MockSender : public CompoundRtcpParser::Client {
           frame_being_sent_, packet_id, ByteBuffer(buffer, kMaxRtpPacketSize));
       UdpPacket packet_to_send(span.begin(), span.end());
       packet_to_send.set_source(sender_endpoint_);
-      task_runner_.PostTaskWithDelay(
+      task_runner_->PostTaskWithDelay(
           [receiver = receiver_, packet = std::move(packet_to_send)]() mutable {
             receiver->OnRead(nullptr, ErrorOr<UdpPacket>(std::move(packet)));
           },
@@ -288,8 +290,8 @@ class MockSender : public CompoundRtcpParser::Client {
               (override));
 
  private:
-  TaskRunner& task_runner_;
-  UdpSocket::Client* const receiver_;
+  const raw_ref<TaskRunner> task_runner_;
+  const raw_ptr<UdpSocket::Client> receiver_;
   const IPEndpoint sender_endpoint_;
   RtcpSession rtcp_session_;
   SenderReportBuilder sender_report_builder_;

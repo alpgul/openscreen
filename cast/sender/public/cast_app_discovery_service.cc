@@ -37,8 +37,8 @@ void CastAppDiscoveryService::Subscription::Reset() {
 }
 
 void CastAppDiscoveryService::Subscription::Swap(Subscription& other) {
-  CastAppDiscoveryService* service = other.discovery_service_;
-  other.discovery_service_ = discovery_service_;
+  CastAppDiscoveryService* service = other.discovery_service_.get();
+  other.discovery_service_ = discovery_service_.get();
   discovery_service_ = service;
 
   uint32_t id = other.id_;

@@ -7,6 +7,8 @@
 #include <map>
 #include <string>
 
+#include "util/raw_ptr.h"
+
 // NOTE: although we use gtest here, prefer OSP_CHECKs to
 // ASSERTS due to asynchronous concerns around test failures.
 // Although this causes the entire test binary to fail instead of
@@ -257,7 +259,7 @@ class DiscoveryE2ETest : public testing::Test {
           CheckForPublishedService(std::move(info), has_been_seen, 0, false);
         });
   }
-  TaskRunner* task_runner_;
+  raw_ptr<TaskRunner> task_runner_;
   FailOnErrorReporting reporting_client_;
   discovery::DnsSdServicePtr dnssd_service_;
   std::unique_ptr<ServiceReceiver> receiver_;

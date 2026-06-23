@@ -26,6 +26,8 @@
 #include "cast/streaming/resolution.h"
 #include "cast/streaming/sender_message.h"
 #include "platform/base/ip_address.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -60,10 +62,10 @@ class ReceiverSession final : public Environment::SocketSubscriber {
     // an acceptable session configuration with the sender, then either of the
     // receivers may be nullptr. In this case, the associated config is default
     // initialized and should be ignored.
-    Receiver* audio_receiver;
+    raw_ptr<Receiver> audio_receiver;
     AudioCaptureConfig audio_config;
 
-    Receiver* video_receiver;
+    raw_ptr<Receiver> video_receiver;
     VideoCaptureConfig video_config;
 
     // Set to true if input events were successfully negotiated for this
@@ -89,7 +91,7 @@ class ReceiverSession final : public Environment::SocketSubscriber {
     // Unlike the SenderSession API, the RPC messenger is negotiation specific.
     // The messenger is torn down when `OnReceiversDestroying` is called, and
     // is owned by the ReceiverSession.
-    RpcMessenger* messenger;
+    raw_ptr<RpcMessenger> messenger;
   };
 
   // The embedder should provide a client for handling connections.
@@ -245,8 +247,8 @@ class ReceiverSession final : public Environment::SocketSubscriber {
                             int sequence_number,
                             const Error& error);
 
-  Client& client_;
-  Environment& environment_;
+  const raw_ref<Client> client_;
+  const raw_ref<Environment> environment_;
   const ReceiverConstraints constraints_;
 
   // The sender_id of this session.

@@ -15,6 +15,7 @@
 #include "cast/streaming/public/constants.h"
 #include "cast/streaming/public/frame_id.h"
 #include "platform/base/span.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -121,7 +122,7 @@ class CompoundRtcpBuilder {
   void FinalizeReceiverLogPacket(ByteBuffer& space_for_header,
                                  size_t payload_size);
 
-  RtcpSession& session_;
+  const raw_ref<RtcpSession> session_;
 
   // Data to include in the next built RTCP packet.
   FrameId checkpoint_frame_id_ = FrameId::leader();

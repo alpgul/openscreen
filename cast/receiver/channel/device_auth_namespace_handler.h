@@ -13,6 +13,7 @@
 
 #include "cast/common/channel/cast_message_handler.h"
 #include "platform/base/span.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -51,7 +52,7 @@ class DeviceAuthNamespaceHandler final : public CastMessageHandler {
                  proto::CastMessage message) override;
 
  private:
-  CredentialsProvider& creds_provider_;
+  const raw_ref<CredentialsProvider> creds_provider_;
 };
 
 }  // namespace openscreen::cast

@@ -58,11 +58,11 @@ ReceiverImpl::ReceiverImpl(Environment& environment,
   playout_delay_changes_.emplace_back(FrameId::leader(),
                                       config.target_playout_delay);
 
-  packet_router_.RegisterPacketConsumer(rtcp_session_.sender_ssrc(), this);
+  packet_router_->RegisterPacketConsumer(rtcp_session_.sender_ssrc(), this);
 }
 
 ReceiverImpl::~ReceiverImpl() {
-  packet_router_.DeregisterPacketConsumer(rtcp_session_.sender_ssrc());
+  packet_router_->DeregisterPacketConsumer(rtcp_session_.sender_ssrc());
 }
 
 const SessionConfig& ReceiverImpl::config() const {
@@ -444,7 +444,7 @@ void ReceiverImpl::SendRtcp() {
   rtcp_builder_->IncludeFeedbackInNextPacket(std::move(packet_nacks),
                                              std::move(frame_acks));
   last_rtcp_send_time_ = now_();
-  packet_router_.SendRtcpPacket(
+  packet_router_->SendRtcpPacket(
       rtcp_builder_->BuildPacket(last_rtcp_send_time_, rtcp_buffer_));
 
   // Schedule the automatic sending of another RTCP packet, if this method is

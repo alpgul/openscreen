@@ -16,6 +16,8 @@
 #include "platform/api/task_runner_deleter.h"
 #include "platform/api/tls_connection_factory.h"
 #include "platform/base/ip_address.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -82,14 +84,14 @@ class SenderSocketFactory final : public TlsConnectionFactory::Client,
   struct PendingConnection {
     IPEndpoint endpoint;
     DeviceMediaPolicy media_policy;
-    CastSocket::Client* client;
+    raw_ptr<CastSocket::Client> client;
   };
 
   struct PendingAuth {
     IPEndpoint endpoint;
     DeviceMediaPolicy media_policy;
     std::unique_ptr<CastSocket, TaskRunnerDeleter> socket;
-    CastSocket::Client* client;
+    raw_ptr<CastSocket::Client> client;
     std::unique_ptr<AuthContext> auth_context;
     std::unique_ptr<ParsedCertificate> peer_cert;
   };
@@ -104,9 +106,9 @@ class SenderSocketFactory final : public TlsConnectionFactory::Client,
   void OnError(CastSocket* socket, const Error& error) override;
   void OnMessage(CastSocket* socket, proto::CastMessage message) override;
 
-  Client& client_;
-  TaskRunner& task_runner_;
-  TlsConnectionFactory* factory_ = nullptr;
+  const raw_ref<Client> client_;
+  const raw_ref<TaskRunner> task_runner_;
+  raw_ptr<TlsConnectionFactory> factory_ = nullptr;
   std::vector<PendingConnection> pending_connections_;
   std::vector<std::unique_ptr<PendingAuth>> pending_auth_;
 

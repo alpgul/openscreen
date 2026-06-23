@@ -19,6 +19,7 @@
 #include "platform/api/task_runner.h"
 #include "platform/base/span.h"
 #include "util/flat_map.h"
+#include "util/raw_ref.h"
 #include "util/weak_ptr.h"
 
 namespace openscreen::cast {
@@ -34,7 +35,7 @@ class SessionMessenger : public MessagePort::Client {
                    ErrorCallback cb);
   ~SessionMessenger() override;
 
-  MessagePort& message_port() { return message_port_; }
+  MessagePort& message_port() { return *message_port_; }
 
  protected:
   // Barebones message sending method shared by both children.
@@ -48,7 +49,7 @@ class SessionMessenger : public MessagePort::Client {
   const std::string& source_id() override { return source_id_; }
 
  private:
-  MessagePort& message_port_;
+  const raw_ref<MessagePort> message_port_;
   const std::string source_id_;
   ErrorCallback error_callback_;
 };
@@ -94,7 +95,7 @@ class SenderSessionMessenger final : public SessionMessenger {
   void OnError(const Error& error) override;
 
  private:
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
 
   // This messenger should only be connected to one receiver, so `receiver_id_`
   // should not change.

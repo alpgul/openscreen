@@ -32,6 +32,8 @@
 #include "platform/base/span.h"
 #include "util/alarm.h"
 #include "util/chrono_helpers.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -142,7 +144,7 @@ class ReceiverImpl : public Receiver,
                              RtcpReceiverEventLogMessage event_log);
 
   const ClockNowFunctionPtr now_;
-  ReceiverPacketRouter& packet_router_;
+  const raw_ref<ReceiverPacketRouter> packet_router_;
   const SessionConfig config_;
   RtcpSession rtcp_session_;
   SenderReportParser rtcp_parser_;
@@ -218,7 +220,7 @@ class ReceiverImpl : public Receiver,
 
   // The consumer to notify when there are one or more frames completed and
   // ready to be consumed.
-  Consumer* consumer_ = nullptr;
+  raw_ptr<Consumer> consumer_ = nullptr;
 
   // The additional time needed to decode/play-out each frame after being
   // consumed from this Receiver.

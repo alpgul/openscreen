@@ -23,6 +23,7 @@
 #include "util/crypto/pem_helpers.h"
 #include "util/no_destructor.h"
 #include "util/osp_logging.h"
+#include "util/raw_ref.h"
 #include "util/read_file.h"
 
 namespace openscreen::cast {
@@ -168,7 +169,7 @@ class CastAuthUtilTest : public ::testing::Test {
     (*data)[0] = ~(*data)[0];
   }
 
-  const std::string& data_path_{GetSpecificTestDataPath()};
+  const raw_ref<const std::string> data_path_{GetSpecificTestDataPath()};
   std::unique_ptr<TrustStore> cast_trust_store_{CastTrustStore::Create()};
   std::unique_ptr<TrustStore> crl_trust_store_{CastCRLTrustStore::Create()};
 };
@@ -294,7 +295,7 @@ TEST_F(CastAuthUtilTest, VerifySenderNonceMissing) {
 
 TEST_F(CastAuthUtilTest, VerifyTLSCertificateSuccess) {
   std::vector<std::string> tls_cert_der = ReadCertificatesFromPemFile(
-      data_path_ + "certificates/test_tls_cert.pem");
+      (*data_path_) + "certificates/test_tls_cert.pem");
   std::string& der_cert = tls_cert_der[0];
   std::unique_ptr<ParsedCertificate> tls_cert = ParseX509Der(der_cert);
   ErrorOr<DateTime> maybe_not_before = tls_cert->GetNotBeforeTime();
@@ -309,7 +310,7 @@ TEST_F(CastAuthUtilTest, VerifyTLSCertificateSuccess) {
 
 TEST_F(CastAuthUtilTest, VerifyTLSCertificateTooEarly) {
   std::vector<std::string> tls_cert_der = ReadCertificatesFromPemFile(
-      data_path_ + "certificates/test_tls_cert.pem");
+      (*data_path_) + "certificates/test_tls_cert.pem");
   std::string& der_cert = tls_cert_der[0];
   std::unique_ptr<ParsedCertificate> tls_cert = ParseX509Der(der_cert);
   ErrorOr<DateTime> maybe_not_before = tls_cert->GetNotBeforeTime();
@@ -327,7 +328,7 @@ TEST_F(CastAuthUtilTest, VerifyTLSCertificateTooEarly) {
 
 TEST_F(CastAuthUtilTest, VerifyTLSCertificateTooLate) {
   std::vector<std::string> tls_cert_der = ReadCertificatesFromPemFile(
-      data_path_ + "certificates/test_tls_cert.pem");
+      (*data_path_) + "certificates/test_tls_cert.pem");
   std::string& der_cert = tls_cert_der[0];
   std::unique_ptr<ParsedCertificate> tls_cert = ParseX509Der(der_cert);
   ErrorOr<DateTime> maybe_not_after = tls_cert->GetNotAfterTime();

@@ -11,6 +11,7 @@
 #include "cast/common/public/cast_socket.h"
 #include "platform/api/tls_connection_factory.h"
 #include "platform/base/ip_address.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -48,8 +49,8 @@ class ReceiverSocketFactory final : public TlsConnectionFactory::Client {
   void CreateSocket(std::unique_ptr<Connection> connection);
 
  private:
-  Client& client_;
-  CastSocket::Client& socket_client_;
+  const raw_ref<Client> client_;
+  const raw_ref<CastSocket::Client> socket_client_;
 };
 
 }  // namespace openscreen::cast

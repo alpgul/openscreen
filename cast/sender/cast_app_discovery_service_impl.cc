@@ -98,7 +98,7 @@ void CastAppDiscoveryServiceImpl::RequestAppAvailability(
     const std::string& receiver_id,
     const std::string& app_id) {
   if (ShouldRefreshAppAvailability(receiver_id, app_id, clock_())) {
-    platform_client_.RequestAppAvailability(
+    platform_client_->RequestAppAvailability(
         receiver_id, app_id,
         [self = weak_factory_.GetWeakPtr(), receiver_id](
             const std::string& id, AppAvailabilityResult availability) {

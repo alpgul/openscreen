@@ -79,7 +79,7 @@ void StreamingPlaybackController::OnRemotingNegotiated(
     ReceiverSession::RemotingNegotiation negotiation) {
   session_ = session;
   remoting_receiver_ =
-      std::make_unique<SimpleRemotingReceiver>(negotiation.messenger);
+      std::make_unique<SimpleRemotingReceiver>(negotiation.messenger.get());
   remoting_receiver_->SendInitializeMessage(
       [this, receivers = negotiation.receivers](AudioCodec audio_codec,
                                                 VideoCodec video_codec) {

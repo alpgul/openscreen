@@ -20,6 +20,7 @@
 #include "platform/api/task_runner_deleter.h"
 #include "platform/base/error.h"
 #include "platform/base/ip_address.h"
+#include "util/raw_ref.h"
 
 namespace openscreen {
 
@@ -44,7 +45,7 @@ class CastService final : public discovery::ReportingClient {
  public:
   struct Configuration {
     // The task runner to be used for async calls.
-    TaskRunner& task_runner;
+    const raw_ref<TaskRunner> task_runner;
 
     // The interface the cast service is running on.
     InterfaceInfo interface;

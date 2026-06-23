@@ -132,7 +132,7 @@ void VirtualConnectionRouter::CloseSocket(int id) {
   if (it != sockets_.end()) {
     RemoveConnectionsBySocketId(id);
     std::unique_ptr<CastSocket> socket = std::move(it->second.socket);
-    SocketErrorHandler* error_handler = it->second.error_handler;
+    SocketErrorHandler* error_handler = it->second.error_handler.get();
     sockets_.erase(it);
     error_handler->OnClose(socket.get());
   }
@@ -189,7 +189,7 @@ void VirtualConnectionRouter::OnError(CastSocket* socket, const Error& error) {
   if (it != sockets_.end()) {
     RemoveConnectionsBySocketId(id);
     std::unique_ptr<CastSocket> socket_owned = std::move(it->second.socket);
-    SocketErrorHandler* error_handler = it->second.error_handler;
+    SocketErrorHandler* error_handler = it->second.error_handler.get();
     sockets_.erase(it);
     error_handler->OnError(socket, error);
   }

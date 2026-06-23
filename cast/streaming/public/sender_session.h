@@ -28,6 +28,8 @@
 #include "json/value.h"
 #include "platform/base/ip_address.h"
 #include "util/json/json_serialization.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -111,10 +113,10 @@ class SenderSession final {
 
     // The cast environment used to access operating system resources, such
     // as the UDP socket for RTP/RTCP messaging. Required.
-    Environment* environment;
+    raw_ptr<Environment> environment;
 
     // The message port used to send streaming control protocol messages.
-    MessagePort* message_port;
+    raw_ptr<MessagePort> message_port;
 
     // The message source identifier (e.g. this sender).
     std::string message_source_id;
@@ -306,7 +308,7 @@ class SenderSession final {
 
   // The statistics client for this session. Must be set in order for statistics
   // to be calculated.
-  SenderStatsClient* stats_client_ = nullptr;
+  raw_ptr<SenderStatsClient> stats_client_ = nullptr;
 };  // namespace cast
 
 }  // namespace openscreen::cast

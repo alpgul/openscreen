@@ -10,6 +10,7 @@
 #include "cast/standalone_receiver/simple_remoting_receiver.h"
 #include "cast/streaming/public/receiver_session.h"
 #include "platform/api/task_runner.h"
+#include "util/raw_ptr.h"
 
 #if defined(CAST_STANDALONE_RECEIVER_HAVE_EXTERNAL_LIBS)
 #include "cast/standalone_receiver/sdl_audio_player.h"  // nogncheck
@@ -52,7 +53,7 @@ class StreamingPlaybackController final : public ReceiverSession::Client {
   void OnError(const ReceiverSession* session, const Error& error) override;
 
  private:
-  StreamingPlaybackController::Client* client_;
+  raw_ptr<StreamingPlaybackController::Client> client_;
 
   void Initialize(ReceiverSession::ConfiguredReceivers receivers);
 
@@ -80,7 +81,7 @@ class StreamingPlaybackController final : public ReceiverSession::Client {
   std::unique_ptr<DummyPlayer> video_player_;
 #endif  // defined(CAST_STANDALONE_RECEIVER_HAVE_EXTERNAL_LIBS)
 
-  const ReceiverSession* session_ = nullptr;
+  raw_ptr<const ReceiverSession> session_ = nullptr;
   std::unique_ptr<SimpleRemotingReceiver> remoting_receiver_;
 };
 

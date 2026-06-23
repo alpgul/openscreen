@@ -13,6 +13,7 @@
 #include "cast/streaming/impl/rtp_defines.h"
 #include "cast/streaming/public/frame_id.h"
 #include "platform/base/span.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -117,8 +118,8 @@ class CompoundRtcpParser {
                             Clock::time_point& receiver_reference_time);
   bool ParsePictureLossIndicator(ByteView in, bool& picture_loss_indicator);
 
-  RtcpSession& session_;
-  Client& client_;
+  const raw_ref<RtcpSession> session_;
+  const raw_ref<Client> client_;
 
   // Tracks the latest timestamp seen from any Receiver Reference Time Report,
   // and uses this to ignore stale RTCP packets that arrived out-of-order and/or

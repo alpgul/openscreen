@@ -14,6 +14,7 @@
 #include "cast/streaming/impl/rtp_defines.h"
 #include "platform/api/time.h"
 #include "platform/base/span.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -41,7 +42,7 @@ class SenderReportBuilder {
       kRtcpCommonHeaderSize + kRtcpSenderReportSize + kRtcpReportBlockSize;
 
  private:
-  RtcpSession& session_;
+  const raw_ref<RtcpSession> session_;
 };
 
 }  // namespace openscreen::cast

@@ -21,6 +21,7 @@
 #include "util/json/json_serialization.h"
 #include "util/json/json_value.h"
 #include "util/osp_logging.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 namespace {
@@ -138,7 +139,7 @@ class ConnectionNamespaceHandlerTest : public ::testing::Test {
 
   FakeCastSocketPair fake_cast_socket_pair_;
   MockSocketErrorHandler mock_error_handler_;
-  CastSocket* socket_;
+  raw_ptr<CastSocket> socket_;
 
   NiceMock<MockVirtualConnectionPolicy> vc_policy_;
   VirtualConnectionRouter router_;

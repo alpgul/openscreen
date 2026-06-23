@@ -32,6 +32,8 @@
 #include "testing/util/task_util.h"
 #include "util/crypto/certificate_utils.h"
 #include "util/osp_logging.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 namespace {
@@ -60,7 +62,7 @@ class SenderSocketsClient : public SenderSocketFactory::Client,
     OSP_LOG_INFO << kLogDecorator
                  << "Sender connected to endpoint: " << endpoint;
     socket_ = socket.get();
-    router_.TakeSocket(this, std::move(socket));
+    router_->TakeSocket(this, std::move(socket));
   }
 
   void OnError(SenderSocketFactory* factory,
@@ -83,7 +85,7 @@ class SenderSocketsClient : public SenderSocketFactory::Client,
   MOCK_METHOD(void, OnErrorMock, (CastSocket * socket, const Error& error), ());
 
  private:
-  VirtualConnectionRouter& router_;
+  const raw_ref<VirtualConnectionRouter> router_;
   std::atomic<CastSocket*> socket_{nullptr};
 };
 
@@ -128,7 +130,7 @@ class ReceiverSocketsClient
   MOCK_METHOD(void, OnErrorMock, (CastSocket * socket, const Error& error), ());
 
  private:
-  VirtualConnectionRouter* router_;
+  raw_ptr<VirtualConnectionRouter> router_;
   IPEndpoint endpoint_;
   std::atomic<CastSocket*> socket_{nullptr};
 };
@@ -255,7 +257,7 @@ class CastSocketE2ETest : public ::testing::Test {
     EXPECT_FALSE(receiver_client_->socket());
   }
 
-  TaskRunner* task_runner_;
+  raw_ptr<TaskRunner> task_runner_;
 
   // NOTE: Sender components.
   std::unique_ptr<VirtualConnectionRouter, TaskRunnerDeleter> sender_router_;

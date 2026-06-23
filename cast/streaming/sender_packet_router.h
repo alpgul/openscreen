@@ -18,6 +18,8 @@
 #include "platform/api/time.h"
 #include "platform/base/span.h"
 #include "util/alarm.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -126,7 +128,7 @@ class SenderPacketRouter : public BandwidthEstimator,
  private:
   struct SenderEntry {
     Ssrc receiver_ssrc;
-    Sender* sender;
+    raw_ptr<Sender> sender;
     Clock::time_point next_rtcp_send_time;
     Clock::time_point next_rtp_send_time;
 
@@ -176,7 +178,7 @@ class SenderPacketRouter : public BandwidthEstimator,
                                     int max_packets_per_burst,
                                     std::chrono::milliseconds burst_interval);
 
-  Environment& environment_;
+  const raw_ref<Environment> environment_;
   const int packet_buffer_size_;
   const std::unique_ptr<uint8_t[]> packet_buffer_;
   const int max_packets_per_burst_;

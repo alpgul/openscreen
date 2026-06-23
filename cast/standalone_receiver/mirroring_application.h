@@ -15,6 +15,7 @@
 #include "cast/standalone_receiver/streaming_playback_controller.h"
 #include "platform/base/error.h"
 #include "platform/base/ip_address.h"
+#include "util/raw_ref.h"
 #include "util/scoped_wake_lock.h"
 
 namespace openscreen {
@@ -69,10 +70,10 @@ class MirroringApplication final : public ApplicationAgent::Application,
                    std::string_view message);
 
  private:
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
   const IPAddress interface_address_;
   const std::vector<std::string> app_ids_;
-  ApplicationAgent& agent_;
+  const raw_ref<ApplicationAgent> agent_;
   const bool enable_dscp_;
   const bool enable_input_events_;
 

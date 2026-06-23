@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "platform/api/tls_connection.h"
+#include "util/raw_ptr.h"
 #include "util/weak_ptr.h"
 
 namespace openscreen::cast {
@@ -71,7 +72,7 @@ class CastSocket : public Connection::Client {
   static int g_next_socket_id_;
 
   const std::unique_ptr<Connection> connection_;
-  Client* client_;  // May never be null.
+  raw_ptr<Client> client_;  // May never be null.
   const int socket_id_;
   bool audio_only_ = false;
   std::vector<uint8_t> read_buffer_;

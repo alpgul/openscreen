@@ -39,6 +39,7 @@
 #include "util/alarm.h"
 #include "util/bit_vector.h"
 #include "util/chrono_helpers.h"
+#include "util/raw_ref.h"
 #include "util/std_util.h"
 
 using testing::_;
@@ -136,17 +137,17 @@ class SimulatedNetworkPipe {
   // The caller needs to spin the task runner before `packet` will reach the
   // other side.
   void StartPacketTransmission(std::vector<uint8_t> packet) {
-    task_runner_.PostTaskWithDelay(
+    task_runner_->PostTaskWithDelay(
         [this, pkt = std::move(packet)]() mutable {
-          remote_.OnReceivedPacket(local_endpoint_, FakeClock::now(),
-                                   std::move(pkt));
+          remote_->OnReceivedPacket(local_endpoint_, FakeClock::now(),
+                                    std::move(pkt));
         },
         network_delay_);
   }
 
  private:
-  TaskRunner& task_runner_;
-  Environment::PacketConsumer& remote_;
+  const raw_ref<TaskRunner> task_runner_;
+  const raw_ref<Environment::PacketConsumer> remote_;
 
   IPEndpoint local_endpoint_;
 
@@ -223,7 +224,7 @@ class MockReceiver : public Environment::PacketConsumer {
     uint8_t buffer[kMaxRtpPacketSizeForIpv6UdpOnEthernet];
     const ByteBuffer packet =
         rtcp_builder_.BuildPacket(FakeClock::now(), buffer);
-    pipe_to_sender_.StartPacketTransmission(
+    pipe_to_sender_->StartPacketTransmission(
         std::vector<uint8_t>(packet.begin(), packet.end()));
   }
 
@@ -314,7 +315,7 @@ class MockReceiver : public Environment::PacketConsumer {
     OnFrameComplete(frame_id);
   }
 
-  SimulatedNetworkPipe& pipe_to_sender_;
+  const raw_ref<SimulatedNetworkPipe> pipe_to_sender_;
   RtcpSession rtcp_session_;
   SenderReportParser sender_report_parser_;
   CompoundRtcpBuilder rtcp_builder_;

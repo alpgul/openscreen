@@ -14,6 +14,7 @@
 #include "cast/common/channel/proto/cast_channel.pb.h"
 #include "cast/common/channel/virtual_connection.h"
 #include "cast/common/public/cast_socket.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 
@@ -123,10 +124,10 @@ class VirtualConnectionRouter final : public CastSocket::Client {
 
   struct SocketWithHandler {
     std::unique_ptr<CastSocket> socket;
-    SocketErrorHandler* error_handler;
+    raw_ptr<SocketErrorHandler> error_handler;
   };
 
-  ConnectionNamespaceHandler* connection_handler_ = nullptr;
+  raw_ptr<ConnectionNamespaceHandler> connection_handler_ = nullptr;
 
   std::map<int /* socket_id */,
            std::multimap<std::string /* local_id */, VCTail>>

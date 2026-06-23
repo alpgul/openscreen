@@ -85,17 +85,17 @@ ConnectionNamespaceHandler::ConnectionNamespaceHandler(
     VirtualConnectionRouter& vc_router,
     VirtualConnectionPolicy& vc_policy)
     : vc_router_(vc_router), vc_policy_(vc_policy) {
-  vc_router_.set_connection_namespace_handler(this);
+  vc_router_->set_connection_namespace_handler(this);
 }
 
 ConnectionNamespaceHandler::~ConnectionNamespaceHandler() {
-  vc_router_.set_connection_namespace_handler(nullptr);
+  vc_router_->set_connection_namespace_handler(nullptr);
 }
 
 void ConnectionNamespaceHandler::OpenRemoteConnection(
     VirtualConnection conn,
     RemoteConnectionResultCallback result_callback) {
-  OSP_CHECK(!vc_router_.GetConnectionData(conn));
+  OSP_CHECK(!vc_router_->GetConnectionData(conn));
   OSP_DCHECK(std::none_of(
       pending_remote_requests_.begin(), pending_remote_requests_.end(),
       [&](const PendingRequest& request) { return request.conn == conn; }));
@@ -164,7 +164,7 @@ void ConnectionNamespaceHandler::HandleConnect(CastSocket* socket,
   VirtualConnection virtual_conn{std::move(message.destination_id()),
                                  std::move(message.source_id()),
                                  ToCastSocketId(socket)};
-  if (!vc_policy_.IsConnectionAllowed(virtual_conn)) {
+  if (!vc_policy_->IsConnectionAllowed(virtual_conn)) {
     SendClose(std::move(virtual_conn));
     return;
   }
@@ -228,7 +228,7 @@ void ConnectionNamespaceHandler::HandleConnect(CastSocket* socket,
     SendConnectedResponse(virtual_conn, negotiated_version.value());
   }
 
-  vc_router_.AddConnection(std::move(virtual_conn), std::move(data));
+  vc_router_->AddConnection(std::move(virtual_conn), std::move(data));
 }
 
 void ConnectionNamespaceHandler::HandleClose(CastSocket* socket,
@@ -259,10 +259,11 @@ void ConnectionNamespaceHandler::HandleConnectedResponse(
     return;
   }
 
-  vc_router_.AddConnection(conn, {VirtualConnection::Type::kStrong,
-                                  {},
-                                  {},
-                                  VirtualConnection::ProtocolVersion::kV2_1_3});
+  vc_router_->AddConnection(conn,
+                            {VirtualConnection::Type::kStrong,
+                             {},
+                             {},
+                             VirtualConnection::ProtocolVersion::kV2_1_3});
 
   const auto callback = std::move(it->result_callback);
   pending_remote_requests_.erase(it);
@@ -272,13 +273,13 @@ void ConnectionNamespaceHandler::HandleConnectedResponse(
 void ConnectionNamespaceHandler::SendConnect(VirtualConnection virtual_conn) {
   proto::CastMessage message =
       MakeConnectMessage(virtual_conn.local_id, virtual_conn.peer_id);
-  vc_router_.Send(std::move(virtual_conn), std::move(message));
+  vc_router_->Send(std::move(virtual_conn), std::move(message));
 }
 
 void ConnectionNamespaceHandler::SendClose(VirtualConnection virtual_conn) {
   proto::CastMessage message =
       MakeCloseMessage(virtual_conn.local_id, virtual_conn.peer_id);
-  vc_router_.Send(std::move(virtual_conn), std::move(message));
+  vc_router_->Send(std::move(virtual_conn), std::move(message));
 }
 
 void ConnectionNamespaceHandler::SendConnectedResponse(
@@ -294,7 +295,7 @@ void ConnectionNamespaceHandler::SendConnectedResponse(
     return;
   }
 
-  vc_router_.Send(
+  vc_router_->Send(
       virtual_conn,
       MakeSimpleUTF8Message(kConnectionNamespace, std::move(result.value())));
 }
@@ -303,8 +304,8 @@ bool ConnectionNamespaceHandler::RemoveConnection(
     const VirtualConnection& conn,
     VirtualConnection::CloseReason reason) {
   bool found_connection = false;
-  if (vc_router_.GetConnectionData(conn)) {
-    vc_router_.RemoveConnection(conn, reason);
+  if (vc_router_->GetConnectionData(conn)) {
+    vc_router_->RemoveConnection(conn, reason);
     found_connection = true;
   }
 

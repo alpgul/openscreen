@@ -259,7 +259,7 @@ int RunStandaloneReceiver(int argc, char* argv[]) {
   RunCastService(
       task_runner,
       CastService::Configuration{
-          *task_runner, interface, std::move(creds.value()),
+          raw_ref(*task_runner), interface, std::move(creds.value()),
           Uuid::GenerateRandomV4().AsLowercaseString(), args->friendly_name,
           args->model_name, args->enable_discovery, args->enable_dscp,
           args->enable_input_events});

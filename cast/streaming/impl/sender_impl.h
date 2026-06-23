@@ -28,6 +28,8 @@
 #include "platform/api/time.h"
 #include "platform/base/span.h"
 #include "util/bit_vector.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -105,7 +107,7 @@ class SenderImpl final : public Sender,
 
   // Return value from the ChooseXYZ() helper methods.
   struct ChosenPacket {
-    PendingFrameSlot* slot = nullptr;
+    raw_ptr<PendingFrameSlot> slot = nullptr;
     FramePacketId packet_id{};
 
     explicit operator bool() const { return !!slot; }
@@ -178,7 +180,7 @@ class SenderImpl final : public Sender,
   }
 
   const SessionConfig config_;
-  SenderPacketRouter& packet_router_;
+  const raw_ref<SenderPacketRouter> packet_router_;
   RtcpSession rtcp_session_;
   CompoundRtcpParser rtcp_parser_;
   SenderReportBuilder sender_report_builder_;
@@ -237,7 +239,7 @@ class SenderImpl final : public Sender,
   FrameId last_enqueued_key_frame_id_ = FrameId::leader();
 
   // The current observer (optional).
-  Observer* observer_ = nullptr;
+  raw_ptr<Observer> observer_ = nullptr;
 
   // Because the observer may take action when frames are cancelled, such as
   // calling APIs like EnqueueFrame(), `this` must be in a good state before

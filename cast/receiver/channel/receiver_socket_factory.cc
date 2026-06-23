@@ -34,21 +34,21 @@ void ReceiverSocketFactory::OnConnected(
 void ReceiverSocketFactory::OnConnectionFailed(
     TlsConnectionFactory* factory,
     const IPEndpoint& remote_address) {
-  client_.OnError(this, Error(Error::Code::kConnectionFailed,
-                              "Accepting connection failed."));
+  client_->OnError(this, Error(Error::Code::kConnectionFailed,
+                               "Accepting connection failed."));
 }
 
 void ReceiverSocketFactory::OnError(TlsConnectionFactory* factory,
                                     const Error& error) {
-  client_.OnError(this, error);
+  client_->OnError(this, error);
 }
 
 void ReceiverSocketFactory::CreateSocket(
     std::unique_ptr<Connection> connection) {
   IPEndpoint endpoint = connection->GetRemoteEndpoint();
   auto socket =
-      std::make_unique<CastSocket>(std::move(connection), &socket_client_);
-  client_.OnConnected(this, endpoint, std::move(socket));
+      std::make_unique<CastSocket>(std::move(connection), &*socket_client_);
+  client_->OnConnected(this, endpoint, std::move(socket));
 }
 
 }  // namespace openscreen::cast

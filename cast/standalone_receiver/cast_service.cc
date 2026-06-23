@@ -44,8 +44,8 @@ discovery::Config MakeDiscoveryConfig(const InterfaceInfo& interface) {
 CastService::CastService(CastService::Configuration config)
     : local_endpoint_(DetermineEndpoint(config.interface)),
       credentials_(std::move(config.credentials)),
-      agent_(config.task_runner, *credentials_.provider, config.device_uuid),
-      mirroring_application_(config.task_runner,
+      agent_(*config.task_runner, *credentials_.provider, config.device_uuid),
+      mirroring_application_(*config.task_runner,
                              local_endpoint_.address,
                              agent_,
                              config.enable_dscp,
@@ -53,10 +53,10 @@ CastService::CastService(CastService::Configuration config)
       socket_factory_(agent_, *agent_.cast_socket_client()),
       connection_factory_(
           TlsConnectionFactory::CreateFactory(socket_factory_,
-                                              config.task_runner)),
+                                              *config.task_runner)),
       discovery_service_(config.enable_discovery
                              ? discovery::CreateDnsSdService(
-                                   config.task_runner,
+                                   *config.task_runner,
                                    *this,
                                    MakeDiscoveryConfig(config.interface))
                              : discovery::DnsSdServicePtr()),
@@ -67,7 +67,7 @@ CastService::CastService(CastService::Configuration config)
                         discovery_service_.get(),
                         kCastV2ServiceId,
                         ReceiverInfoToDnsSdInstance),
-                    TaskRunnerDeleter(config.task_runner))
+                    TaskRunnerDeleter(*config.task_runner))
               : LazyDeletedDiscoveryPublisher()) {
   connection_factory_->SetListenCredentials(credentials_.tls_credentials);
   connection_factory_->Listen(local_endpoint_, kDefaultListenOptions);

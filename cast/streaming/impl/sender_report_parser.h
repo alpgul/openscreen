@@ -12,6 +12,7 @@
 #include "cast/streaming/impl/rtp_defines.h"
 #include "cast/streaming/rtp_time.h"
 #include "platform/base/span.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -38,7 +39,7 @@ class SenderReportParser {
   std::optional<SenderReportWithId> Parse(ByteView packet);
 
  private:
-  RtcpSession& session_;
+  const raw_ref<RtcpSession> session_;
 
   // Tracks the recently-parsed RTP timestamps so that the truncated values can
   // be re-expanded into full-form.

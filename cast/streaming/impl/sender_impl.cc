@@ -46,7 +46,7 @@ SenderImpl::SenderImpl(Environment& environment,
       sender_report_builder_(rtcp_session_),
       rtp_packetizer_(rtp_payload_type,
                       config.sender_ssrc,
-                      packet_router_.max_packet_size()),
+                      packet_router_->max_packet_size()),
       rtp_timebase_(config.rtp_timebase),
       crypto_(config.aes_secret_key, config.aes_iv_mask),
       statistics_dispatcher_(environment),
@@ -57,11 +57,11 @@ SenderImpl::SenderImpl(Environment& environment,
 
   pending_sender_report_.reference_time = SenderPacketRouter::kNever;
 
-  packet_router_.OnSenderCreated(rtcp_session_.receiver_ssrc(), this);
+  packet_router_->OnSenderCreated(rtcp_session_.receiver_ssrc(), this);
 }
 
 SenderImpl::~SenderImpl() {
-  packet_router_.OnSenderDestroyed(rtcp_session_.receiver_ssrc());
+  packet_router_->OnSenderDestroyed(rtcp_session_.receiver_ssrc());
 }
 
 void SenderImpl::SetObserver(openscreen::cast::Sender::Observer* observer) {
@@ -216,11 +216,11 @@ openscreen::cast::Sender::EnqueueFrameResult SenderImpl::EnqueueFrame(
   // Sender Report from this Sender. Thus, this Sender really needs to send
   // that, right now!
   if (round_trip_time_ == Clock::duration::zero()) {
-    packet_router_.RequestRtcpSend(rtcp_session_.receiver_ssrc());
+    packet_router_->RequestRtcpSend(rtcp_session_.receiver_ssrc());
   }
 
   // Re-activate RTP sending if it was suspended.
-  packet_router_.RequestRtpSend(rtcp_session_.receiver_ssrc());
+  packet_router_->RequestRtpSend(rtcp_session_.receiver_ssrc());
   statistics_dispatcher_.DispatchEnqueueEvents(config_.stream_type, frame);
 
   return OK;
@@ -251,7 +251,7 @@ void SenderImpl::OnReceivedRtcpPacket(Clock::time_point arrival_time,
   // This call to Parse() invoke zero or more of the OnReceiverXYZ() methods in
   // the current call stack:
   if (rtcp_parser_.Parse(packet, last_enqueued_frame_id_)) {
-    packet_router_.OnRtcpReceived(arrival_time, round_trip_time_);
+    packet_router_->OnRtcpReceived(arrival_time, round_trip_time_);
   }
 }
 
@@ -577,7 +577,7 @@ void SenderImpl::OnReceiverIsMissingPackets(std::vector<PacketNack> nacks) {
   }
 
   if (need_to_send) {
-    packet_router_.RequestRtpSend(rtcp_session_.receiver_ssrc());
+    packet_router_->RequestRtpSend(rtcp_session_.receiver_ssrc());
   }
 }
 
@@ -653,7 +653,7 @@ void SenderImpl::CancelPendingFrame(FrameId frame_id, bool was_acked) {
   }
 
   if (was_acked) {
-    packet_router_.OnPayloadReceived(
+    packet_router_->OnPayloadReceived(
         slot.frame->data.size(), rtcp_packet_arrival_time_, round_trip_time_);
   }
 

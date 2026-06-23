@@ -15,6 +15,7 @@
 #include "platform/test/fake_task_runner.h"
 #include "util/chrono_helpers.h"
 #include "util/enum_name_table.h"
+#include "util/raw_ptr.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -158,12 +159,12 @@ class StatisticsAnalyzerTest : public ::testing::Test {
   }
 
  protected:
-  NiceMock<FakeClockOffsetEstimator>* fake_estimator_;
+  raw_ptr<NiceMock<FakeClockOffsetEstimator>> fake_estimator_;
   StrictMock<FakeSenderStatsClient> stats_client_;
   FakeClock fake_clock_;
   FakeTaskRunner fake_task_runner_;
   std::unique_ptr<StatisticsAnalyzer> analyzer_;
-  StatisticsCollector* collector_ = nullptr;
+  raw_ptr<StatisticsCollector> collector_ = nullptr;
 };
 
 TEST_F(StatisticsAnalyzerTest, FrameEncoded) {

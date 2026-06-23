@@ -16,6 +16,7 @@
 #include "cast/streaming/public/statistics.h"
 #include "platform/api/time.h"
 #include "util/alarm.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 
@@ -170,7 +171,7 @@ class StatisticsAnalyzer {
       StatisticsEvent::MediaType media_type) const;
 
   // The statistics client to which we report analyzed statistics.
-  SenderStatsClient* const stats_client_;
+  const raw_ptr<SenderStatsClient> stats_client_;
 
   // The statistics collector from which we take the un-analyzed stats packets.
   std::unique_ptr<StatisticsCollector> statistics_collector_;

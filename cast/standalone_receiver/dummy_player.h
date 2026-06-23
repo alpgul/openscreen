@@ -12,6 +12,7 @@
 #include "cast/streaming/public/receiver.h"
 #include "platform/api/task_runner.h"
 #include "platform/api/time.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -29,7 +30,7 @@ class DummyPlayer final : public Receiver::Consumer {
   // Receiver::Consumer implementation.
   void OnFramesReady(size_t next_frame_buffer_size) final;
 
-  Receiver& receiver_;
+  const raw_ref<Receiver> receiver_;
   std::vector<uint8_t> buffer_;
 };
 

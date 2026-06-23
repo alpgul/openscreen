@@ -10,6 +10,7 @@
 
 #include "cast/streaming/public/constants.h"
 #include "cast/streaming/public/rpc_messenger.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 
@@ -45,7 +46,7 @@ class SimpleRemotingReceiver {
  private:
   void OnInitializeCallbackMessage(std::unique_ptr<RpcMessage> message);
 
-  RpcMessenger* messenger_;
+  raw_ptr<RpcMessenger> messenger_;
   InitializeCallback initialize_cb_;
 };
 

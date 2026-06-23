@@ -12,6 +12,7 @@
 #include "cast/common/channel/proto/cast_channel.pb.h"
 #include "cast/common/channel/virtual_connection.h"
 #include "util/json/json_serialization.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -82,8 +83,8 @@ class ConnectionNamespaceHandler : public CastMessageHandler {
   bool RemoveConnection(const VirtualConnection& conn,
                         VirtualConnection::CloseReason reason);
 
-  VirtualConnectionRouter& vc_router_;
-  VirtualConnectionPolicy& vc_policy_;
+  const raw_ref<VirtualConnectionRouter> vc_router_;
+  const raw_ref<VirtualConnectionPolicy> vc_policy_;
 
   struct PendingRequest {
     VirtualConnection conn;

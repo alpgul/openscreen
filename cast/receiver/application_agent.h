@@ -21,6 +21,8 @@
 #include "platform/base/error.h"
 #include "platform/base/ip_address.h"
 #include "util/json/json_value.h"
+#include "util/raw_ptr.h"
+#include "util/raw_ref.h"
 
 namespace openscreen::cast {
 
@@ -167,16 +169,16 @@ class ApplicationAgent final
   // Application LAUNCH or STOP.
   void BroadcastReceiverStatus();
 
-  TaskRunner& task_runner_;
+  const raw_ref<TaskRunner> task_runner_;
   DeviceAuthNamespaceHandler auth_handler_;
   VirtualConnectionRouter router_;
   ConnectionNamespaceHandler connection_handler_;
 
   std::map<std::string, Application*> registered_applications_;
-  Application* idle_screen_app_ = nullptr;
+  raw_ptr<Application> idle_screen_app_ = nullptr;
 
   CastSocketMessagePort message_port_;
-  Application* launched_app_ = nullptr;
+  raw_ptr<Application> launched_app_ = nullptr;
   std::string launched_via_app_id_;
   std::string device_id_;
   ReceiverInfo receiver_info_;

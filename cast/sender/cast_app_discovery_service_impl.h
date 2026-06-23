@@ -14,6 +14,7 @@
 #include "cast/sender/cast_platform_client.h"
 #include "cast/sender/public/cast_app_discovery_service.h"
 #include "platform/api/time.h"
+#include "util/raw_ref.h"
 #include "util/weak_ptr.h"
 
 namespace openscreen::cast {
@@ -80,7 +81,7 @@ class CastAppDiscoveryServiceImpl : public CastAppDiscoveryService {
   // Callback ID tracking.
   uint32_t next_avail_query_id_ = 1U;
 
-  CastPlatformClient& platform_client_;
+  const raw_ref<CastPlatformClient> platform_client_;
 
   CastAppAvailabilityTracker availability_tracker_;
 

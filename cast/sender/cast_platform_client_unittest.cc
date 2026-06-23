@@ -17,6 +17,7 @@
 #include "platform/test/fake_task_runner.h"
 #include "util/json/json_serialization.h"
 #include "util/json/json_value.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 
@@ -44,7 +45,7 @@ class CastPlatformClientTest : public ::testing::Test {
   }
 
   FakeCastSocketPair fake_cast_socket_pair_;
-  CastSocket* socket_ = nullptr;
+  raw_ptr<CastSocket> socket_ = nullptr;
   MockSocketErrorHandler mock_error_handler_;
   VirtualConnectionRouter router_;
   FakeClock clock_{Clock::now()};

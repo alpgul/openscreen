@@ -108,9 +108,9 @@ ReceiverSession::ReceiverSession(Client& client,
           session_id_,
           [this](Error error) {
             OSP_DLOG_WARN << "Got a session messenger error: " << error;
-            client_.OnError(this, error);
+            client_->OnError(this, error);
           })),
-      packet_router_(environment_),
+      packet_router_(*environment_),
       input_messenger_([this](std::vector<uint8_t> message) {
         if (!negotiated_sender_id_.empty()) {
           const Error error = this->messenger_->SendInputMessage(
@@ -147,11 +147,11 @@ ReceiverSession::ReceiverSession(Client& client,
       [this](const std::string& sender_id, SenderMessage message) {
         this->OnInputMessage(sender_id, std::move(message));
       });
-  environment_.SetSocketSubscriber(this);
+  environment_->SetSocketSubscriber(this);
 }
 
 ReceiverSession::~ReceiverSession() {
-  environment_.SetSocketSubscriber(nullptr);
+  environment_->SetSocketSubscriber(nullptr);
   // messenger_ must be destroyed before OnReceiversDestroying runs, since it
   // calls message_port_.ResetClient(). That MessagePort is destroyed before
   // OnReceiversDestroying returns. See crbug.com/374199735 for more details.
@@ -201,9 +201,9 @@ void ReceiverSession::OnSocketInvalid(const Error& error) {
     pending_offer_.reset();
   }
 
-  client_.OnError(this,
-                  Error(Error::Code::kSocketFailure,
-                        "The environment is invalid and should be replaced."));
+  client_->OnError(this,
+                   Error(Error::Code::kSocketFailure,
+                         "The environment is invalid and should be replaced."));
 }
 
 bool ReceiverSession::PendingOffer::IsValid() const {
@@ -226,7 +226,7 @@ void ReceiverSession::OnOffer(const std::string& sender_id,
     const Error error(Error::Code::kParameterInvalid,
                       "Failed to parse malformed OFFER");
     SendErrorAnswerReply(sender_id, message.sequence_number, error);
-    client_.OnError(this, error);
+    client_->OnError(this, error);
     return;
   }
 
@@ -266,7 +266,7 @@ void ReceiverSession::OnOffer(const std::string& sender_id,
     pending_offer_.reset();
   }
 
-  switch (environment_.socket_state()) {
+  switch (environment_->socket_state()) {
     // If the environment is ready or in a bad state, we can respond
     // immediately.
     case Environment::SocketState::kInvalid:
@@ -312,7 +312,7 @@ void ReceiverSession::OnCapabilitiesRequest(const std::string& sender_id,
   // capabilities before making an OFFER.
   const Error result = messenger_->SendMessage(sender_id, std::move(response));
   if (!result.ok()) {
-    client_.OnError(this, result);
+    client_->OnError(this, result);
   }
 }
 
@@ -360,12 +360,12 @@ void ReceiverSession::SelectStreams(const Offer& offer,
                                     PendingOffer* properties) {
   if (offer.cast_mode == CastMode::kMirroring) {
     if (!offer.audio_streams.empty() && !constraints_.audio_codecs.empty()) {
-      properties->selected_audio =
-          SelectStream(constraints_.audio_codecs, client_, offer.audio_streams);
+      properties->selected_audio = SelectStream(constraints_.audio_codecs,
+                                                *client_, offer.audio_streams);
     }
     if (!offer.video_streams.empty() && !constraints_.video_codecs.empty()) {
-      properties->selected_video =
-          SelectStream(constraints_.video_codecs, client_, offer.video_streams);
+      properties->selected_video = SelectStream(constraints_.video_codecs,
+                                                *client_, offer.video_streams);
     }
   } else {
     OSP_CHECK(offer.cast_mode == CastMode::kRemoting);
@@ -384,7 +384,7 @@ void ReceiverSession::InitializeSession(const PendingOffer& properties) {
   // Enable DSCP on the UDP socket, if enabled and offered by the sender.
   if (constraints_.enable_dscp) {
     MaybeSetDscp(properties.selected_audio.get(),
-                 properties.selected_video.get(), environment_);
+                 properties.selected_video.get(), *environment_);
   }
 
   Answer answer = ConstructAnswer(properties);
@@ -406,14 +406,14 @@ void ReceiverSession::InitializeSession(const PendingOffer& properties) {
                       properties.sequence_number, true /* valid */,
                       std::move(answer)});
   if (!result.ok()) {
-    client_.OnError(this, result);
+    client_->OnError(this, result);
   }
 
   ConfiguredReceivers receivers = SpawnReceivers(properties);
   negotiated_sender_id_ = properties.sender_id;
 
   if (properties.mode == CastMode::kMirroring) {
-    client_.OnNegotiated(this, std::move(receivers));
+    client_->OnNegotiated(this, std::move(receivers));
   } else {
     rpc_messenger_ =
         std::make_unique<RpcMessenger>([this](std::vector<uint8_t> message) {
@@ -423,7 +423,7 @@ void ReceiverSession::InitializeSession(const PendingOffer& properties) {
             OSP_LOG_WARN << "Failed to send RPC message: " << error;
           }
         });
-    client_.OnRemotingNegotiated(
+    client_->OnRemotingNegotiated(
         this, RemotingNegotiation{std::move(receivers), rpc_messenger_.get()});
   }
 }
@@ -438,7 +438,7 @@ std::unique_ptr<Receiver> ReceiverSession::ConstructReceiver(
   if (!config.IsValid()) {
     return nullptr;
   }
-  return std::make_unique<ReceiverImpl>(environment_, packet_router_,
+  return std::make_unique<ReceiverImpl>(*environment_, packet_router_,
                                         std::move(config));
 }
 
@@ -492,7 +492,7 @@ ReceiverSession::ConfiguredReceivers ReceiverSession::SpawnReceivers(
 
 void ReceiverSession::ResetReceivers(Client::ReceiversDestroyingReason reason) {
   if (current_video_receiver_ || current_audio_receiver_) {
-    client_.OnReceiversDestroying(this, reason);
+    client_->OnReceiversDestroying(this, reason);
     current_audio_receiver_.reset();
     current_video_receiver_.reset();
     rpc_messenger_.reset();
@@ -591,7 +591,7 @@ Answer ReceiverSession::ConstructAnswer(const PendingOffer& properties) {
   }
 
   return Answer{
-      .udp_port = environment_.GetBoundLocalEndpoint().port,
+      .udp_port = environment_->GetBoundLocalEndpoint().port,
       .send_indexes = std::move(stream_indexes),
       .ssrcs = std::move(stream_ssrcs),
       .constraints = answer_constraints,
@@ -635,7 +635,7 @@ void ReceiverSession::SendErrorAnswerReply(const std::string& sender_id,
       ReceiverMessage{ReceiverMessage::Type::kAnswer, sequence_number,
                       false /* valid */, ReceiverError(error)});
   if (!result.ok()) {
-    client_.OnError(this, result);
+    client_->OnError(this, result);
   }
 }
 

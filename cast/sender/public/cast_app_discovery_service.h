@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "cast/common/public/receiver_info.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 
@@ -36,7 +37,7 @@ class CastAppDiscoveryService {
 
     void Swap(Subscription& other);
 
-    CastAppDiscoveryService* discovery_service_;
+    raw_ptr<CastAppDiscoveryService> discovery_service_;
     uint32_t id_;
   };
 
