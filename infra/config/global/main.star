@@ -55,8 +55,10 @@ luci.project(
 )
 
 luci.milo(
-    logo = ("https://storage.googleapis.com/chrome-infra-public/logo/" +
-            "openscreen-logo.png"),
+    logo = (
+        "https://storage.googleapis.com/chrome-infra-public/logo/" +
+        "openscreen-logo.png"
+    ),
 )
 
 luci.logdog(gs_bucket = "chromium-luci-logdog")
@@ -110,6 +112,7 @@ luci.bucket(
             roles = "role/buildbucket.creator",
             groups = [
                 "mdb/chrome-build-access-sphinx",
+                "project-openscreen-tryjob-access",
             ],
         ),
     ],
@@ -139,6 +142,7 @@ luci.bucket(
             roles = "role/buildbucket.creator",
             groups = [
                 "mdb/chrome-build-access-sphinx",
+                "project-openscreen-tryjob-access",
             ],
         ),
     ],
@@ -219,12 +223,13 @@ def get_properties(
         properties["use_coverage"] = True
     if cast_receiver:
         # TODO(crbug.com/337080120): enable receiver-side dependencies.
-        #properties["have_ffmpeg"] = True
-        #properties["have_libsdl2"] = True
+        # properties["have_ffmpeg"] = True
+        # properties["have_libsdl2"] = True
         properties["have_libopus"] = True
         properties["have_libvpx"] = True
     if chromium:
         properties["builder_group"] = "client.openscreen.chromium"
+        properties["clang_use_chrome_plugins"] = True
         properties[SISO_PROPERTY] = {
             "configs": ["builder"],
             "enable_cloud_monitoring": True,
@@ -267,7 +272,11 @@ def builder(builder_type, name, os, cpu, properties):
 
     triggers = None
     if builder_type == "ci":
-        triggers = ["chromium-trigger" if recipe_id == "chromium" else "main-gitiles-trigger"]
+        triggers = [
+            (
+                "chromium-trigger" if recipe_id == "chromium" else "main-gitiles-trigger"
+            ),
+        ]
 
     luci.builder(
         name = name,
@@ -275,8 +284,7 @@ def builder(builder_type, name, os, cpu, properties):
         executable = luci.recipe(
             name = recipe_id,
             recipe = recipe_id,
-            cipd_package =
-                "infra/recipe_bundles/chromium.googlesource.com/chromium/tools/build",
+            cipd_package = "infra/recipe_bundles/chromium.googlesource.com/chromium/tools/build",
             cipd_version = "refs/heads/main",
             use_bbagent = True,
         ),
@@ -287,13 +295,13 @@ def builder(builder_type, name, os, cpu, properties):
         },
         caches = caches,
         properties = properties,
-        service_account =
-            "openscreen-{}-builder@chops-service-accounts.iam.gserviceaccount.com"
-                .format(builder_type),
+        service_account = "openscreen-{}-builder@chops-service-accounts.iam.gserviceaccount.com".format(
+            builder_type,
+        ),
         triggered_by = triggers,
     )
 
-    # CI jobs get triggered by |triggers|, try jobs get trigged by the commit
+    # CI jobs get triggered by |triggers|, try jobs get triggered by the commit
     # queue instead.
     if builder_type == "try":
         # We mark some bots as experimental to not block the build.
@@ -323,11 +331,11 @@ def builder(builder_type, name, os, cpu, properties):
 def ci_builder(name, os, cpu, properties):
     """Defines a post submit builder.
 
-       Args:
-        name: name of the builder to define.
-        os: the target operating system.
-        cpu: the target central processing unit.
-        properties: configuration to be passed to GN.
+    Args:
+     name: name of the builder to define.
+     os: the target operating system.
+     cpu: the target central processing unit.
+     properties: configuration to be passed to GN.
     """
     builder("ci", name, os, cpu, properties)
 
@@ -378,8 +386,18 @@ try_and_ci_builders(
     "x86-64",
     get_properties("arm64", cast_receiver = True, is_component_build = False),
 )
-try_and_ci_builders("linux_x64_coverage", LINUX_VERSION, "x86-64", get_properties("x64", use_coverage = True))
-try_and_ci_builders("linux_x64", LINUX_VERSION, "x86-64", get_properties("x64", is_asan = True))
+try_and_ci_builders(
+    "linux_x64_coverage",
+    LINUX_VERSION,
+    "x86-64",
+    get_properties("x64", use_coverage = True),
+)
+try_and_ci_builders(
+    "linux_x64",
+    LINUX_VERSION,
+    "x86-64",
+    get_properties("x64", is_asan = True),
+)
 try_and_ci_builders(
     "linux_x64_gcc",
     LINUX_VERSION,
