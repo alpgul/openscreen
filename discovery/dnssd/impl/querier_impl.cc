@@ -222,7 +222,7 @@ void QuerierImpl::StartQuery(const std::string& service, Callback* callback) {
 
   // Start tracking the new callback
   const ServiceKey key(service, kLocalDomain);
-  auto it = callback_map_.emplace(key, std::vector<Callback*>{}).first;
+  auto it = callback_map_.emplace(key, std::vector<raw_ptr<Callback>>{}).first;
   it->second.push_back(callback);
 
   const DomainName domain = key.GetName();
@@ -262,7 +262,7 @@ void QuerierImpl::StopQuery(const std::string& service, Callback* callback) {
     return;
   }
 
-  std::vector<Callback*>& callbacks = callbacks_it->second;
+  std::vector<raw_ptr<Callback>>& callbacks = callbacks_it->second;
   const auto it = std::find(callbacks.begin(), callbacks.end(), callback);
   if (it == callbacks.end()) {
     return;
@@ -415,7 +415,7 @@ void QuerierImpl::InvokeChangeCallbacks(
   }
 
   // Call relevant callbacks.
-  std::vector<Callback*>& callbacks = it->second;
+  std::vector<raw_ptr<Callback>>& callbacks = it->second;
   for (Callback* callback : callbacks) {
     for (const DnsSdInstanceEndpoint& endpoint : created) {
       callback->OnEndpointCreated(endpoint);

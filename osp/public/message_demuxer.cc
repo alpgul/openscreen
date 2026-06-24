@@ -145,7 +145,8 @@ MessageDemuxer::MessageWatch MessageDemuxer::WatchMessageType(
   if (callbacks_entry == message_callbacks_.end()) {
     callbacks_entry =
         message_callbacks_
-            .emplace(instance_id, std::map<msgs::Type, MessageCallback*>{})
+            .emplace(instance_id,
+                     std::map<msgs::Type, raw_ptr<MessageCallback>>{})
             .first;
   }
 
@@ -240,7 +241,7 @@ void MessageDemuxer::StopDefaultMessageTypeWatch(msgs::Type message_type) {
 MessageDemuxer::HandleStreamBufferResult MessageDemuxer::HandleStreamBufferLoop(
     uint64_t instance_id,
     uint64_t connection_id,
-    std::map<uint64_t, std::map<msgs::Type, MessageCallback*>>::iterator
+    std::map<uint64_t, std::map<msgs::Type, raw_ptr<MessageCallback>>>::iterator
         callbacks_entry,
     std::vector<uint8_t>& buffer) {
   HandleStreamBufferResult result;
@@ -280,7 +281,7 @@ MessageDemuxer::HandleStreamBufferResult MessageDemuxer::HandleStreamBufferLoop(
 MessageDemuxer::HandleStreamBufferResult MessageDemuxer::HandleStreamBuffer(
     uint64_t instance_id,
     uint64_t connection_id,
-    std::map<msgs::Type, MessageCallback*>* message_callbacks,
+    std::map<msgs::Type, raw_ptr<MessageCallback>>* message_callbacks,
     std::vector<uint8_t>& buffer) {
   size_t msg_type_byte_length;
   ErrorOr<msgs::Type> message_type =

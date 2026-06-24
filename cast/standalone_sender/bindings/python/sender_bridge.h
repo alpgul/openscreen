@@ -11,6 +11,7 @@
 #include <string_view>
 
 #include "platform/base/ip_address.h"
+#include "util/raw_ptr.h"
 #include "util/thread_annotations.h"
 
 namespace openscreen {
@@ -77,7 +78,7 @@ class CastSenderBridge {
   int port_;
   std::string cert_path_;
   std::mutex mutex_;
-  TaskRunner* const task_runner_;
+  const raw_ptr<TaskRunner> task_runner_;
   std::unique_ptr<LoopingFileCastAgent> cast_agent_ OSP_GUARDED_BY(mutex_);
 };
 

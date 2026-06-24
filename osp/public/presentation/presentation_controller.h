@@ -191,7 +191,7 @@ class Controller final : public ServiceListener::Observer,
   struct ControlledPresentation {
     std::string instance_name;
     std::string url;
-    std::vector<Connection*> connections;
+    std::vector<raw_ptr<Connection>> connections;
   };
 
   // ServiceListener::Observer overrides.

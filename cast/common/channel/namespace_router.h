@@ -10,6 +10,7 @@
 
 #include "cast/common/channel/cast_message_handler.h"
 #include "cast/common/channel/proto/cast_channel.pb.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 
@@ -27,7 +28,7 @@ class NamespaceRouter final : public CastMessageHandler {
                  proto::CastMessage message) override;
 
  private:
-  std::map<std::string /* namespace */, CastMessageHandler*> handlers_;
+  std::map<std::string /* namespace */, raw_ptr<CastMessageHandler>> handlers_;
 };
 
 }  // namespace openscreen::cast

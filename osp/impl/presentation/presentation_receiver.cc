@@ -57,7 +57,7 @@ Error Receiver::OnPresentationTerminated(const std::string& presentation_id,
     return Error::Code::kNoActiveConnection;
   }
 
-  for (auto* connection : presentation.connections) {
+  for (auto connection : presentation.connections) {
     connection->OnTerminated();
   }
 
@@ -87,7 +87,7 @@ void Receiver::OnConnectionDestroyed(Connection* connection) {
     return;
   }
 
-  std::vector<Connection*>& connections =
+  std::vector<raw_ptr<Connection>>& connections =
       presentation_entry->second.connections;
   connections.erase(
       std::remove(connections.begin(), connections.end(), connection),

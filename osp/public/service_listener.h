@@ -173,7 +173,7 @@ class ServiceListener final {
   Error last_error_;
   Config config_;
   std::unique_ptr<Delegate> delegate_;
-  std::vector<Observer*> observers_;
+  std::vector<raw_ptr<Observer>> observers_;
   ReceiverList receiver_list_;
 };
 

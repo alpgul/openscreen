@@ -17,6 +17,7 @@
 #include "cast/standalone_sender/streaming_opus_encoder.h"
 #include "cast/standalone_sender/streaming_video_encoder.h"
 #include "cast/streaming/public/sender_session.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 
@@ -84,7 +85,7 @@ class LoopingFileSender final : public SimulatedAudioCapturer::Client,
   const ConnectionSettings settings_;
 
   // Session to query for bandwidth information.
-  const SenderSession* session_;
+  const raw_ptr<const SenderSession> session_;
 
   // Callback for tearing down the sender process.
   ShutdownCallback shutdown_callback_;

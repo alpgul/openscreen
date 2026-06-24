@@ -206,7 +206,7 @@ class ConnectionManager final : public MessageDemuxer::MessageCallback {
   // TODO(btolsch): Connection IDs were changed to be per-instance, but this
   // table then needs to be <instance id, connection id> since connection id
   // is still not unique globally.
-  std::map<uint64_t, Connection*> connections_;
+  std::map<uint64_t, raw_ptr<Connection>> connections_;
 
   MessageDemuxer::MessageWatch message_watch_;
   MessageDemuxer::MessageWatch close_event_watch_;

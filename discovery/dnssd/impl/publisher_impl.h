@@ -13,6 +13,7 @@
 #include "discovery/dnssd/public/dns_sd_publisher.h"
 #include "discovery/mdns/public/mdns_domain_confirmed_provider.h"
 #include "discovery/mdns/public/mdns_service.h"
+#include "util/raw_ptr.h"
 #include "util/raw_ref.h"
 
 namespace openscreen::discovery {
@@ -43,7 +44,7 @@ class PublisherImpl : public DnsSdPublisher,
 
   // The set of instances which will be published once the mDNS Probe phase
   // completes.
-  std::map<DnsSdInstance, Client* const> pending_instances_;
+  std::map<DnsSdInstance, const raw_ptr<Client>> pending_instances_;
 
   // Maps from the requested instance to the endpoint which was published after
   // the mDNS Probe phase was completed. The only difference between these

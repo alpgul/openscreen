@@ -9,6 +9,7 @@
 
 #include "cast/streaming/public/constants.h"
 #include "cast/streaming/public/rpc_messenger.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::cast {
 
@@ -61,7 +62,7 @@ class RemotingSender {
   const AudioCodec audio_codec_;
   const VideoCodec video_codec_;
 
-  Client* client_;
+  raw_ptr<Client> client_;
 
   // The initialization message from the receiver contains the handle the
   // callback should go to.

@@ -135,7 +135,7 @@ void ServicePublisher::SetState(State state) {
 
 void ServicePublisher::OnError(const Error& error) {
   last_error_ = error;
-  for (auto* observer : observers_) {
+  for (auto observer : observers_) {
     observer->OnError(error);
   }
 }
@@ -143,21 +143,21 @@ void ServicePublisher::OnError(const Error& error) {
 void ServicePublisher::MaybeNotifyObserver() {
   switch (state_) {
     case State::kRunning: {
-      for (auto* observer : observers_) {
+      for (auto observer : observers_) {
         observer->OnStarted();
       }
       break;
     }
 
     case State::kStopped: {
-      for (auto* observer : observers_) {
+      for (auto observer : observers_) {
         observer->OnStopped();
       }
       break;
     }
 
     case State::kSuspended: {
-      for (auto* observer : observers_) {
+      for (auto observer : observers_) {
         observer->OnSuspended();
       }
       break;

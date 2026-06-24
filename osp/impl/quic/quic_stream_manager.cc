@@ -38,7 +38,7 @@ void QuicStreamManager::OnClose(uint64_t stream_id) {
   }
 
   delegate_->OnClose(quic_connection_->instance_id(), stream_id);
-  auto* protocol_connection = stream_entry->second;
+  auto protocol_connection = stream_entry->second;
   if (protocol_connection) {
     protocol_connection->OnClose();
   }

@@ -371,7 +371,7 @@ bool MdnsQuestionTracker::SendQuery() const {
     OSP_CHECK((*it)->tracker_type() == TrackerType::kRecordTracker);
 
     const MdnsRecordTracker* record_tracker =
-        static_cast<const MdnsRecordTracker*>(*it);
+        static_cast<const MdnsRecordTracker*>((*it).get());
     if (record_tracker->IsNearingExpiry()) {
       it++;
       continue;

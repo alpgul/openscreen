@@ -12,6 +12,7 @@
 #include "platform/api/udp_socket.h"
 #include "platform/base/error.h"
 #include "platform/base/udp_packet.h"
+#include "util/raw_ptr.h"
 
 namespace openscreen::discovery {
 
@@ -60,7 +61,7 @@ class MdnsReceiver {
       query_callback_;
   State state_ = State::kStopped;
 
-  std::vector<ResponseClient*> response_clients_;
+  std::vector<raw_ptr<ResponseClient>> response_clients_;
 
   Config config_;
 };

@@ -14,6 +14,7 @@
 #include "cast/streaming/ssrc.h"
 #include "platform/base/span.h"
 #include "util/flat_map.h"
+#include "util/raw_ptr.h"
 #include "util/raw_ref.h"
 
 namespace openscreen::cast {
@@ -60,7 +61,7 @@ class ReceiverPacketRouter final : public Environment::PacketConsumer {
 
   const raw_ref<Environment> environment_;
 
-  FlatMap<Ssrc, PacketConsumer*> receivers_;
+  FlatMap<Ssrc, raw_ptr<PacketConsumer>> receivers_;
 };
 
 }  // namespace openscreen::cast

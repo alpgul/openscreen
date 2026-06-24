@@ -113,7 +113,7 @@ class Receiver final : public MessageDemuxer::MessageCallback,
     uint64_t instance_id = 0u;
     MessageDemuxer::MessageWatch terminate_watch;
     uint64_t terminate_request_id = 0u;
-    std::vector<Connection*> connections;
+    std::vector<raw_ptr<Connection>> connections;
   };
 
   using QueuedResponseIterator = std::vector<QueuedResponse>::const_iterator;

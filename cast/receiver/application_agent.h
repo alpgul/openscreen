@@ -174,7 +174,7 @@ class ApplicationAgent final
   VirtualConnectionRouter router_;
   ConnectionNamespaceHandler connection_handler_;
 
-  std::map<std::string, Application*> registered_applications_;
+  std::map<std::string, raw_ptr<Application>> registered_applications_;
   raw_ptr<Application> idle_screen_app_ = nullptr;
 
   CastSocketMessagePort message_port_;

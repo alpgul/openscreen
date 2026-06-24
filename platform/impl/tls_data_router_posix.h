@@ -102,11 +102,12 @@ class TlsDataRouterPosix : public SocketHandleWaiter::Subscriber {
 
   // Mapping from all sockets to the observer that should be called when the
   // socket recognizes an incoming connection.
-  std::unordered_map<StreamSocketPosix*, SocketObserver*>
+  std::unordered_map<raw_ptr<StreamSocketPosix>, raw_ptr<SocketObserver>>
       accept_socket_mappings_ OSP_GUARDED_BY(accept_socket_mutex_);
 
   // Set of all TlsConnectionPosix objects currently registered.
-  std::vector<TlsConnectionPosix*> connections_ OSP_GUARDED_BY(connections_mutex_);
+  std::vector<raw_ptr<TlsConnectionPosix>> connections_
+      OSP_GUARDED_BY(connections_mutex_);
 
   // StreamSockets currently owned by this object, being watched for
   std::vector<std::unique_ptr<StreamSocketPosix>> accept_stream_sockets_;

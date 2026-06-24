@@ -111,7 +111,7 @@ void UrlAvailabilityRequester::RemoveObserverUrls(
 void UrlAvailabilityRequester::RemoveObserver(ReceiverObserver* observer) {
   std::set<std::string> unobserved_urls;
   for (auto& entry : observers_by_url_) {
-    auto& observer_list = entry.second;
+    std::vector<raw_ptr<ReceiverObserver>>& observer_list = entry.second;
     auto it = std::remove(observer_list.begin(), observer_list.end(), observer);
     if (it != observer_list.end()) {
       observer_list.erase(it);
@@ -308,7 +308,7 @@ Error::Code UrlAvailabilityRequester::ReceiverRequester::UpdateAvailabilities(
       continue;
     }
 
-    std::vector<ReceiverObserver*>& observers = observer_entry->second;
+    std::vector<raw_ptr<ReceiverObserver>>& observers = observer_entry->second;
     auto result = known_availability_by_url_.emplace(url, *availability_it);
     auto entry = result.first;
     bool inserted = result.second;
@@ -316,7 +316,7 @@ Error::Code UrlAvailabilityRequester::ReceiverRequester::UpdateAvailabilities(
     if (inserted || updated) {
       switch (*availability_it) {
         case msgs::UrlAvailability::kAvailable: {
-          for (auto* observer : observers) {
+          for (auto observer : observers) {
             observer->OnReceiverAvailable(url, instance_name_);
           }
           break;
@@ -324,7 +324,7 @@ Error::Code UrlAvailabilityRequester::ReceiverRequester::UpdateAvailabilities(
 
         case msgs::UrlAvailability::kUnavailable:  // fallthrough
         case msgs::UrlAvailability::kInvalid: {
-          for (auto* observer : observers) {
+          for (auto observer : observers) {
             observer->OnReceiverUnavailable(url, instance_name_);
           }
           break;

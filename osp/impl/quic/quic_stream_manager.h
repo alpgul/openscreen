@@ -60,7 +60,7 @@ class QuicStreamManager final : public QuicStream::Delegate {
   const raw_ref<Delegate> delegate_;
   // This class manages all QuicStreams for `quic_connection_`;
   raw_ptr<QuicConnection> quic_connection_ = nullptr;
-  std::map<uint64_t, QuicProtocolConnection*> streams_by_id_;
+  std::map<uint64_t, raw_ptr<QuicProtocolConnection>> streams_by_id_;
 };
 
 }  // namespace openscreen::osp

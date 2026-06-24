@@ -19,6 +19,7 @@
 #include "osp/public/service_info.h"
 #include "platform/api/time.h"
 #include "platform/base/error.h"
+#include "util/raw_ptr.h"
 #include "util/raw_ref.h"
 
 namespace openscreen::osp {
@@ -150,7 +151,8 @@ class UrlAvailabilityRequester {
 
   const ClockNowFunctionPtr now_function_;
 
-  std::map<std::string, std::vector<ReceiverObserver*>> observers_by_url_;
+  std::map<std::string, std::vector<raw_ptr<ReceiverObserver>>>
+      observers_by_url_;
   std::map<std::string, std::unique_ptr<ReceiverRequester>>
       receiver_by_instance_name_;
 };

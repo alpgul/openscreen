@@ -184,7 +184,7 @@ void ServiceListener::OnReceiverUpdated(
 
 void ServiceListener::OnError(const Error& error) {
   last_error_ = error;
-  for (auto* observer : observers_) {
+  for (auto observer : observers_) {
     observer->OnError(error);
   }
 }
@@ -192,7 +192,7 @@ void ServiceListener::OnError(const Error& error) {
 void ServiceListener::OnReceiverAdded(const ServiceInfo& info) {
   OSP_VLOG << __func__ << ": new receiver added=" << info;
   receiver_list_.OnReceiverAdded(info);
-  for (auto* observer : observers_) {
+  for (auto observer : observers_) {
     observer->OnReceiverAdded(info);
   }
 }
@@ -201,7 +201,7 @@ void ServiceListener::OnReceiverChanged(const ServiceInfo& info) {
   OSP_VLOG << __func__ << ": receiver changed=" << info;
   const Error changed_error = receiver_list_.OnReceiverChanged(info);
   if (changed_error.ok()) {
-    for (auto* observer : observers_) {
+    for (auto observer : observers_) {
       observer->OnReceiverChanged(info);
     }
   }
@@ -212,7 +212,7 @@ void ServiceListener::OnReceiverRemoved(const ServiceInfo& info) {
   const ErrorOr<ServiceInfo> removed_or_error =
       receiver_list_.OnReceiverRemoved(info);
   if (removed_or_error.is_value()) {
-    for (auto* observer : observers_) {
+    for (auto observer : observers_) {
       observer->OnReceiverRemoved(removed_or_error.value());
     }
   }
@@ -222,7 +222,7 @@ void ServiceListener::OnAllReceiversRemoved() {
   OSP_VLOG << __func__ << ": all receivers removed.";
   const Error removed_all_error = receiver_list_.OnAllReceiversRemoved();
   if (removed_all_error.ok()) {
-    for (auto* observer : observers_) {
+    for (auto observer : observers_) {
       observer->OnAllReceiversRemoved();
     }
   }
@@ -231,28 +231,28 @@ void ServiceListener::OnAllReceiversRemoved() {
 void ServiceListener::MaybeNotifyObservers() {
   switch (state_) {
     case State::kRunning: {
-      for (auto* observer : observers_) {
+      for (auto observer : observers_) {
         observer->OnStarted();
       }
       break;
     }
 
     case State::kStopped: {
-      for (auto* observer : observers_) {
+      for (auto observer : observers_) {
         observer->OnStopped();
       }
       break;
     }
 
     case State::kSuspended: {
-      for (auto* observer : observers_) {
+      for (auto observer : observers_) {
         observer->OnSuspended();
       }
       break;
     }
 
     case State::kSearching: {
-      for (auto* observer : observers_) {
+      for (auto observer : observers_) {
         observer->OnSearching();
       }
       break;

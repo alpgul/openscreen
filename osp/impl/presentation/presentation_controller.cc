@@ -365,7 +365,7 @@ ErrorOr<size_t> Controller::TerminationListener::OnStreamMessage(
   auto presentation_entry =
       controller_->presentations_by_id_.find(event.presentation_id);
   if (presentation_entry != controller_->presentations_by_id_.end()) {
-    for (auto* connection : presentation_entry->second.connections) {
+    for (auto connection : presentation_entry->second.connections) {
       connection->OnTerminated();
     }
     controller_->presentations_by_id_.erase(presentation_entry);
@@ -530,7 +530,7 @@ Error Controller::OnPresentationTerminated(const std::string& presentation_id,
   }
 
   ControlledPresentation& presentation = presentation_entry->second;
-  for (auto* connection : presentation.connections) {
+  for (auto connection : presentation.connections) {
     connection->OnTerminated();
   }
 
@@ -551,7 +551,7 @@ void Controller::OnConnectionDestroyed(Connection* connection) {
     return;
   }
 
-  std::vector<Connection*>& connections =
+  std::vector<raw_ptr<Connection>>& connections =
       presentation_entry->second.connections;
   connections.erase(
       std::remove(connections.begin(), connections.end(), connection),
@@ -789,7 +789,7 @@ void Controller::OpenConnection(
 void Controller::TerminatePresentationById(const std::string& presentation_id) {
   auto presentation_entry = presentations_by_id_.find(presentation_id);
   if (presentation_entry != presentations_by_id_.end()) {
-    for (auto* connection : presentation_entry->second.connections) {
+    for (auto connection : presentation_entry->second.connections) {
       connection->OnTerminated();
     }
     presentations_by_id_.erase(presentation_entry);

@@ -266,7 +266,7 @@ void PublisherImpl::OnDomainFound(const DomainName& requested_name,
   DnsSdInstance requested_instance = std::move(it->first);
   DnsSdInstanceEndpoint endpoint =
       CreateEndpoint(requested_instance, *network_config_);
-  Client* const client = it->second;
+  Client* client = it->second;
   pending_instances_.erase(it);
 
   if (requested_name != confirmed_name) {
