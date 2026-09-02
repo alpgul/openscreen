@@ -42,7 +42,7 @@ TaskRunnerImpl::TaskRunnerImpl(ClockNowFunctionPtr now_function,
 
 TaskRunnerImpl::~TaskRunnerImpl() {
   // Ensure no thread is currently executing inside RunUntilStopped().
-  OSP_CHECK_EQ(task_runner_thread_id_, std::thread::id());
+  OSP_CHECK_EQ(task_runner_thread_id_.load(), std::thread::id());
 }
 
 void TaskRunnerImpl::PostPackagedTask(Task task) {
@@ -72,12 +72,13 @@ void TaskRunnerImpl::PostPackagedTaskWithDelay(Task task,
 }
 
 bool TaskRunnerImpl::IsRunningOnTaskRunner() {
-  return task_runner_thread_id_ == std::this_thread::get_id();
+  return task_runner_thread_id_.load() == std::this_thread::get_id();
 }
 
 void TaskRunnerImpl::RunUntilStopped() {
   OSP_CHECK(!is_running_);
-  task_runner_thread_id_ = std::this_thread::get_id();
+  OSP_CHECK_EQ(task_runner_thread_id_.load(), std::thread::id());
+  task_runner_thread_id_.store(std::this_thread::get_id());
   is_running_ = true;
 
   OSP_DVLOG << "Running tasks until stopped...";
@@ -108,7 +109,7 @@ void TaskRunnerImpl::RunUntilStopped() {
     RunRunnableTasks();
   }
   OSP_DVLOG << "Finished flushing...";
-  task_runner_thread_id_ = std::thread::id();
+  task_runner_thread_id_.store(std::thread::id());
 }
 
 void TaskRunnerImpl::RunUntilSignaled() {

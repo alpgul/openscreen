@@ -99,6 +99,30 @@ TEST(TaskRunnerImplTest, TaskRunnerExecutesTaskAndStops) {
   EXPECT_EQ(ran_tasks, "1");
 }
 
+TEST(TaskRunnerImplTest, ReportsIsRunningOnTaskRunner) {
+  FakeClock fake_clock{Clock::time_point(milliseconds(1337))};
+  TaskRunnerImpl runner(&fake_clock.now);
+  EXPECT_FALSE(runner.IsRunningOnTaskRunner());
+
+  std::atomic<bool> task_ran{false};
+  std::thread t([&runner] { runner.RunUntilStopped(); });
+
+  runner.PostTask([&runner, &task_ran] {
+    EXPECT_TRUE(runner.IsRunningOnTaskRunner());
+    task_ran.store(true);
+  });
+
+  WaitUntilCondition([&runner, &task_ran] {
+    EXPECT_FALSE(runner.IsRunningOnTaskRunner());
+    return task_ran.load();
+  });
+  EXPECT_FALSE(runner.IsRunningOnTaskRunner());
+
+  runner.RequestStopSoon();
+  t.join();
+  EXPECT_FALSE(runner.IsRunningOnTaskRunner());
+}
+
 TEST(TaskRunnerImplTest, TaskRunnerRunsDelayedTasksInOrder) {
   FakeClock fake_clock{Clock::time_point(milliseconds(1337))};
   TaskRunnerImpl runner(&fake_clock.now);

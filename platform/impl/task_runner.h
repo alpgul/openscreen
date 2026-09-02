@@ -5,6 +5,7 @@
 #ifndef PLATFORM_IMPL_TASK_RUNNER_H_
 #define PLATFORM_IMPL_TASK_RUNNER_H_
 
+#include <atomic>
 #include <condition_variable>  // NOLINT
 #include <map>
 #include <memory>
@@ -143,7 +144,7 @@ class TaskRunnerImpl : public TaskRunner {
   // empty, and is swapped with `tasks_` when it is time to run the Tasks.
   std::vector<TaskWithMetadata> running_tasks_;
 
-  std::thread::id task_runner_thread_id_;
+  std::atomic<std::thread::id> task_runner_thread_id_{};
 };
 }  // namespace openscreen
 
