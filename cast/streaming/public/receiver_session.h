@@ -230,7 +230,10 @@ class ReceiverSession final : public Environment::SocketSubscriber {
 
   // Creates a set of configured receivers from a given pair of audio and
   // video streams. NOTE: either audio or video may be null, but not both.
-  ConfiguredReceivers SpawnReceivers(const PendingOffer& properties);
+  // `max_video_resolution` is the largest video size the sender may send,
+  // based on our ANSWER.
+  ConfiguredReceivers SpawnReceivers(const PendingOffer& properties,
+                                     const Resolution& max_video_resolution);
 
   // Creates an ANSWER object. Assumes at least one stream is not nullptr.
   Answer ConstructAnswer(const PendingOffer& properties);

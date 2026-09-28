@@ -17,10 +17,12 @@
 #include "cast/streaming/impl/receiver_impl.h"
 #include "cast/streaming/message_fields.h"
 #include "cast/streaming/public/answer_messages.h"
+#include "cast/streaming/public/capture_recommendations.h"
 #include "cast/streaming/public/constants.h"
 #include "cast/streaming/public/environment.h"
 #include "cast/streaming/public/offer_messages.h"
 #include "cast/streaming/public/receiver.h"
+#include "cast/streaming/resolution.h"
 #include "cast/streaming/sender_message.h"
 #include "util/json/json_helpers.h"
 #include "util/osp_logging.h"
@@ -47,6 +49,25 @@ std::unique_ptr<Stream> SelectStream(
     }
   }
   return nullptr;
+}
+
+// Returns the resolution to configure the video decoder for: the largest
+// offered resolution that fits in `limit`, or `limit` itself when none fits or
+// none was offered. A sender that follows our ANSWER never sends more than
+// `limit`.
+Resolution SelectDecodeResolution(const std::vector<Resolution>& offered,
+                                  const Resolution& limit) {
+  const Resolution* best = nullptr;
+  for (const Resolution& candidate : offered) {
+    if (!limit.IsSupersetOf(candidate)) {
+      continue;
+    }
+    if (!best ||
+        (candidate.width * candidate.height) > (best->width * best->height)) {
+      best = &candidate;
+    }
+  }
+  return best ? *best : limit;
 }
 
 MediaCapability ToCapability(AudioCodec codec) {
@@ -397,6 +418,12 @@ void ReceiverSession::InitializeSession(const PendingOffer& properties) {
     return;
   }
 
+  // The sender limits its video to the maximum it gets from this ANSWER. Use
+  // the same function, so the decoder is set up for the same limit.
+  const Resolution max_video_resolution =
+      capture_recommendations::GetRecommendations(answer)
+          .video.maximum.ToResolution();
+
   // Send the ANSWER before informing the client, in case we have an error, or
   // the client happens to decide to send a message that depends on the ANSWER
   // being sent.
@@ -409,7 +436,8 @@ void ReceiverSession::InitializeSession(const PendingOffer& properties) {
     client_->OnError(this, result);
   }
 
-  ConfiguredReceivers receivers = SpawnReceivers(properties);
+  ConfiguredReceivers receivers =
+      SpawnReceivers(properties, max_video_resolution);
   negotiated_sender_id_ = properties.sender_id;
 
   if (properties.mode == CastMode::kMirroring) {
@@ -443,7 +471,8 @@ std::unique_ptr<Receiver> ReceiverSession::ConstructReceiver(
 }
 
 ReceiverSession::ConfiguredReceivers ReceiverSession::SpawnReceivers(
-    const PendingOffer& properties) {
+    const PendingOffer& properties,
+    const Resolution& max_video_resolution) {
   OSP_CHECK(properties.IsValid());
   ResetReceivers(Client::kRenegotiated);
 
@@ -464,11 +493,15 @@ ReceiverSession::ConfiguredReceivers ReceiverSession::SpawnReceivers(
   if (properties.selected_video) {
     current_video_receiver_ =
         ConstructReceiver(properties.selected_video->stream);
+    // Give the embedder one resolution that fits the limit in our ANSWER. The
+    // offered list can have sizes larger than our display.
+    std::vector<Resolution> resolutions = {SelectDecodeResolution(
+        properties.selected_video->resolutions, max_video_resolution)};
     video_config =
         VideoCaptureConfig{properties.selected_video->codec,
                            properties.selected_video->max_frame_rate,
                            properties.selected_video->max_bit_rate,
-                           properties.selected_video->resolutions,
+                           std::move(resolutions),
                            properties.selected_video->stream.target_delay,
                            properties.selected_video->stream.codec_parameter};
   }

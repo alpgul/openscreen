@@ -16,9 +16,11 @@ namespace openscreen::cast {
 
 struct Answer;
 
-// This namespace contains classes and functions to be used by senders for
-// determining what constraints are recommended for the capture device, based on
-// the limits reported by the receiver.
+// This namespace contains classes and functions for determining what
+// constraints are recommended for the capture device, based on the limits
+// reported by the receiver in its ANSWER. Senders use them to configure
+// capture. Receivers can use them to know the limits a sender will apply for
+// a given ANSWER, for example to set up the video decoder.
 //
 // A general note about recommendations: they are NOT maximum operational
 // limits, instead they are targeted to provide a delightful cast experience.

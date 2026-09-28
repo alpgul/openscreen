@@ -23,8 +23,9 @@ struct Display {
   // The display limitations of the actual screen, used to provide upper
   // bounds on streams. For example, we will never
   // send 60FPS if it is going to be displayed on a 30FPS screen.
-  // Note that we may exceed the display width and height for standard
-  // content sizes like 720p or 1080p.
+  // Senders do not send video larger than these dimensions (see
+  // capture_recommendations::GetRecommendations()), and the receiver uses the
+  // same limit to pick the video decoder resolution.
   Dimensions dimensions;
 
   // Whether the embedder is capable of scaling content. If set to false,

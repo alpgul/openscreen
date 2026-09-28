@@ -194,6 +194,87 @@ constexpr char kNoAudioOfferMessage[] = R"({
   }
 })";
 
+// An offer with one audio stream and one video stream that lists several
+// resolutions, largest first. The audio stream lets the ANSWER include
+// constraints, which need both audio and video limits.
+constexpr char kMultiResolutionOfferMessage[] = R"({
+  "type": "OFFER",
+  "seqNum": 1337,
+  "offer": {
+    "castMode": "mirroring",
+    "supportedStreams": [
+      {
+        "index": 31338,
+        "type": "video_source",
+        "codecName": "vp8",
+        "rtpProfile": "cast",
+        "rtpPayloadType": 127,
+        "ssrc": 19088745,
+        "maxFrameRate": "60000/1000",
+        "timeBase": "1/90000",
+        "maxBitRate": 5000000,
+        "profile": "main",
+        "level": "4",
+        "aesKey": "040d756791711fd3adb939066e6d8690",
+        "aesIvMask": "9ff0f022a959150e70a2d05a6c184aed",
+        "resolutions": [
+          {
+            "width": 3840,
+            "height": 2160
+          },
+          {
+            "width": 1920,
+            "height": 1080
+          },
+          {
+            "width": 1280,
+            "height": 720
+          }
+        ]
+      },
+      {
+        "index": 1337,
+        "type": "audio_source",
+        "codecName": "opus",
+        "rtpProfile": "cast",
+        "rtpPayloadType": 97,
+        "ssrc": 19088747,
+        "bitRate": 124000,
+        "timeBase": "1/48000",
+        "channels": 2,
+        "aesKey": "51027e4e2347cbcb49d57ef10177aebc",
+        "aesIvMask": "7f12a19be62a36c04ae4116caaeff6d1"
+      }
+    ]
+  }
+})";
+
+// Legacy senders may omit "resolutions" entirely.
+constexpr char kNoResolutionsOfferMessage[] = R"({
+  "type": "OFFER",
+  "seqNum": 1337,
+  "offer": {
+    "castMode": "mirroring",
+    "supportedStreams": [
+      {
+        "index": 31338,
+        "type": "video_source",
+        "codecName": "vp8",
+        "rtpProfile": "cast",
+        "rtpPayloadType": 127,
+        "ssrc": 19088745,
+        "maxFrameRate": "60000/1000",
+        "timeBase": "1/90000",
+        "maxBitRate": 5000000,
+        "profile": "main",
+        "level": "4",
+        "aesKey": "040d756791711fd3adb939066e6d8690",
+        "aesIvMask": "9ff0f022a959150e70a2d05a6c184aed"
+      }
+    ]
+  }
+})";
+
 constexpr char kInvalidCodecOfferMessage[] = R"({
   "type": "OFFER",
   "seqNum": 1337,
@@ -444,6 +525,35 @@ class ReceiverSessionTest : public ::testing::Test {
   }
 
  protected:
+  // Constraints for a VP8 receiver advertising a display of the given size.
+  static ReceiverConstraints ConstraintsWithDisplay(int width, int height) {
+    auto display = std::make_unique<Display>(
+        Display{{width, height, {60, 1}}, true /* can scale content */});
+    return ReceiverConstraints({VideoCodec::kVp8}, {AudioCodec::kOpus}, {}, {},
+                               std::move(display));
+  }
+
+  // Negotiates `offer` with `constraints` and returns the video resolutions
+  // given to the embedder to set up its decoder.
+  std::vector<Resolution> NegotiatedDecodeResolutions(
+      ReceiverConstraints constraints,
+      const char* offer) {
+    ReceiverSession session(client_, *environment_, *message_port_,
+                            std::move(constraints));
+    std::vector<Resolution> resolutions;
+    InSequence s;
+    EXPECT_CALL(client_, OnNegotiated(&session, _))
+        .WillOnce([&resolutions](const ReceiverSession* session_,
+                                 ReceiverSession::ConfiguredReceivers cr) {
+          EXPECT_TRUE(cr.video_receiver);
+          resolutions = cr.video_config.resolutions;
+        });
+    EXPECT_CALL(client_, OnReceiversDestroying(
+                             &session, ReceiverSession::Client::kEndOfSession));
+    message_port_->ReceiveMessage(offer);
+    return resolutions;
+  }
+
   void AssertGotAnErrorAnswerResponse() {
     const std::vector<std::string>& messages = message_port_->posted_messages();
     ASSERT_EQ(1u, messages.size());
@@ -596,6 +706,98 @@ TEST_F(ReceiverSessionTest, AcceptsStreamWithMatchingParameter) {
   EXPECT_CALL(client_, OnReceiversDestroying(
                            &session, ReceiverSession::Client::kEndOfSession));
   message_port_->ReceiveMessage(kValidOfferMessage);
+}
+
+TEST_F(ReceiverSessionTest, ConfiguresDecoderWithinDisplayDimensions) {
+  const std::vector<Resolution> resolutions = NegotiatedDecodeResolutions(
+      ConstraintsWithDisplay(1280, 720), kMultiResolutionOfferMessage);
+
+  ASSERT_EQ(1u, resolutions.size());
+  EXPECT_EQ(1280, resolutions[0].width);
+  EXPECT_EQ(720, resolutions[0].height);
+}
+
+TEST_F(ReceiverSessionTest, SelectsLargestOfferedResolutionWithinDisplay) {
+  const std::vector<Resolution> resolutions = NegotiatedDecodeResolutions(
+      ConstraintsWithDisplay(1920, 1080), kMultiResolutionOfferMessage);
+
+  ASSERT_EQ(1u, resolutions.size());
+  EXPECT_EQ(1920, resolutions[0].width);
+  EXPECT_EQ(1080, resolutions[0].height);
+}
+
+TEST_F(ReceiverSessionTest, ClampsToDisplayWhenNoOfferedResolutionFits) {
+  // No offered resolution fits in 1024x768, so the display size is used.
+  const std::vector<Resolution> resolutions = NegotiatedDecodeResolutions(
+      ConstraintsWithDisplay(1024, 768), kMultiResolutionOfferMessage);
+
+  ASSERT_EQ(1u, resolutions.size());
+  EXPECT_EQ(1024, resolutions[0].width);
+  EXPECT_EQ(768, resolutions[0].height);
+}
+
+TEST_F(ReceiverSessionTest, UsesDisplayDimensionsWhenOfferHasNoResolutions) {
+  const std::vector<Resolution> resolutions = NegotiatedDecodeResolutions(
+      ConstraintsWithDisplay(1280, 720), kNoResolutionsOfferMessage);
+
+  ASSERT_EQ(1u, resolutions.size());
+  EXPECT_EQ(1280, resolutions[0].width);
+  EXPECT_EQ(720, resolutions[0].height);
+}
+
+TEST_F(ReceiverSessionTest, RespectsVideoLimitsMaxDimensions) {
+  // The ANSWER only has constraints when both audio and video limits are
+  // found, so set both.
+  std::vector<AudioLimits> audio_limits = {
+      {true, AudioCodec::kOpus, 48000, 2, 32000, 256000, milliseconds(1000)}};
+  std::vector<VideoLimits> video_limits = {{true,
+                                            VideoCodec::kVp8,
+                                            62208000,
+                                            {1280, 720, {60, 1}},
+                                            300000,
+                                            90000000,
+                                            milliseconds(1000)}};
+  const std::vector<Resolution> resolutions = NegotiatedDecodeResolutions(
+      ReceiverConstraints({VideoCodec::kVp8}, {AudioCodec::kOpus},
+                          std::move(audio_limits), std::move(video_limits),
+                          nullptr),
+      kMultiResolutionOfferMessage);
+
+  ASSERT_EQ(1u, resolutions.size());
+  EXPECT_EQ(1280, resolutions[0].width);
+  EXPECT_EQ(720, resolutions[0].height);
+}
+
+TEST_F(ReceiverSessionTest, OnlyAppliesLimitsSentInAnswer) {
+  // Without audio limits the ANSWER has no constraints, so the sender never
+  // sees the 1280x720 video limit and may send up to 1920x1080.
+  std::vector<VideoLimits> video_limits = {{true,
+                                            VideoCodec::kVp8,
+                                            62208000,
+                                            {1280, 720, {60, 1}},
+                                            300000,
+                                            90000000,
+                                            milliseconds(1000)}};
+  const std::vector<Resolution> resolutions = NegotiatedDecodeResolutions(
+      ReceiverConstraints({VideoCodec::kVp8}, {AudioCodec::kOpus}, {},
+                          std::move(video_limits), nullptr),
+      kMultiResolutionOfferMessage);
+
+  ASSERT_EQ(1u, resolutions.size());
+  EXPECT_EQ(1920, resolutions[0].width);
+  EXPECT_EQ(1080, resolutions[0].height);
+}
+
+TEST_F(ReceiverSessionTest, DefaultsToMaxResolutionWithoutConstraints) {
+  // With no display and no limits, the sender is capped at
+  // capture_recommendations::kDefaultMaxResolution (1920x1080).
+  const std::vector<Resolution> resolutions = NegotiatedDecodeResolutions(
+      ReceiverConstraints({VideoCodec::kVp8}, {AudioCodec::kOpus}),
+      kMultiResolutionOfferMessage);
+
+  ASSERT_EQ(1u, resolutions.size());
+  EXPECT_EQ(1920, resolutions[0].width);
+  EXPECT_EQ(1080, resolutions[0].height);
 }
 
 TEST_F(ReceiverSessionTest, CanNegotiateWithLimits) {
