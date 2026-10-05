@@ -144,7 +144,11 @@ if (!build_with_chromium) {
       "../streaming:common",
     ]
     if (have_external_libs && have_ffmpeg) {
-      sources += [ "streaming_ffmpeg_encoder_unittest.cc" ]
+      sources += [
+        "looping_file_sender_unittest.cc",
+        "streaming_ffmpeg_encoder_unittest.cc",
+        "testing/fake_sender.h",
+      ]
     }
   }
 }

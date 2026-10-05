@@ -501,10 +501,13 @@ void SenderSession::OnAnswer(ErrorOr<ReceiverMessage> message) {
     return;
   }
 
-  capture_recommendations::Recommendations recommendations{};
+  // Populate capture recommendations from the receiver's ANSWER for both
+  // Mirroring and Remoting sessions so the client can respect the receiver's
+  // display and codec constraints in either mode.
+  const capture_recommendations::Recommendations recommendations =
+      capture_recommendations::GetRecommendations(answer);
   if (current_negotiation_->offer.cast_mode == CastMode::kMirroring) {
     state_ = State::kStreaming;
-    recommendations = capture_recommendations::GetRecommendations(answer);
   } else {
     state_ = State::kRemoting;
   }

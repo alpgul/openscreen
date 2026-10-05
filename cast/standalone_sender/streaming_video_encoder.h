@@ -11,6 +11,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <span>
 #include <thread>
 #include <vector>
 
@@ -26,6 +27,25 @@ namespace openscreen {
 class TaskRunner;
 
 namespace cast {
+
+// A single writable image plane: the pixel bytes and the row stride (the
+// number of bytes between the start of successive rows, which may exceed the
+// plane's width due to alignment padding).
+struct Plane {
+  std::span<uint8_t> data;
+  int stride = 0;
+};
+
+// The three planes of a planar YUV 4:2:0 (I420) image of `width` x `height`
+// pixels. The `u` and `v` chroma planes are subsampled by two in both
+// dimensions relative to `y`.
+struct YuvPlanes {
+  int width = 0;
+  int height = 0;
+  Plane y;
+  Plane u;
+  Plane v;
+};
 
 class StreamingVideoEncoder {
  public:

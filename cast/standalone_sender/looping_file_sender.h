@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "cast/standalone_common/ffmpeg_glue.h"
 #include "cast/standalone_sender/connection_settings.h"
 #include "cast/standalone_sender/constants.h"
 #include "cast/standalone_sender/file_sender.h"
@@ -18,9 +19,18 @@
 #include "cast/standalone_sender/streaming_opus_encoder.h"
 #include "cast/standalone_sender/streaming_video_encoder.h"
 #include "cast/streaming/public/sender_session.h"
+#include "cast/streaming/resolution.h"
 #include "util/raw_ptr.h"
 
 namespace openscreen::cast {
+
+// If `source` is larger than `target`, scales it down to fit while keeping the
+// same aspect ratio. If `source` already fits, returns `source` as is.
+Resolution GetMaybeDownscaledResolution(Resolution source, Resolution target);
+
+// Returns the visible area (inside the crop rectangle) of the YUV420P `frame`.
+// The planes are views into the frame's own buffers, so no pixels are copied.
+YuvPlanes GetVisiblePlanes(const AVFrame& frame);
 
 // Plays the media file at a given path over and over again, transcoding and
 // streaming its audio/video.
@@ -28,11 +38,16 @@ class LoopingFileSender final : public FileSender,
                                 public SimulatedAudioCapturer::Client,
                                 public SimulatedVideoCapturer::Client {
  public:
-  LoopingFileSender(Environment& environment,
-                    ConnectionSettings settings,
-                    const SenderSession* session,
-                    SenderSession::ConfiguredSenders senders,
-                    ShutdownCallback shutdown_callback);
+  // `video_encoder` may be provided to inject a specific encoder
+  // implementation (e.g. a fake in unit tests). When null, an encoder is
+  // created based on `settings.codec`.
+  LoopingFileSender(
+      Environment& environment,
+      ConnectionSettings settings,
+      const SenderSession* session,
+      SenderSession::ConfiguredSenders senders,
+      ShutdownCallback shutdown_callback,
+      std::unique_ptr<StreamingVideoEncoder> video_encoder = nullptr);
 
   ~LoopingFileSender() final;
 
@@ -40,30 +55,33 @@ class LoopingFileSender final : public FileSender,
 
   void OnInputMessage(InputMessage message) override;
 
- private:
-  void UpdateEncoderBitrates();
-  void ControlForNetworkCongestion();
-  void SendFileAgain();
-
-  // SimulatedAudioCapturer overrides.
+  // SimulatedAudioCapturer::Client overrides.
   void OnAudioData(const float* interleaved_samples,
                    int num_samples,
                    Clock::time_point capture_begin_time,
                    Clock::time_point capture_end_time,
                    Clock::time_point reference_time) final;
 
-  // SimulatedVideoCapturer overrides;
+  // SimulatedVideoCapturer::Client overrides.
   void OnVideoFrame(const AVFrame& av_frame,
                     Clock::time_point capture_begin_time,
                     Clock::time_point capture_end_time,
                     Clock::time_point reference_time) final;
 
+ private:
+  void UpdateEncoderBitrates();
+  void ControlForNetworkCongestion();
+  void SendFileAgain();
+
   void UpdateStatusOnConsole();
 
-  // Draws any active animations (like mouse clicks) onto the frame.
-  void DrawAnimations(const AVFrame& av_frame,
-                      int frame_width,
-                      int frame_height);
+  // Draws any active animations (like mouse clicks) onto `planes`, which must
+  // hold a YUV420P image.
+  void DrawAnimations(YuvPlanes& planes);
+
+  // Scales the YUV420P image in `source` to `dest_size`. The returned planes
+  // point into `scaled_yuv_buffer_`, so they stay valid until the next call.
+  YuvPlanes Downscale(const YuvPlanes& source, Resolution dest_size);
 
   // SimulatedCapturer::Client overrides.
   void OnEndOfFile(SimulatedCapturer* capturer) final;
@@ -99,6 +117,16 @@ class LoopingFileSender final : public FileSender,
   int num_capturers_running_ = 0;
   Clock::time_point capture_begin_time_{};
   Clock::time_point latest_frame_time_{};
+
+  // The resolution negotiated with the receiver, if any. This is an upper
+  // bound: frames larger than this are downscaled, smaller ones are sent at
+  // their native resolution rather than being upscaled.
+  std::optional<Resolution> target_resolution_;
+
+  // Kept across frames by Downscale(), so they are only reallocated when the
+  // frame size changes.
+  SwsContext* sws_context_ = nullptr;
+  std::vector<uint8_t> scaled_yuv_buffer_;
   std::unique_ptr<SimulatedAudioCapturer> audio_capturer_;
   std::unique_ptr<SimulatedVideoCapturer> video_capturer_;
 

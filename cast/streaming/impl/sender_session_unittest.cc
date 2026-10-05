@@ -671,6 +671,55 @@ TEST_F(SenderSessionTest, SuccessfulRemotingNegotiationYieldsValidObject) {
   EXPECT_NE(RpcMessenger::kInvalidHandle, handle);
 }
 
+TEST_F(SenderSessionTest, RemotingNegotiationPopulatesCaptureRecommendations) {
+  NegotiateRemotingWithValidConfigs();
+  const auto& messages = message_port_->posted_messages();
+  ASSERT_EQ(1u, messages.size());
+  auto message_body = json::Parse(messages[0]);
+  ASSERT_TRUE(message_body.is_value());
+  const Json::Value& offer = message_body.value();
+  const Json::Value& streams = offer["offer"]["supportedStreams"];
+  const int audio_index = streams[0]["index"].asInt();
+  const int audio_ssrc = streams[0]["ssrc"].asUInt();
+  const int video_index = streams[1]["index"].asInt();
+  const int video_ssrc = streams[1]["ssrc"].asUInt();
+
+  const std::string answer = std::format(
+      R"({{
+        "type": "ANSWER",
+        "seqNum": {},
+        "result": "ok",
+        "answer": {{
+          "castMode": "remoting",
+          "udpPort": 1234,
+          "sendIndexes": [{}, {}],
+          "ssrcs": [{}, {}],
+          "display": {{
+            "dimensions": {{
+              "width": 3840,
+              "height": 2160,
+              "frameRate": "60"
+            }}
+          }}
+        }}
+      }})",
+      offer["seqNum"].asInt(), audio_index, video_index, audio_ssrc + 1,
+      video_ssrc + 1);
+
+  capture_recommendations::Recommendations received_recommendations{};
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _, _))
+      .WillOnce([&received_recommendations](
+                    const SenderSession* session,
+                    SenderSession::ConfiguredSenders senders,
+                    capture_recommendations::Recommendations recommendations) {
+        received_recommendations = recommendations;
+      });
+
+  message_port_->ReceiveMessage(answer);
+  EXPECT_EQ(received_recommendations.video.maximum.width, 3840);
+  EXPECT_EQ(received_recommendations.video.maximum.height, 2160);
+}
+
 TEST_F(SenderSessionTest, SuccessfulGetCapabilitiesRequest) {
   session_->RequestCapabilities();
 

@@ -8,6 +8,7 @@ include_rules = [
   '+cast/sender/public',
   '+cast/streaming/public',
   '+cast/streaming/message_fields.h',
+  '+cast/streaming/resolution.h',
   '+cast/streaming/rtp_time.h',
   '+cast/standalone_common',
   '+discovery',

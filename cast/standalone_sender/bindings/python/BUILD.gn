@@ -52,6 +52,7 @@ openscreen_shared_library("cast_sender_python_bindings") {
     "avformat",
     "avutil",
     "swresample",
+    "swscale",
     "opus",
     "vpx",
   ]

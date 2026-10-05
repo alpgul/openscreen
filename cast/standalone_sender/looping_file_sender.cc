@@ -4,6 +4,9 @@
 
 #include "cast/standalone_sender/looping_file_sender.h"
 
+#include <array>
+#include <cmath>
+#include <span>
 #include <utility>
 
 #if defined(CAST_STANDALONE_SENDER_HAVE_LIBAOM)
@@ -19,19 +22,82 @@
 
 namespace openscreen::cast {
 
-LoopingFileSender::LoopingFileSender(Environment& environment,
-                                     ConnectionSettings settings,
-                                     const SenderSession* session,
-                                     SenderSession::ConfiguredSenders senders,
-                                     ShutdownCallback shutdown_callback)
+namespace {
+
+// Wraps all rows of `frame` plane `index` in one span, then narrows it to the
+// visible `width` x `height` rectangle, from its first pixel to its last one.
+Plane GetVisiblePlane(const AVFrame& frame, int index, int width, int height) {
+  // The chroma planes (1 and 2) are subsampled by two in both dimensions.
+  const int shift = index == 0 ? 0 : 1;
+  const int stride = frame.linesize[index];
+  OSP_CHECK_GT(stride, 0);
+  const size_t plane_rows = (frame.height + shift) >> shift;
+  const std::span<uint8_t> plane(frame.data[index], stride * plane_rows);
+
+  const size_t offset =
+      stride * (frame.crop_top >> shift) + (frame.crop_left >> shift);
+  const size_t visible_width = (width + shift) >> shift;
+  const size_t visible_rows = (height + shift) >> shift;
+  return Plane{
+      plane.subspan(offset, stride * (visible_rows - 1) + visible_width),
+      stride};
+}
+
+}  // namespace
+
+// If `source` is larger than `target`, scales it down to fit while keeping the
+// same aspect ratio. If `source` already fits, returns `source` as is.
+Resolution GetMaybeDownscaledResolution(Resolution source, Resolution target) {
+  // Do not upscale if the source already fits inside the target box.
+  if (target.IsSupersetOf(source)) {
+    return source;
+  }
+
+  // Use the smaller scale factor on both sides to keep the aspect ratio.
+  const double scale =
+      std::min(static_cast<double>(target.width) / source.width,
+               static_cast<double>(target.height) / source.height);
+
+  // Round to the nearest pixel, keep at least 2 pixels, and make the size even
+  // (`& ~1`) because YUV420P requires even width and height.
+  const int width =
+      std::max(2, static_cast<int>(std::round(source.width * scale))) & ~1;
+  const int height =
+      std::max(2, static_cast<int>(std::round(source.height * scale))) & ~1;
+  return {width, height};
+}
+
+YuvPlanes GetVisiblePlanes(const AVFrame& frame) {
+  OSP_CHECK_EQ(frame.format, AV_PIX_FMT_YUV420P);
+  const int width = frame.width - frame.crop_left - frame.crop_right;
+  const int height = frame.height - frame.crop_top - frame.crop_bottom;
+  OSP_CHECK_GT(width, 0);
+  OSP_CHECK_GT(height, 0);
+
+  return YuvPlanes{.width = width,
+                   .height = height,
+                   .y = GetVisiblePlane(frame, 0, width, height),
+                   .u = GetVisiblePlane(frame, 1, width, height),
+                   .v = GetVisiblePlane(frame, 2, width, height)};
+}
+
+LoopingFileSender::LoopingFileSender(
+    Environment& environment,
+    ConnectionSettings settings,
+    const SenderSession* session,
+    SenderSession::ConfiguredSenders senders,
+    ShutdownCallback shutdown_callback,
+    std::unique_ptr<StreamingVideoEncoder> video_encoder)
     : env_(environment),
       settings_(std::move(settings)),
       session_(session),
       shutdown_callback_(std::move(shutdown_callback)),
-      video_encoder_(CreateVideoEncoder(
-          StreamingVideoEncoder::Parameters{.codec = settings.codec},
-          env_.task_runner(),
-          std::move(senders.video_sender))),
+      video_encoder_(video_encoder ? std::move(video_encoder)
+                                   : CreateVideoEncoder(
+                                         StreamingVideoEncoder::Parameters{
+                                             .codec = settings.codec},
+                                         env_.task_runner(),
+                                         std::move(senders.video_sender))),
       next_task_(env_.now_function(), env_.task_runner()),
       console_update_task_(env_.now_function(), env_.task_runner()) {
   if (settings_.should_include_audio) {
@@ -40,6 +106,9 @@ LoopingFileSender::LoopingFileSender(Environment& environment,
         senders.audio_config.channels,
         StreamingOpusEncoder::kDefaultCastAudioFramesPerSecond,
         std::move(senders.audio_sender));
+  }
+  if (!senders.video_config.resolutions.empty()) {
+    target_resolution_ = senders.video_config.resolutions[0];
   }
   OSP_CHECK(senders.video_config.codec == VideoCodec::kVp8 ||
             senders.video_config.codec == VideoCodec::kVp9 ||
@@ -51,10 +120,17 @@ LoopingFileSender::LoopingFileSender(Environment& environment,
   bandwidth_being_utilized_ = settings_.max_bitrate / 2;
   UpdateEncoderBitrates();
 
-  next_task_.Schedule([this] { SendFileAgain(); }, Alarm::kImmediately);
+  if (!settings_.path_to_file.empty()) {
+    next_task_.Schedule([this] { SendFileAgain(); }, Alarm::kImmediately);
+  }
 }
 
-LoopingFileSender::~LoopingFileSender() = default;
+LoopingFileSender::~LoopingFileSender() {
+  if (sws_context_) {
+    sws_freeContext(sws_context_);
+    sws_context_ = nullptr;
+  }
+}
 
 void LoopingFileSender::SetPlaybackRate(double rate) {
   if (video_capturer_) {
@@ -170,21 +246,32 @@ void LoopingFileSender::OnVideoFrame(const AVFrame& av_frame,
   TRACE_SCOPED1(TraceCategory::kStandaloneSender, "OnVideoFrame",
                 "reference_time", ToString(reference_time));
   latest_frame_time_ = std::max(reference_time, latest_frame_time_);
-  StreamingVideoEncoder::VideoFrame frame{};
-  frame.width = av_frame.width - av_frame.crop_left - av_frame.crop_right;
-  frame.height = av_frame.height - av_frame.crop_top - av_frame.crop_bottom;
 
-  DrawAnimations(av_frame, frame.width, frame.height);
-
-  frame.yuv_planes[0] = av_frame.data[0] + av_frame.crop_left +
-                        av_frame.linesize[0] * av_frame.crop_top;
-  frame.yuv_planes[1] = av_frame.data[1] + av_frame.crop_left / 2 +
-                        av_frame.linesize[1] * av_frame.crop_top / 2;
-  frame.yuv_planes[2] = av_frame.data[2] + av_frame.crop_left / 2 +
-                        av_frame.linesize[2] * av_frame.crop_top / 2;
-  for (int i = 0; i < 3; ++i) {
-    frame.yuv_strides[i] = av_frame.linesize[i];
+  YuvPlanes planes = GetVisiblePlanes(av_frame);
+  if (target_resolution_) {
+    const Resolution source_size{planes.width, planes.height};
+    const Resolution dest_size =
+        GetMaybeDownscaledResolution(source_size, *target_resolution_);
+    if (dest_size != source_size) {
+      planes = Downscale(planes, dest_size);
+    }
   }
+  // YUV420P subsamples chroma 2x2, and some encoders reject odd sizes, so drop
+  // the last column or row of an odd-sized frame.
+  planes.width &= ~1;
+  planes.height &= ~1;
+
+  DrawAnimations(planes);
+
+  StreamingVideoEncoder::VideoFrame frame{};
+  frame.width = planes.width;
+  frame.height = planes.height;
+  frame.yuv_planes[0] = planes.y.data.data();
+  frame.yuv_planes[1] = planes.u.data.data();
+  frame.yuv_planes[2] = planes.v.data.data();
+  frame.yuv_strides[0] = planes.y.stride;
+  frame.yuv_strides[1] = planes.u.stride;
+  frame.yuv_strides[2] = planes.v.stride;
   frame.capture_begin_time = capture_begin_time;
   frame.capture_end_time = capture_end_time;
 
@@ -207,28 +294,18 @@ void LoopingFileSender::UpdateStatusOnConsole() {
                                        kConsoleUpdateInterval);
 }
 
-void LoopingFileSender::DrawAnimations(const AVFrame& av_frame,
-                                       int frame_width,
-                                       int frame_height) {
+void LoopingFileSender::DrawAnimations(YuvPlanes& planes) {
   const auto now = env_.now();
   // Remove clicks that have exceeded their 500ms display duration.
-  active_clicks_.erase(
-      std::remove_if(active_clicks_.begin(), active_clicks_.end(),
-                     [now](const Click& c) { return c.end_time < now; }),
-      active_clicks_.end());
+  std::erase_if(active_clicks_,
+                [now](const Click& c) { return c.end_time < now; });
 
   if (active_clicks_.empty()) {
     return;
   }
 
-  // We modify the AVFrame data in-place. We use the same base pointer offsets
-  // as the encoder to account for any cropping or padding in the original file.
-  uint8_t* const y_plane = av_frame.data[0] + av_frame.crop_left +
-                           av_frame.linesize[0] * av_frame.crop_top;
-  uint8_t* const u_plane = av_frame.data[1] + av_frame.crop_left / 2 +
-                           av_frame.linesize[1] * av_frame.crop_top / 2;
-  uint8_t* const v_plane = av_frame.data[2] + av_frame.crop_left / 2 +
-                           av_frame.linesize[2] * av_frame.crop_top / 2;
+  const int frame_width = planes.width;
+  const int frame_height = planes.height;
 
   for (const auto& click : active_clicks_) {
     // Map the click coordinates from the receiver's logical display space
@@ -261,19 +338,59 @@ void LoopingFileSender::DrawAnimations(const AVFrame& av_frame,
           if (px >= 0 && px < frame_width && py >= 0 && py < frame_height) {
             // In YUV, pure white is represented by maximum luminance (Y=255)
             // and neutral chrominance (U=128, V=128).
-            y_plane[py * av_frame.linesize[0] + px] = 255;
+            planes.y.data[py * planes.y.stride + px] = 255;
 
             // Chrominance (U/V) planes are sub-sampled 2x2 in YUV420p.
             if (px % 2 == 0 && py % 2 == 0) {
-              const int uv_offset = (py / 2) * av_frame.linesize[1] + (px / 2);
-              u_plane[uv_offset] = 128;
-              v_plane[uv_offset] = 128;
+              planes.u.data[(py / 2) * planes.u.stride + (px / 2)] = 128;
+              planes.v.data[(py / 2) * planes.v.stride + (px / 2)] = 128;
             }
           }
         }
       }
     }
   }
+}
+
+YuvPlanes LoopingFileSender::Downscale(const YuvPlanes& source,
+                                       Resolution dest_size) {
+  sws_context_ = sws_getCachedContext(sws_context_, source.width, source.height,
+                                      AV_PIX_FMT_YUV420P, dest_size.width,
+                                      dest_size.height, AV_PIX_FMT_YUV420P,
+                                      SWS_BILINEAR, nullptr, nullptr, nullptr);
+  OSP_CHECK(sws_context_);
+
+  // 32-byte stride alignment for SIMD and encoder efficiency.
+  const int y_stride = (dest_size.width + 31) & ~31;
+  const int uv_stride = ((dest_size.width + 1) / 2 + 31) & ~31;
+  const size_t y_size = static_cast<size_t>(y_stride) * dest_size.height;
+  const size_t uv_size =
+      static_cast<size_t>(uv_stride) * ((dest_size.height + 1) / 2);
+  scaled_yuv_buffer_.resize(y_size + 2 * uv_size);
+
+  const std::span<uint8_t> buffer(scaled_yuv_buffer_);
+  YuvPlanes dest{.width = dest_size.width,
+                 .height = dest_size.height,
+                 .y = {buffer.subspan(0, y_size), y_stride},
+                 .u = {buffer.subspan(y_size, uv_size), uv_stride},
+                 .v = {buffer.subspan(y_size + uv_size, uv_size), uv_stride}};
+
+  // sws_scale() takes up to four planes. The fourth one is for alpha, which
+  // YUV420P does not have.
+  const std::array<const uint8_t*, 4> source_data = {
+      source.y.data.data(), source.u.data.data(), source.v.data.data(),
+      nullptr};
+  const std::array<int, 4> source_strides = {source.y.stride, source.u.stride,
+                                             source.v.stride, 0};
+  const std::array<uint8_t*, 4> dest_data = {
+      dest.y.data.data(), dest.u.data.data(), dest.v.data.data(), nullptr};
+  const std::array<int, 4> dest_strides = {dest.y.stride, dest.u.stride,
+                                           dest.v.stride, 0};
+  const int scaled_height =
+      sws_scale(sws_context_, source_data.data(), source_strides.data(), 0,
+                source.height, dest_data.data(), dest_strides.data());
+  OSP_CHECK_EQ(scaled_height, dest.height);
+  return dest;
 }
 
 void LoopingFileSender::OnEndOfFile(SimulatedCapturer* capturer) {

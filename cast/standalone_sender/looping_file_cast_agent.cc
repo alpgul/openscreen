@@ -4,6 +4,7 @@
 
 #include "cast/standalone_sender/looping_file_cast_agent.h"
 
+#include <algorithm>
 #include <format>
 #include <optional>
 #include <string>
@@ -16,6 +17,7 @@
 #include "cast/streaming/public/capture_recommendations.h"
 #include "cast/streaming/public/constants.h"
 #include "cast/streaming/public/offer_messages.h"
+#include "cast/streaming/resolution.h"
 #include "json/value.h"
 #include "platform/api/tls_connection_factory.h"
 #include "util/json/json_helpers.h"
@@ -384,6 +386,30 @@ void LoopingFileCastAgent::OnNegotiated(
        senders.audio_sender == nullptr)) {
     OSP_LOG_ERROR << "Missing required senders, so exiting...";
     return;
+  }
+
+  // Cap the resolution we transmit at what the receiver reported it can handle
+  // in the ANSWER. Offered tiers are preference-ordered highest-first, so the
+  // first tier that fits is the best usable one. If the receiver is more
+  // constrained than every tier we offered, clamp to its reported maximum
+  // rather than transmitting something larger than it asked for. The encoder
+  // requires even dimensions, so round that down to a multiple of two.
+  if (!senders.video_config.resolutions.empty()) {
+    const Resolution max_resolution =
+        capture_recommendations.video.maximum.ToResolution();
+    const auto it =
+        std::ranges::find_if(senders.video_config.resolutions,
+                             [&max_resolution](const Resolution& res) {
+                               return max_resolution.IsSupersetOf(res);
+                             });
+    Resolution negotiated_resolution =
+        (it != senders.video_config.resolutions.end())
+            ? *it
+            : Resolution{max_resolution.width & ~1, max_resolution.height & ~1};
+    if (!negotiated_resolution.IsValid()) {
+      negotiated_resolution = senders.video_config.resolutions.front();
+    }
+    senders.video_config.resolutions = {negotiated_resolution};
   }
 
   current_negotiation_ =
