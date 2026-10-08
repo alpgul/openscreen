@@ -5,12 +5,14 @@
 #ifndef UTIL_ALARM_H_
 #define UTIL_ALARM_H_
 
+#include <stdint.h>
+
 #include <utility>
 
 #include "platform/api/task_runner.h"
 #include "platform/api/time.h"
-#include "util/raw_ptr.h"
 #include "util/raw_ref.h"
+#include "util/weak_ptr.h"
 
 namespace openscreen {
 
@@ -74,13 +76,11 @@ class Alarm {
   static constexpr Clock::time_point kImmediately = Clock::time_point::min();
 
  private:
-  // A move-only functor that holds a raw pointer back to `this` and can be
-  // canceled before its call operator is invoked. When canceled, its call
-  // operator becomes a no-op.
-  class CancelableFunctor;
-
-  // Posts a delayed call to TryInvoke() to the TaskRunner.
+  // Posts a delayed call to OnFire() to the TaskRunner.
   void InvokeLater(Clock::time_point now, Clock::time_point fire_time);
+
+  // Called when a posted TaskRunner event fires.
+  void OnFire(uint64_t fire_id);
 
   // Examines whether to invoke the client's Task now; or try again later; or
   // just do nothing. See class-level design comments.
@@ -94,14 +94,18 @@ class Alarm {
   TaskRunner::Task scheduled_task_;
   Clock::time_point alarm_time_{};
 
-  // When non-null, there is a task in the TaskRunner's queue that will call
-  // TryInvoke() some time in the future. This member is exclusively maintained
-  // by the CancelableFunctor class methods.
-  raw_ptr<CancelableFunctor> queued_fire_;
+  // True when there is a task in the TaskRunner's queue that will call
+  // OnFire() some time in the future.
+  bool has_queued_fire_ = false;
 
-  // When the CancelableFunctor is scheduled to run. It may possibly execute
-  // later than this, if the TaskRunner is falling behind.
+  // The ID of the currently active queued fire event.
+  uint64_t current_fire_id_ = 0;
+
+  // When the active queued fire event is scheduled to run. It may possibly
+  // execute later than this, if the TaskRunner is falling behind.
   Clock::time_point next_fire_time_{};
+
+  WeakPtrFactory<Alarm> weak_factory_{this};
 };
 
 }  // namespace openscreen

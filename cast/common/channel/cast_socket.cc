@@ -71,6 +71,7 @@ void CastSocket::OnRead(Connection* connection, std::vector<uint8_t> block) {
   read_buffer_.insert(read_buffer_.end(), block.begin(), block.end());
   // NOTE: Read as many messages as possible out of `read_buffer_` since we only
   // get one callback opportunity for this.
+  const WeakPtr<CastSocket> self = GetWeakPtr();
   do {
     ErrorOr<DeserializeResult> message_or_error =
         message_serialization::TryDeserialize(
@@ -86,6 +87,9 @@ void CastSocket::OnRead(Connection* connection, std::vector<uint8_t> block) {
     read_buffer_.erase(read_buffer_.begin(),
                        read_buffer_.begin() + message_or_error.value().length);
     client_->OnMessage(this, std::move(message_or_error.value().message));
+    if (!self) {
+      return;
+    }
   } while (!read_buffer_.empty());
 }
 

@@ -506,6 +506,9 @@ void LoopingFileCastAgent::Shutdown() {
   app_session_id_.clear();
 
   file_sender_.reset();
+  remoting_sender_.reset();
+  current_negotiation_.reset();
+  is_ready_for_remoting_ = false;
   if (current_session_) {
     OSP_LOG_INFO << "Stopping mirroring session...";
     current_session_.reset();

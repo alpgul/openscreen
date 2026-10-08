@@ -383,7 +383,7 @@ void StatisticsAnalyzer::AddToHistogram(HistogramType histogram,
 SenderStats::StatisticsList StatisticsAnalyzer::ConstructStatisticsList(
     Clock::time_point end_time,
     StatisticsEvent::MediaType media_type) {
-  SenderStats::StatisticsList stats_list;
+  SenderStats::StatisticsList stats_list{};
 
   PopulateFrameCountStat(StatisticsEvent::Type::kFrameDroppedByEncoder,
                          StatisticType::kNumFramesDroppedByEncoder, media_type,

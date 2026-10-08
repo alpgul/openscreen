@@ -12,9 +12,9 @@ pub mod prelude {
     pub use gtest_attribute::extern_test_suite;
     // The #[gtest(TestSuite, TestName)] macro.
     pub use gtest_attribute::gtest;
-    // Gtest expectation macros, which should be used to verify test expectations.
-    // These replace the standard practice of using assert/panic in Rust tests
-    // which would crash the test binary.
+    // Gtest expectation macros, which should be used to verify test
+    // expectations. These replace the standard practice of using
+    // assert/panic in Rust tests which would crash the test binary.
     pub use crate::expect_eq;
     pub use crate::expect_false;
     pub use crate::expect_ge;
@@ -113,8 +113,10 @@ pub mod __private {
     /// TODO(danakj): We should be able to pass a `c_int` directly to C++:
     /// https://github.com/dtolnay/cxx/issues/1015.
     pub fn add_failure_at(file: &'static str, line: u32, message: &str) {
-        let null_term_file = std::ffi::CString::new(make_canonical_file_path(file)).unwrap();
-        let null_term_message = std::ffi::CString::new(message).unwrap();
+        let safe_file = make_canonical_file_path(file).replace('\0', "\\0");
+        let null_term_file = std::ffi::CString::new(safe_file).unwrap_or_default();
+        let safe_message = message.replace('\0', "\\0");
+        let null_term_message = std::ffi::CString::new(safe_message).unwrap_or_default();
 
         unsafe extern "C" {
             // SAFETY: Both pointers have to be valid, probably
@@ -138,19 +140,21 @@ pub mod __private {
     /// Turn a file!() string for a source file into a path from the root of the
     /// source tree.
     pub fn make_canonical_file_path(file: &str) -> String {
-        // The path of the file here is relative to and prefixed with the crate root's
-        // source file with the current directory being the build's output
-        // directory. So for a generated crate root at gen/foo/, the file path
-        // would look like `gen/foo/../../../../real/path.rs`. The last two `../
-        // ` move up from the build output directory to the source tree root. As such,
-        // we need to strip pairs of `something/../` until there are none left, and
-        // remove the remaining `../` path components up to the source tree
-        // root.
+        // The path of the file here is relative to and prefixed with the crate
+        // root's source file with the current directory being the
+        // build's output directory. So for a generated crate root at
+        // gen/foo/, the file path would look like
+        // `gen/foo/../../../../real/path.rs`. The last two `../
+        // ` move up from the build output directory to the source tree root. As
+        // such, we need to strip pairs of `something/../` until there
+        // are none left, and remove the remaining `../` path components
+        // up to the source tree root.
         //
-        // Note that std::fs::canonicalize() does not work here since it requires the
-        // file to exist, but we're working with a relative path that is rooted
-        // in the build directory, not the current directory. We could try to
-        // get the path to the build directory.. but this is simple enough.
+        // Note that std::fs::canonicalize() does not work here since it
+        // requires the file to exist, but we're working with a relative
+        // path that is rooted in the build directory, not the current
+        // directory. We could try to get the path to the build
+        // directory.. but this is simple enough.
         let (keep_rev, _) = std::path::Path::new(file).iter().rev().fold(
             (Vec::new(), 0),
             // Build the set of path components we want to keep, which we do by keeping a count of
@@ -160,7 +164,8 @@ pub mod __private {
                     // The `..` component will skip the next downward component.
                     (keep, dotdot_count + 1)
                 } else if dotdot_count > 0 {
-                    // Skip the component as we drop it with `..` later in the path.
+                    // Skip the component as we drop it with `..` later in the
+                    // path.
                     (keep, dotdot_count - 1)
                 } else {
                     // Keep this component.
@@ -169,8 +174,8 @@ pub mod __private {
                 }
             },
         );
-        // Reverse the path components, join them together, and write them into a
-        // string.
+        // Reverse the path components, join them together, and write them into
+        // a string.
         keep_rev
             .into_iter()
             .rev()
@@ -223,8 +228,8 @@ pub mod __private {
     /// call anything that may panic.
     pub fn register_test(r: TestRegistration) {
         let line = r.line.try_into().unwrap_or(-1);
-        // SAFETY: The `factory` parameter to rust_gtest_add_test() must be a C++
-        // function that returns a `testing::Test*` disguised as a
+        // SAFETY: The `factory` parameter to rust_gtest_add_test() must be a
+        // C++ function that returns a `testing::Test*` disguised as a
         // `OpaqueTestingTest`. The #[gtest] macro will use
         // `rust_gtest_interop::rust_gtest_default_factory()` by default.
         unsafe {

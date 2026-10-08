@@ -24,11 +24,29 @@ openscreen_source_set("unittests") {
 }
 
 if (is_posix && !build_with_chromium) {
+  openscreen_rust_static_library("cast_e2e_rust_tests") {
+    testonly = true
+    is_gtest_unittests = true
+    crate_name = "cast_e2e_rust_tests"
+    crate_root = "e2e/lib.rs"
+    allow_unsafe = true
+    sources = [
+      "e2e/lib.rs",
+      "e2e/runner.rs",
+    ]
+    deps = [ "//testing/rust_gtest_interop" ]
+    if (is_posix) {
+      # Used to send SIGTERM for graceful child process shutdown.
+      deps += [ "//third_party/rust/libc/v0_2:lib" ]
+    }
+  }
+
   openscreen_source_set("e2e_tests") {
     testonly = true
     sources = [ "cast_socket_e2e_test.cc" ]
 
     deps = [
+      ":cast_e2e_rust_tests",
       "../../platform",
       "../../platform:standalone_impl",
       "../../testing/util",

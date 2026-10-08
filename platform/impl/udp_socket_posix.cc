@@ -72,6 +72,7 @@ UdpSocketPosix::UdpSocketPosix(TaskRunner& task_runner,
       client_(client),
       handle_(handle),
       local_endpoint_(local_endpoint),
+      version_(local_endpoint.address.version()),
       platform_client_(platform_client) {
   if (handle_.fd >= 0) {
     if (platform_client_) {
@@ -125,18 +126,18 @@ ErrorOr<std::unique_ptr<UdpSocket>> UdpSocket::Create(
 }
 
 bool UdpSocketPosix::IsIPv4() const {
-  return local_endpoint_.address.IsV4();
+  return version_ == Version::kV4;
 }
 
 bool UdpSocketPosix::IsIPv6() const {
-  return local_endpoint_.address.IsV6();
+  return version_ == Version::kV6;
 }
 
 IPEndpoint UdpSocketPosix::GetLocalEndpoint() const {
   if (local_endpoint_.port == 0) {
     // Note: If the getsockname() call fails, just assume that's because the
     // socket isn't bound yet. In this case, leave the original value in-place.
-    switch (local_endpoint_.address.version()) {
+    switch (version_) {
       case UdpSocket::Version::kV4: {
         struct sockaddr_in address {};
         socklen_t address_len = sizeof(address);
@@ -195,7 +196,7 @@ void UdpSocketPosix::Bind() {
 #endif  // BUILDFLAG(IS_APPLE)
 
   bool is_bound = false;
-  switch (local_endpoint_.address.version()) {
+  switch (version_) {
     case UdpSocket::Version::kV4: {
       struct sockaddr_in address = ToSockAddrIn(local_endpoint_);
       if (bind(handle_.fd, reinterpret_cast<struct sockaddr*>(&address),
@@ -214,6 +215,9 @@ void UdpSocketPosix::Bind() {
   }
 
   if (is_bound) {
+    if (local_endpoint_.port == 0) {
+      GetLocalEndpoint();
+    }
     client_->OnBound(this);
   } else {
     OnError(Error::Code::kSocketBindFailure);
@@ -491,7 +495,7 @@ void UdpSocketPosix::ReceiveMessage() {
   }
 
   ErrorOr<UdpPacket> read_result = Error::Code::kUnknownError;
-  switch (local_endpoint_.address.version()) {
+  switch (version_) {
     case UdpSocket::Version::kV4: {
       read_result = ReceiveMessageInternal<sockaddr_in, in_pktinfo>(handle_.fd);
       break;
@@ -585,7 +589,7 @@ void UdpSocketPosix::SetDscp(UdpSocket::DscpMode mode) {
 
   int level;
   int option;
-  switch (local_endpoint_.address.version()) {
+  switch (version_) {
     case UdpSocket::Version::kV4:
       level = IPPROTO_IP;
       option = IP_TOS;

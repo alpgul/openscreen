@@ -82,6 +82,8 @@ class UdpSocketPosix : public UdpSocket {
   // port is non-zero, it is assumed never to change again.
   mutable IPEndpoint local_endpoint_;
 
+  const Version version_;
+
   WeakPtrFactory<UdpSocketPosix> weak_factory_{this};
 
   const raw_ptr<PlatformClientPosix> platform_client_;

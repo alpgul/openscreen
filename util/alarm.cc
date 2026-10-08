@@ -10,71 +10,17 @@
 
 namespace openscreen {
 
-class Alarm::CancelableFunctor {
- public:
-  explicit CancelableFunctor(Alarm* alarm) : alarm_(alarm) {
-    OSP_CHECK(alarm_);
-    OSP_CHECK(!alarm_->queued_fire_);
-    alarm_->queued_fire_ = this;
-  }
-
-  ~CancelableFunctor() { Cancel(); }
-
-  CancelableFunctor(CancelableFunctor&& other) : alarm_(other.alarm_) {
-    other.alarm_ = nullptr;
-    if (alarm_) {
-      OSP_CHECK_EQ(alarm_->queued_fire_, &other);
-      alarm_->queued_fire_ = this;
-    }
-  }
-
-  CancelableFunctor& operator=(CancelableFunctor&& other) {
-    Cancel();
-    alarm_ = other.alarm_;
-    other.alarm_ = nullptr;
-    if (alarm_) {
-      OSP_CHECK_EQ(alarm_->queued_fire_, &other);
-      alarm_->queued_fire_ = this;
-    }
-    return *this;
-  }
-
-  void operator()() noexcept {
-    if (alarm_) {
-      Alarm* alarm = alarm_;
-      OSP_CHECK_EQ(alarm->queued_fire_, this);
-      alarm->queued_fire_ = nullptr;
-      alarm_ = nullptr;
-      alarm->TryInvoke();
-    }
-  }
-
-  void Cancel() {
-    if (alarm_) {
-      OSP_CHECK_EQ(alarm_->queued_fire_, this);
-      alarm_->queued_fire_ = nullptr;
-      alarm_ = nullptr;
-    }
-  }
-
- private:
-  raw_ptr<Alarm> alarm_;
-};
-
 Alarm::Alarm(ClockNowFunctionPtr now_function, TaskRunner& task_runner)
     : now_function_(now_function), task_runner_(task_runner) {
   OSP_CHECK(now_function_);
 }
 
-Alarm::~Alarm() {
-  if (queued_fire_) {
-    queued_fire_->Cancel();
-    OSP_CHECK(!queued_fire_);
-  }
-}
+Alarm::~Alarm() = default;
 
 void Alarm::Cancel() {
   scheduled_task_ = TaskRunner::Task();
+  has_queued_fire_ = false;
+  ++current_fire_id_;
 }
 
 void Alarm::ScheduleWithTask(TaskRunner::Task task,
@@ -87,21 +33,33 @@ void Alarm::ScheduleWithTask(TaskRunner::Task task,
   alarm_time_ = std::max(now, desired_alarm_time);
 
   // Ensure that a later firing will occur, and not too late.
-  if (queued_fire_) {
+  if (has_queued_fire_) {
     if (next_fire_time_ <= alarm_time_) {
       return;
     }
-    queued_fire_->Cancel();
-    OSP_CHECK(!queued_fire_);
   }
   InvokeLater(now, alarm_time_);
 }
 
 void Alarm::InvokeLater(Clock::time_point now, Clock::time_point fire_time) {
-  OSP_CHECK(!queued_fire_);
+  has_queued_fire_ = true;
   next_fire_time_ = fire_time;
-  // Note: Instantiating the CancelableFunctor below sets |this->queued_fire_|.
-  task_runner_->PostTaskWithDelay(CancelableFunctor(this), fire_time - now);
+  const uint64_t fire_id = ++current_fire_id_;
+  task_runner_->PostTaskWithDelay(
+      [weak_this = weak_factory_.GetWeakPtr(), fire_id]() {
+        if (auto* self = weak_this.get()) {
+          self->OnFire(fire_id);
+        }
+      },
+      fire_time - now);
+}
+
+void Alarm::OnFire(uint64_t fire_id) {
+  if (fire_id != current_fire_id_) {
+    return;  // Superceded by a newer scheduling or canceled.
+  }
+  has_queued_fire_ = false;
+  TryInvoke();
 }
 
 void Alarm::TryInvoke() {
