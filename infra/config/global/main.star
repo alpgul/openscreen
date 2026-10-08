@@ -96,6 +96,14 @@ luci.bucket(
             ],
         ),
     ],
+    bindings = [
+        # Allow try builders to create ResultDB invocations, e.g. when the
+        # chromium recipe runs `rdb stream -new` for local gtest steps.
+        luci.binding(
+            roles = "role/resultdb.invocationCreator",
+            users = "openscreen-try-builder@chops-service-accounts.iam.gserviceaccount.com",
+        ),
+    ],
 )
 luci.bucket(
     name = "try.shadow",
@@ -124,6 +132,14 @@ luci.bucket(
         acl.entry(
             roles = [acl.BUILDBUCKET_TRIGGERER],
             users = "luci-scheduler@appspot.gserviceaccount.com",
+        ),
+    ],
+    bindings = [
+        # Allow CI builders to create ResultDB invocations, e.g. when the
+        # chromium recipe runs `rdb stream -new` for local gtest steps.
+        luci.binding(
+            roles = "role/resultdb.invocationCreator",
+            users = "openscreen-ci-builder@chops-service-accounts.iam.gserviceaccount.com",
         ),
     ],
 )
