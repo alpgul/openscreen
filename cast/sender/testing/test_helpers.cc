@@ -85,6 +85,46 @@ CastMessage CreateAppUnavailableResponseChecked(int request_id,
   return std::move(message.value());
 }
 
+void VerifyConnectMessage(const CastMessage& message) {
+  std::string sender_id;
+  VerifyConnectMessage(message, &sender_id);
+}
+
+void VerifyConnectMessage(const CastMessage& message,
+                          std::string* sender_id_out) {
+  EXPECT_EQ(message.namespace_(), kConnectionNamespace);
+  EXPECT_EQ(message.destination_id(), kPlatformReceiverId);
+  EXPECT_EQ(message.payload_type(), proto::CastMessage_PayloadType_STRING);
+  EXPECT_NE(message.source_id(), kPlatformSenderId);
+  *sender_id_out = message.source_id();
+
+  ErrorOr<Json::Value> maybe_value = json::Parse(message.payload_utf8());
+  ASSERT_TRUE(maybe_value);
+  Json::Value& value = maybe_value.value();
+
+  std::optional<std::string_view> maybe_type =
+      MaybeGetString(value, JSON_EXPAND_FIND_CONSTANT_ARGS(kMessageKeyType));
+  ASSERT_TRUE(maybe_type);
+  EXPECT_EQ(maybe_type.value(),
+            CastMessageTypeToString(CastMessageType::kConnect));
+}
+
+CastMessage CreateConnectedResponse(const std::string& sender_id) {
+  Json::Value dict(Json::ValueType::objectValue);
+  dict[kMessageKeyType] = kMessageTypeConnected;
+  dict[kMessageKeyProtocolVersion] =
+      static_cast<int>(proto::CastMessage_ProtocolVersion_CASTV2_1_0);
+
+  CastMessage message;
+  message.set_source_id(kPlatformReceiverId);
+  message.set_destination_id(sender_id);
+  message.set_namespace_(kConnectionNamespace);
+  message.set_protocol_version(proto::CastMessage_ProtocolVersion_CASTV2_1_0);
+  message.set_payload_utf8(json::Stringify(dict).value());
+  message.set_payload_type(proto::CastMessage_PayloadType_STRING);
+  return message;
+}
+
 void VerifyLaunchRequest(const CastMessage& message,
                          const std::string& expected_app_id,
                          int* request_id_out,

@@ -6,6 +6,7 @@
 #define CAST_COMMON_CHANNEL_VIRTUAL_CONNECTION_ROUTER_H_
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -69,6 +70,19 @@ class VirtualConnectionRouter final : public CastSocket::Client {
   bool RemoveConnection(const VirtualConnection& virtual_connection,
                         VirtualConnection::CloseReason reason);
 
+  // Forwards to the OpenRemoteConnection() of whichever
+  // ConnectionNamespaceHandler is currently registered via
+  // set_connection_namespace_handler(). `conn` must not already have an active
+  // connection. If no handler is registered, `result_callback` is invoked
+  // synchronously with false.
+  void OpenRemoteConnection(VirtualConnection conn,
+                            std::function<void(bool)> result_callback);
+
+  // Forwards to the CloseRemoteConnection() of whichever
+  // ConnectionNamespaceHandler is currently registered via
+  // set_connection_namespace_handler(), if any. A no-op if none is registered.
+  void CloseRemoteConnection(VirtualConnection conn);
+
   // Removes all VirtualConnections whose local endpoint matches the given
   // `local_id`.
   void RemoveConnectionsByLocalId(const std::string& local_id);
@@ -98,6 +112,14 @@ class VirtualConnectionRouter final : public CastSocket::Client {
   void CloseSocket(int id);
 
   Error Send(VirtualConnection virtual_conn, proto::CastMessage message);
+
+  // Sends `message` over `virtual_conn`, opening the connection first via
+  // OpenRemoteConnection() if it isn't already established. `callback` is
+  // invoked with the result of actually sending `message` on success, or an
+  // error if the connection could not be opened.
+  void SendEnsuringConnected(VirtualConnection virtual_conn,
+                             proto::CastMessage message,
+                             std::function<void(Error)> callback);
 
   Error BroadcastFromLocalPeer(std::string local_id,
                                proto::CastMessage message);

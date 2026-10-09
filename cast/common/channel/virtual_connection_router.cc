@@ -64,6 +64,23 @@ bool VirtualConnectionRouter::RemoveConnection(
   return false;
 }
 
+void VirtualConnectionRouter::OpenRemoteConnection(
+    VirtualConnection conn,
+    std::function<void(bool)> result_callback) {
+  if (connection_handler_) {
+    connection_handler_->OpenRemoteConnection(std::move(conn),
+                                              std::move(result_callback));
+    return;
+  }
+  result_callback(false);
+}
+
+void VirtualConnectionRouter::CloseRemoteConnection(VirtualConnection conn) {
+  if (connection_handler_) {
+    connection_handler_->CloseRemoteConnection(std::move(conn));
+  }
+}
+
 void VirtualConnectionRouter::RemoveConnectionsByLocalId(
     const std::string& local_id) {
   for (auto socket_entry = connections_.begin();
@@ -156,6 +173,26 @@ Error VirtualConnectionRouter::Send(VirtualConnection virtual_conn,
   message.set_source_id(std::move(virtual_conn.local_id));
   message.set_destination_id(std::move(virtual_conn.peer_id));
   return it->second.socket->Send(message);
+}
+
+void VirtualConnectionRouter::SendEnsuringConnected(
+    VirtualConnection virtual_conn,
+    proto::CastMessage message,
+    std::function<void(Error)> callback) {
+  if (GetConnectionData(virtual_conn)) {
+    callback(Send(std::move(virtual_conn), std::move(message)));
+    return;
+  }
+  OpenRemoteConnection(
+      virtual_conn, [this, virtual_conn, message = std::move(message),
+                     callback = std::move(callback)](bool success) mutable {
+        if (!success) {
+          callback(Error(Error::Code::kNoActiveConnection,
+                         "Failed to establish connection"));
+          return;
+        }
+        callback(Send(std::move(virtual_conn), std::move(message)));
+      });
 }
 
 Error VirtualConnectionRouter::BroadcastFromLocalPeer(

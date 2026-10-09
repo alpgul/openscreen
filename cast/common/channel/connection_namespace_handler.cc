@@ -96,10 +96,15 @@ void ConnectionNamespaceHandler::OpenRemoteConnection(
     VirtualConnection conn,
     RemoteConnectionResultCallback result_callback) {
   OSP_CHECK(!vc_router_->GetConnectionData(conn));
-  OSP_DCHECK(std::none_of(
-      pending_remote_requests_.begin(), pending_remote_requests_.end(),
-      [&](const PendingRequest& request) { return request.conn == conn; }));
-  pending_remote_requests_.push_back({conn, std::move(result_callback)});
+  const auto it =
+      std::ranges::find(pending_remote_requests_, conn, &PendingRequest::conn);
+  if (it != pending_remote_requests_.end()) {
+    // A CONNECT is already in flight for this exact connection; it will
+    // invoke every queued callback (including this one) once it resolves.
+    it->result_callbacks.push_back(std::move(result_callback));
+    return;
+  }
+  pending_remote_requests_.push_back({conn, {std::move(result_callback)}});
 
   SendConnect(std::move(conn));
 }
@@ -252,9 +257,8 @@ void ConnectionNamespaceHandler::HandleConnectedResponse(
   const VirtualConnection conn{std::move(message.destination_id()),
                                std::move(message.source_id()),
                                ToCastSocketId(socket)};
-  const auto it = std::find_if(
-      pending_remote_requests_.begin(), pending_remote_requests_.end(),
-      [&](const PendingRequest& request) { return request.conn == conn; });
+  const auto it =
+      std::ranges::find(pending_remote_requests_, conn, &PendingRequest::conn);
   if (it == pending_remote_requests_.end()) {
     return;
   }
@@ -265,9 +269,11 @@ void ConnectionNamespaceHandler::HandleConnectedResponse(
                              {},
                              VirtualConnection::ProtocolVersion::kV2_1_3});
 
-  const auto callback = std::move(it->result_callback);
+  const auto callbacks = std::move(it->result_callbacks);
   pending_remote_requests_.erase(it);
-  callback(true);
+  for (auto& callback : callbacks) {
+    callback(true);
+  }
 }
 
 void ConnectionNamespaceHandler::SendConnect(VirtualConnection virtual_conn) {
@@ -310,13 +316,14 @@ bool ConnectionNamespaceHandler::RemoveConnection(
   }
 
   // Cancel pending remote request, if any.
-  const auto it = std::find_if(
-      pending_remote_requests_.begin(), pending_remote_requests_.end(),
-      [&](const PendingRequest& request) { return request.conn == conn; });
+  const auto it =
+      std::ranges::find(pending_remote_requests_, conn, &PendingRequest::conn);
   if (it != pending_remote_requests_.end()) {
-    const auto callback = std::move(it->result_callback);
+    const auto callbacks = std::move(it->result_callbacks);
     pending_remote_requests_.erase(it);
-    callback(false);
+    for (auto& callback : callbacks) {
+      callback(false);
+    }
     found_connection = true;
   }
 

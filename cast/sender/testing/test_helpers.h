@@ -33,6 +33,17 @@ proto::CastMessage CreateAppUnavailableResponseChecked(
     const std::string& sender_id,
     const std::string& app_id);
 
+// Verifies that `message` is the CONNECT message CastPlatformClient sends the
+// first time it talks to a given receiver.
+void VerifyConnectMessage(const proto::CastMessage& message);
+void VerifyConnectMessage(const proto::CastMessage& message,
+                          std::string* sender_id_out);
+
+// Builds a CONNECTED reply, as if sent by the receiver's platform endpoint
+// in response to the CONNECT message captured by VerifyConnectMessage(),
+// completing CastPlatformClient::Connect()'s handshake.
+proto::CastMessage CreateConnectedResponse(const std::string& sender_id);
+
 void VerifyLaunchRequest(const proto::CastMessage& message,
                          const std::string& expected_app_id,
                          int* request_id_out,

@@ -39,15 +39,20 @@ class FlatMap final : public std::vector<std::pair<Key, Value>> {
   ~FlatMap() = default;
 
   // Accessors that wrap std::find_if, and return an iterator to the key value
-  // pair.
-  iterator find(const Key& key) {
+  // pair. Templated on the lookup key type (rather than fixed to `Key`) so a
+  // type that's merely comparable to `Key` -- e.g. std::string_view against a
+  // FlatMap<std::string, V> -- can be used directly, without constructing a
+  // temporary `Key`.
+  template <typename LookupKey>
+  iterator find(const LookupKey& key) {
     return std::find_if(this->begin(), this->end(),
                         [&key](const std::pair<Key, Value>& pair) {
                           return key == pair.first;
                         });
   }
 
-  const_iterator find(const Key& key) const {
+  template <typename LookupKey>
+  const_iterator find(const LookupKey& key) const {
     return std::find_if(this->begin(), this->end(),
                         [&key](const std::pair<Key, Value>& pair) {
                           return key == pair.first;
@@ -55,13 +60,17 @@ class FlatMap final : public std::vector<std::pair<Key, Value>> {
   }
 
   // Returns true if the map contains an entry with key `key`.
-  bool contains(const Key& key) const { return find(key) != this->end(); }
+  template <typename LookupKey>
+  bool contains(const LookupKey& key) const {
+    return find(key) != this->end();
+  }
 
   // Remove an entry from the map. Returns an iterator pointing to the new
   // location of the element that followed the last element erased by the
   // function call. This is the container end if the operation erased the last
   // element in the sequence.
-  iterator erase_key(const Key& key) {
+  template <typename LookupKey>
+  iterator erase_key(const LookupKey& key) {
     auto it = find(key);
     if (it == this->end()) {
       return this->end();

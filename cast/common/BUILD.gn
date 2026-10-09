@@ -163,11 +163,13 @@ if (!build_with_chromium && is_linux) {
 openscreen_source_set("test_helpers") {
   testonly = true
 
-  # Used in Chromium for //components/media_router/common/providers/cast/channel unittests.
+  # Used in Chromium for //components/media_router/common/providers/cast/channel
+  # unittests.
   visibility += [ "*" ]
   public = [
     "certificate/testing/test_helpers.h",
     "channel/testing/fake_cast_socket.h",
+    "channel/testing/fake_virtual_connection_policy.h",
     "channel/testing/mock_socket_error_handler.h",
   ]
   sources = [

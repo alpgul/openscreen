@@ -6,7 +6,9 @@
 
 #include <utility>
 
+#include "cast/common/channel/connection_namespace_handler.h"
 #include "cast/common/channel/testing/fake_cast_socket.h"
+#include "cast/common/channel/testing/fake_virtual_connection_policy.h"
 #include "cast/common/channel/testing/mock_socket_error_handler.h"
 #include "cast/common/channel/virtual_connection_router.h"
 #include "cast/common/public/receiver_info.h"
@@ -62,17 +64,24 @@ class CastAppDiscoveryServiceImplTest : public ::testing::Test {
       std::string* sender_id) {
     auto subscription = StartObservingAvailability(source_a_1_, receivers);
 
-    // Adding a receiver after app registered causes app availability request to
-    // be sent.
+    // Adding a receiver after app registered causes the initial CONNECT to be
+    // sent.
     *request_id = -1;
     *sender_id = "";
+    EXPECT_CALL(peer_client(), OnMessage(_, _))
+        .WillOnce([sender_id](CastSocket*, CastMessage message) {
+          VerifyConnectMessage(message, sender_id);
+        });
+
+    AddOrUpdateReceiver(receiver_, socket_id_);
+
+    // Once CONNECTED, the app availability request follows.
     EXPECT_CALL(peer_client(), OnMessage(_, _))
         .WillOnce([request_id, sender_id](CastSocket*, CastMessage message) {
           VerifyAppAvailabilityRequest(message, "AAAAAAAA", request_id,
                                        sender_id);
         });
-
-    AddOrUpdateReceiver(receiver_, socket_id_);
+    EXPECT_TRUE(peer_socket().Send(CreateConnectedResponse(*sender_id)).ok());
 
     return subscription;
   }
@@ -80,6 +89,8 @@ class CastAppDiscoveryServiceImplTest : public ::testing::Test {
   int32_t socket_id_;
   MockSocketErrorHandler mock_error_handler_;
   VirtualConnectionRouter router_;
+  FakeVirtualConnectionPolicy policy_;
+  ConnectionNamespaceHandler connection_handler_{router_, policy_};
   FakeCastSocketPair fake_cast_socket_pair_;
   FakeClock clock_{Clock::now()};
   FakeTaskRunner task_runner_{clock_};
@@ -174,11 +185,19 @@ TEST_F(CastAppDiscoveryServiceImplTest, Refresh) {
   std::vector<ReceiverInfo> receivers2;
   auto subscription2 = StartObservingAvailability(source_b_1_, &receivers2);
 
-  // Adding a receiver after app registered causes two separate app availability
-  // requests to be sent.
+  // Adding a receiver after app registered causes the initial CONNECT to be
+  // sent.
   int request_idA = -1;
   int request_idB = -1;
   std::string sender_id = "";
+  EXPECT_CALL(peer_client(), OnMessage(_, _))
+      .WillOnce([&sender_id](CastSocket*, CastMessage message) {
+        VerifyConnectMessage(message, &sender_id);
+      });
+
+  AddOrUpdateReceiver(receiver_, socket_id_);
+
+  // Once CONNECTED, two separate app availability requests follow.
   EXPECT_CALL(peer_client(), OnMessage(_, _))
       .Times(2)
       .WillRepeatedly([&request_idA, &request_idB, &sender_id](
@@ -196,8 +215,7 @@ TEST_F(CastAppDiscoveryServiceImplTest, Refresh) {
           EXPECT_TRUE(false);
         }
       });
-
-  AddOrUpdateReceiver(receiver_, socket_id_);
+  EXPECT_TRUE(peer_socket().Send(CreateConnectedResponse(sender_id)).ok());
 
   CastMessage availability_response =
       CreateAppAvailableResponseChecked(request_idA, sender_id, "AAAAAAAA");
@@ -230,41 +248,25 @@ TEST_F(CastAppDiscoveryServiceImplTest,
   EXPECT_CALL(peer_client(), OnMessage(_, _)).Times(0);
   AddOrUpdateReceiver(receiver_, socket_id_);
 
-  // Registering apps immediately sends requests to `receiver_`.
-  int request_idA = -1;
+  // Registering the first app immediately sends the initial CONNECT to
+  // `receiver_`.
   std::string sender_id = "";
   EXPECT_CALL(peer_client(), OnMessage(_, _))
-      .WillOnce([&request_idA, &sender_id](CastSocket*, CastMessage message) {
-        VerifyAppAvailabilityRequest(message, "AAAAAAAA", &request_idA,
-                                     &sender_id);
+      .WillOnce([&sender_id](CastSocket*, CastMessage message) {
+        VerifyConnectMessage(message, &sender_id);
       });
   std::vector<ReceiverInfo> receivers1;
   auto subscription1 = StartObservingAvailability(source_a_1_, &receivers1);
 
-  int request_idB = -1;
-  EXPECT_CALL(peer_client(), OnMessage(_, _))
-      .WillOnce([&request_idB, &sender_id](CastSocket*, CastMessage message) {
-        VerifyAppAvailabilityRequest(message, "BBBBBBBB", &request_idB,
-                                     &sender_id);
-      });
+  // Registering the second app while still waiting on CONNECTED piggybacks
+  // onto the same in-flight Connect() -- no second CONNECT is sent.
   std::vector<ReceiverInfo> receivers2;
   auto subscription2 = StartObservingAvailability(source_b_1_, &receivers2);
 
-  // Add a new receiver with a corresponding socket.
-  FakeCastSocketPair fake_sockets2({{192, 168, 1, 17}, 2345},
-                                   {{192, 168, 1, 19}, 2345});
-  CastSocket* socket2 = fake_sockets2.socket.get();
-  router_.TakeSocket(&mock_error_handler_, std::move(fake_sockets2.socket));
-  ReceiverInfo receiver2;
-  receiver2.unique_id = "receiverId2";
-  receiver2.v4_address = fake_sockets2.remote_endpoint.address;
-  receiver2.port = fake_sockets2.remote_endpoint.port;
-
-  // Adding new receiver causes availability requests for both apps to be sent
-  // to the new receiver.
-  request_idA = -1;
-  request_idB = -1;
-  EXPECT_CALL(fake_sockets2.mock_peer_client, OnMessage(_, _))
+  // Once CONNECTED, availability requests for both apps follow.
+  int request_idA = -1;
+  int request_idB = -1;
+  EXPECT_CALL(peer_client(), OnMessage(_, _))
       .Times(2)
       .WillRepeatedly([&request_idA, &request_idB, &sender_id](
                           CastSocket*, CastMessage message) {
@@ -281,8 +283,52 @@ TEST_F(CastAppDiscoveryServiceImplTest,
           EXPECT_TRUE(false);
         }
       });
+  EXPECT_TRUE(peer_socket().Send(CreateConnectedResponse(sender_id)).ok());
+
+  // Add a new receiver with a corresponding socket.
+  FakeCastSocketPair fake_sockets2({{192, 168, 1, 17}, 2345},
+                                   {{192, 168, 1, 19}, 2345});
+  CastSocket* socket2 = fake_sockets2.socket.get();
+  router_.TakeSocket(&mock_error_handler_, std::move(fake_sockets2.socket));
+  ReceiverInfo receiver2;
+  receiver2.unique_id = "receiverId2";
+  receiver2.v4_address = fake_sockets2.remote_endpoint.address;
+  receiver2.port = fake_sockets2.remote_endpoint.port;
+
+  // Adding the new receiver causes the initial CONNECT to be sent to it.
+  std::string sender_id2;
+  EXPECT_CALL(fake_sockets2.mock_peer_client, OnMessage(_, _))
+      .WillOnce([&sender_id2](CastSocket*, CastMessage message) {
+        VerifyConnectMessage(message, &sender_id2);
+      });
 
   AddOrUpdateReceiver(receiver2, socket2->socket_id());
+
+  // Once CONNECTED, availability requests for both apps follow for the new
+  // receiver too.
+  request_idA = -1;
+  request_idB = -1;
+  EXPECT_CALL(fake_sockets2.mock_peer_client, OnMessage(_, _))
+      .Times(2)
+      .WillRepeatedly([&request_idA, &request_idB, &sender_id2](
+                          CastSocket*, CastMessage message) {
+        std::string app_id;
+        int request_id = -1;
+        VerifyAppAvailabilityRequest(message, &app_id, &request_id,
+                                     &sender_id2);
+        if (app_id == "AAAAAAAA") {
+          EXPECT_EQ(request_idA, -1);
+          request_idA = request_id;
+        } else if (app_id == "BBBBBBBB") {
+          EXPECT_EQ(request_idB, -1);
+          request_idB = request_id;
+        } else {
+          EXPECT_TRUE(false);
+        }
+      });
+  EXPECT_TRUE(
+      fake_sockets2.peer_socket->Send(CreateConnectedResponse(sender_id2))
+          .ok());
 }
 
 TEST_F(CastAppDiscoveryServiceImplTest, StartObservingAvailabilityCachedValue) {

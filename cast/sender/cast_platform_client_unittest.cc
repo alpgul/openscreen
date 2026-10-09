@@ -6,7 +6,9 @@
 
 #include <utility>
 
+#include "cast/common/channel/connection_namespace_handler.h"
 #include "cast/common/channel/testing/fake_cast_socket.h"
+#include "cast/common/channel/testing/fake_virtual_connection_policy.h"
 #include "cast/common/channel/testing/mock_socket_error_handler.h"
 #include "cast/common/channel/virtual_connection_router.h"
 #include "cast/common/public/receiver_info.h"
@@ -36,6 +38,23 @@ class CastPlatformClientTest : public ::testing::Test {
     receiver_.port = 4434;
     receiver_.unique_id = "receiverId1";
     platform_client_.AddOrUpdateReceiver(receiver_, socket_id);
+
+    // Connect() is a precondition for RequestAppAvailability()/
+    // LaunchSession()/StopSession(), so every test needs it done first.
+    std::string sender_id;
+    EXPECT_CALL(peer_client(), OnMessage(_, _))
+        .WillOnce([&sender_id](CastSocket* socket, CastMessage message) {
+          VerifyConnectMessage(message, &sender_id);
+        });
+    bool connected = false;
+    platform_client_.Connect(receiver_.unique_id, [&connected](bool success) {
+      EXPECT_TRUE(success);
+      connected = true;
+    });
+    ASSERT_FALSE(connected);  // Waiting on the real CONNECTED reply.
+
+    EXPECT_TRUE(peer_socket().Send(CreateConnectedResponse(sender_id)).ok());
+    ASSERT_TRUE(connected);
   }
 
  protected:
@@ -92,6 +111,8 @@ class CastPlatformClientTest : public ::testing::Test {
   FakeCastSocketPair fake_cast_socket_pair_;
   MockSocketErrorHandler mock_error_handler_;
   VirtualConnectionRouter router_;
+  FakeVirtualConnectionPolicy policy_;
+  ConnectionNamespaceHandler connection_handler_{router_, policy_};
   FakeClock clock_{Clock::now()};
   FakeTaskRunner task_runner_{clock_};
   CastPlatformClient platform_client_{router_, &FakeClock::now, task_runner_};
@@ -347,6 +368,68 @@ TEST_F(CastPlatformClientTest, StopSessionTimeoutIsFailure) {
 
   clock_.Advance(std::chrono::seconds(61));
   EXPECT_TRUE(ran);
+}
+
+// Regression test: destroying CastPlatformClient while multiple Connect()
+// calls are still pending (no CONNECTED reply ever sent) must synchronously
+// resolve all of them as failures, without hanging or using the
+// just-destroyed CastPlatformClient from a callback that fires later.
+TEST_F(CastPlatformClientTest, DestructorCancelsMultiplePendingConnects) {
+  FakeCastSocketPair socket_pair_a;
+  FakeCastSocketPair socket_pair_b;
+  const int socket_id_a = socket_pair_a.socket->socket_id();
+  const int socket_id_b = socket_pair_b.socket->socket_id();
+  router_.TakeSocket(&mock_error_handler_, std::move(socket_pair_a.socket));
+  router_.TakeSocket(&mock_error_handler_, std::move(socket_pair_b.socket));
+
+  auto local_client = std::make_unique<CastPlatformClient>(
+      router_, &FakeClock::now, task_runner_);
+
+  ReceiverInfo receiver_a;
+  receiver_a.unique_id = "receiverA";
+  local_client->AddOrUpdateReceiver(receiver_a, socket_id_a);
+  ReceiverInfo receiver_b;
+  receiver_b.unique_id = "receiverB";
+  local_client->AddOrUpdateReceiver(receiver_b, socket_id_b);
+
+  EXPECT_CALL(socket_pair_a.mock_peer_client, OnMessage(_, _))
+      .WillOnce([](CastSocket*, CastMessage message) {
+        VerifyConnectMessage(message);
+      });
+  EXPECT_CALL(socket_pair_b.mock_peer_client, OnMessage(_, _))
+      .WillOnce([](CastSocket*, CastMessage message) {
+        VerifyConnectMessage(message);
+      });
+
+  bool a_resolved = false;
+  bool a_success = true;
+  bool b_resolved = false;
+  bool b_success = true;
+  local_client->Connect("receiverA", [&](bool success) {
+    a_resolved = true;
+    a_success = success;
+  });
+  local_client->Connect("receiverB", [&](bool success) {
+    b_resolved = true;
+    b_success = success;
+  });
+
+  // Neither has resolved yet -- both are waiting on a CONNECTED reply that
+  // this test never sends.
+  EXPECT_FALSE(a_resolved);
+  EXPECT_FALSE(b_resolved);
+
+  // Destroying `local_client` below cancels both pending connects via
+  // CloseRemoteConnection(), which notifies each peer with a CLOSE message.
+  EXPECT_CALL(socket_pair_a.mock_peer_client, OnMessage(_, _)).Times(1);
+  EXPECT_CALL(socket_pair_b.mock_peer_client, OnMessage(_, _)).Times(1);
+
+  local_client.reset();
+
+  EXPECT_TRUE(a_resolved);
+  EXPECT_FALSE(a_success);
+  EXPECT_TRUE(b_resolved);
+  EXPECT_FALSE(b_success);
 }
 
 }  // namespace openscreen::cast

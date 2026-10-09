@@ -86,9 +86,12 @@ class ConnectionNamespaceHandler : public CastMessageHandler {
   const raw_ref<VirtualConnectionRouter> vc_router_;
   const raw_ref<VirtualConnectionPolicy> vc_policy_;
 
+  // `result_callbacks` collects every caller waiting on this same connect if
+  // OpenRemoteConnection() is called again for the same `conn` before the
+  // first attempt resolves; all of them are invoked together once it does.
   struct PendingRequest {
     VirtualConnection conn;
-    RemoteConnectionResultCallback result_callback;
+    std::vector<RemoteConnectionResultCallback> result_callbacks;
   };
   std::vector<PendingRequest> pending_remote_requests_;
 };

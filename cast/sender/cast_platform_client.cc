@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <random>
+#include <ranges>
 #include <string_view>
 #include <utility>
 
@@ -127,18 +128,125 @@ CastPlatformClient::~CastPlatformClient() {
           Error::Code::kOperationCancelled, "CastPlatformClient destroyed"));
     }
   }
+
+  // Cancel every in-flight Connect(). Since OpenRemoteConnection() callback
+  // captures `this` directly and has no other way to be invalidated, it must be
+  // synchronously resolved via CloseRemoteConnection() now.
+  //
+  // Iterating in reverse is safe because `pending_connects_by_receiver_id_`
+  // is a vector-backed FlatMap. CloseRemoteConnection() can reentrantly erase
+  // the last element via OnConnectResult(), which doesn't shifts or invalidates
+  // the earlier elements this loop still needs to visit. This breaks if the
+  // container type ever changes.
+  for (auto& receiver_id : pending_connects_by_receiver_id_ |
+                               std::views::reverse | std::views::keys) {
+    auto virtual_conn = GetPlatformConnection(receiver_id);
+    if (virtual_conn) {
+      virtual_conn_router_->CloseRemoteConnection(*virtual_conn);
+    }
+  }
+
+  // Fallback for any pending connect CloseRemoteConnection() didn't resolve
+  // above.
+  for (auto& [_, pending_connects] : pending_connects_by_receiver_id_) {
+    for (auto& callback : pending_connects.callbacks) {
+      callback(false);
+    }
+  }
+}
+
+std::optional<VirtualConnection> CastPlatformClient::GetPlatformConnection(
+    std::string_view receiver_id) const {
+  auto entry = socket_id_by_receiver_id_.find(receiver_id);
+  if (entry == socket_id_by_receiver_id_.end()) {
+    return std::nullopt;
+  }
+  return VirtualConnection{sender_id_, kPlatformReceiverId, entry->second};
+}
+
+CastPlatformClient::PendingRequests&
+CastPlatformClient::GetOrCreatePendingRequests(std::string_view receiver_id) {
+  auto it = pending_requests_by_receiver_id_.find(receiver_id);
+  if (it != pending_requests_by_receiver_id_.end()) {
+    return it->second;
+  }
+  pending_requests_by_receiver_id_.emplace_back(std::string(receiver_id),
+                                                PendingRequests{});
+  return pending_requests_by_receiver_id_.back().second;
+}
+
+CastPlatformClient::PendingConnect&
+CastPlatformClient::GetOrCreatePendingConnect(std::string_view receiver_id) {
+  auto it = pending_connects_by_receiver_id_.find(receiver_id);
+  if (it != pending_connects_by_receiver_id_.end()) {
+    return it->second;
+  }
+  pending_connects_by_receiver_id_.emplace_back(std::string(receiver_id),
+                                                PendingConnect{});
+  return pending_connects_by_receiver_id_.back().second;
+}
+
+void CastPlatformClient::Connect(std::string_view receiver_id,
+                                 ConnectCallback callback) {
+  auto virtual_conn = GetPlatformConnection(receiver_id);
+  if (!virtual_conn) {
+    callback(false);
+    return;
+  }
+  if (virtual_conn_router_->GetConnectionData(*virtual_conn)) {
+    callback(true);
+    return;
+  }
+
+  PendingConnect& pending_connect = GetOrCreatePendingConnect(receiver_id);
+  pending_connect.callbacks.push_back(std::move(callback));
+  if (pending_connect.callbacks.size() > 1) {
+    // A connect is already in flight for this receiver; it will invoke
+    // every queued callback (including this one) once it resolves.
+    return;
+  }
+
+  pending_connect.timeout = std::make_unique<Alarm>(clock_, *task_runner_);
+  pending_connect.timeout->ScheduleFromNow(
+      [this, receiver_id = std::string(receiver_id)]() {
+        OnConnectResult(receiver_id, false);
+      },
+      kRequestTimeout);
+  virtual_conn_router_->OpenRemoteConnection(
+      *virtual_conn,
+      [this, receiver_id = std::string(receiver_id)](bool success) {
+        OnConnectResult(receiver_id, success);
+      });
+}
+
+bool CastPlatformClient::IsConnected(std::string_view receiver_id) const {
+  auto virtual_conn = GetPlatformConnection(receiver_id);
+  return virtual_conn &&
+         virtual_conn_router_->GetConnectionData(*virtual_conn).has_value();
+}
+
+void CastPlatformClient::OnConnectResult(std::string receiver_id,
+                                         bool success) {
+  auto entry = pending_connects_by_receiver_id_.find(receiver_id);
+  if (entry == pending_connects_by_receiver_id_.end()) {
+    return;  // Already resolved (e.g. the timeout raced the real reply).
+  }
+  std::vector<ConnectCallback> callbacks = std::move(entry->second.callbacks);
+  pending_connects_by_receiver_id_.erase(entry);
+  for (auto& callback : callbacks) {
+    callback(success);
+  }
 }
 
 std::optional<int> CastPlatformClient::RequestAppAvailability(
     std::string_view receiver_id,
     std::string_view app_id,
     AppAvailabilityCallback callback) {
-  auto entry = socket_id_by_receiver_id_.find(receiver_id);
-  if (entry == socket_id_by_receiver_id_.end()) {
+  auto virtual_conn = GetPlatformConnection(receiver_id);
+  if (!virtual_conn) {
     callback(app_id, AppAvailabilityResult::kUnknown);
     return std::nullopt;
   }
-  int socket_id = entry->second;
 
   int request_id = GetNextRequestId();
   ErrorOr<proto::CastMessage> message =
@@ -148,8 +256,7 @@ std::optional<int> CastPlatformClient::RequestAppAvailability(
     return std::nullopt;
   }
 
-  PendingRequests& pending_requests =
-      pending_requests_by_receiver_id_[std::string(receiver_id)];
+  PendingRequests& pending_requests = GetOrCreatePendingRequests(receiver_id);
   auto timeout = std::make_unique<Alarm>(clock_, *task_runner_);
   timeout->ScheduleFromNow(
       [this, request_id]() { CancelAppAvailabilityRequest(request_id); },
@@ -158,14 +265,13 @@ std::optional<int> CastPlatformClient::RequestAppAvailability(
       AvailabilityRequest{request_id, std::string(app_id), std::move(timeout),
                           std::move(callback)});
 
-  VirtualConnection virtual_conn{sender_id_, kPlatformReceiverId, socket_id};
-  if (!virtual_conn_router_->GetConnectionData(virtual_conn)) {
-    virtual_conn_router_->AddConnection(virtual_conn,
-                                        VirtualConnection::AssociatedData{});
-  }
-
-  virtual_conn_router_->Send(std::move(virtual_conn),
-                             std::move(message.value()));
+  virtual_conn_router_->SendEnsuringConnected(
+      std::move(*virtual_conn), std::move(message.value()),
+      [this, request_id](Error error) {
+        if (!error.ok()) {
+          CancelAppAvailabilityRequest(request_id);
+        }
+      });
 
   return request_id;
 }
@@ -175,12 +281,11 @@ std::optional<int> CastPlatformClient::LaunchSession(
     std::string_view app_id,
     const Json::Value& app_params,
     LaunchSessionCallback callback) {
-  auto entry = socket_id_by_receiver_id_.find(receiver_id);
-  if (entry == socket_id_by_receiver_id_.end()) {
+  auto virtual_conn = GetPlatformConnection(receiver_id);
+  if (!virtual_conn) {
     callback(Error(Error::Code::kItemNotFound, "Unknown receiver"));
     return std::nullopt;
   }
-  int socket_id = entry->second;
 
   auto pending_entry = pending_requests_by_receiver_id_.find(receiver_id);
   if (pending_entry != pending_requests_by_receiver_id_.end() &&
@@ -198,8 +303,7 @@ std::optional<int> CastPlatformClient::LaunchSession(
     return std::nullopt;
   }
 
-  PendingRequests& pending_requests =
-      pending_requests_by_receiver_id_[std::string(receiver_id)];
+  PendingRequests& pending_requests = GetOrCreatePendingRequests(receiver_id);
   auto timeout = std::make_unique<Alarm>(clock_, *task_runner_);
   timeout->ScheduleFromNow(
       [this, request_id]() { HandleLaunchTimeout(request_id); },
@@ -207,14 +311,13 @@ std::optional<int> CastPlatformClient::LaunchSession(
   pending_requests.launch_request =
       LaunchRequest{request_id, std::move(timeout), std::move(callback)};
 
-  VirtualConnection virtual_conn{sender_id_, kPlatformReceiverId, socket_id};
-  if (!virtual_conn_router_->GetConnectionData(virtual_conn)) {
-    virtual_conn_router_->AddConnection(virtual_conn,
-                                        VirtualConnection::AssociatedData{});
-  }
-
-  virtual_conn_router_->Send(std::move(virtual_conn),
-                             std::move(message.value()));
+  virtual_conn_router_->SendEnsuringConnected(
+      std::move(*virtual_conn), std::move(message.value()),
+      [this, request_id](Error error) {
+        if (!error.ok()) {
+          FailLaunchRequest(request_id, std::move(error));
+        }
+      });
 
   return request_id;
 }
@@ -223,12 +326,11 @@ std::optional<int> CastPlatformClient::StopSession(
     std::string_view receiver_id,
     std::string_view session_id,
     StopSessionCallback callback) {
-  auto entry = socket_id_by_receiver_id_.find(receiver_id);
-  if (entry == socket_id_by_receiver_id_.end()) {
+  auto virtual_conn = GetPlatformConnection(receiver_id);
+  if (!virtual_conn) {
     callback(Error(Error::Code::kItemNotFound, "Unknown receiver"));
     return std::nullopt;
   }
-  int socket_id = entry->second;
 
   auto pending_entry = pending_requests_by_receiver_id_.find(receiver_id);
   if (pending_entry != pending_requests_by_receiver_id_.end() &&
@@ -246,8 +348,7 @@ std::optional<int> CastPlatformClient::StopSession(
     return std::nullopt;
   }
 
-  PendingRequests& pending_requests =
-      pending_requests_by_receiver_id_[std::string(receiver_id)];
+  PendingRequests& pending_requests = GetOrCreatePendingRequests(receiver_id);
   auto timeout = std::make_unique<Alarm>(clock_, *task_runner_);
   timeout->ScheduleFromNow(
       [this, request_id]() { HandleStopTimeout(request_id); }, kRequestTimeout);
@@ -255,21 +356,25 @@ std::optional<int> CastPlatformClient::StopSession(
       StopRequest{request_id, std::string(session_id), std::move(timeout),
                   std::move(callback)};
 
-  VirtualConnection virtual_conn{sender_id_, kPlatformReceiverId, socket_id};
-  if (!virtual_conn_router_->GetConnectionData(virtual_conn)) {
-    virtual_conn_router_->AddConnection(virtual_conn,
-                                        VirtualConnection::AssociatedData{});
-  }
-
-  virtual_conn_router_->Send(std::move(virtual_conn),
-                             std::move(message.value()));
+  virtual_conn_router_->SendEnsuringConnected(
+      std::move(*virtual_conn), std::move(message.value()),
+      [this, request_id](Error error) {
+        if (!error.ok()) {
+          FailStopRequest(request_id, std::move(error));
+        }
+      });
 
   return request_id;
 }
 
 void CastPlatformClient::AddOrUpdateReceiver(const ReceiverInfo& receiver,
                                              int socket_id) {
-  socket_id_by_receiver_id_[receiver.unique_id] = socket_id;
+  auto it = socket_id_by_receiver_id_.find(receiver.unique_id);
+  if (it != socket_id_by_receiver_id_.end()) {
+    it->second = socket_id;
+  } else {
+    socket_id_by_receiver_id_.emplace_back(receiver.unique_id, socket_id);
+  }
 }
 
 void CastPlatformClient::RemoveReceiver(const ReceiverInfo& receiver) {
@@ -291,7 +396,27 @@ void CastPlatformClient::RemoveReceiver(const ReceiverInfo& receiver) {
     }
     pending_requests_by_receiver_id_.erase(pending_requests_it);
   }
-  socket_id_by_receiver_id_.erase(receiver.unique_id);
+
+  // Cancel any in-flight Connect() for this receiver before forgetting its
+  // socket mapping below.
+  if (pending_connects_by_receiver_id_.contains(receiver.unique_id)) {
+    auto virtual_conn = GetPlatformConnection(receiver.unique_id);
+    if (virtual_conn) {
+      virtual_conn_router_->CloseRemoteConnection(*virtual_conn);
+    }
+  }
+  auto pending_connects_it =
+      pending_connects_by_receiver_id_.find(receiver.unique_id);
+  if (pending_connects_it != pending_connects_by_receiver_id_.end()) {
+    std::vector<ConnectCallback> callbacks =
+        std::move(pending_connects_it->second.callbacks);
+    pending_connects_by_receiver_id_.erase(pending_connects_it);
+    for (auto& callback : callbacks) {
+      callback(false);
+    }
+  }
+
+  socket_id_by_receiver_id_.erase_key(receiver.unique_id);
 }
 
 // Note: unlike a timeout or a receiver disconnect, an explicit cancellation
@@ -483,31 +608,39 @@ bool CastPlatformClient::HandleStopResponse(PendingRequests& pending_requests,
   return true;
 }
 
-void CastPlatformClient::HandleLaunchTimeout(int request_id) {
+void CastPlatformClient::FailLaunchRequest(int request_id, Error error) {
   for (auto& entry : pending_requests_by_receiver_id_) {
     PendingRequests& pending_requests = entry.second;
     if (pending_requests.launch_request &&
         pending_requests.launch_request->request_id == request_id) {
-      pending_requests.launch_request->callback(
-          Error(Error::Code::kOperationCancelled, "Launch timed out"));
+      pending_requests.launch_request->callback(std::move(error));
       pending_requests.launch_request.reset();
       return;
     }
   }
 }
 
-void CastPlatformClient::HandleStopTimeout(int request_id) {
+void CastPlatformClient::FailStopRequest(int request_id, Error error) {
   for (auto& entry : pending_requests_by_receiver_id_) {
     PendingRequests& pending_requests = entry.second;
     if (pending_requests.stop_request &&
         pending_requests.stop_request->request_id == request_id) {
-      // Silence does not imply success (see StopSession()'s comment.)
-      pending_requests.stop_request->callback(
-          Error(Error::Code::kOperationCancelled, "Stop timed out"));
+      pending_requests.stop_request->callback(std::move(error));
       pending_requests.stop_request.reset();
       return;
     }
   }
+}
+
+void CastPlatformClient::HandleLaunchTimeout(int request_id) {
+  FailLaunchRequest(
+      request_id, Error(Error::Code::kOperationCancelled, "Launch timed out"));
+}
+
+void CastPlatformClient::HandleStopTimeout(int request_id) {
+  // Silence does not imply success (see StopSession()'s comment.)
+  FailStopRequest(request_id,
+                  Error(Error::Code::kOperationCancelled, "Stop timed out"));
 }
 
 void CastPlatformClient::CancelAppAvailabilityRequest(int request_id) {
@@ -528,6 +661,8 @@ int CastPlatformClient::GetNextRequestId() {
 }
 
 // static
-int CastPlatformClient::next_request_id_ = 0;
+// Starts at 1: `requestId: 0` is reserved for unsolicited RECEIVER_STATUS
+// broadcasts.
+int CastPlatformClient::next_request_id_ = 1;
 
 }  // namespace openscreen::cast
