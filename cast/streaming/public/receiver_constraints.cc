@@ -178,6 +178,7 @@ ReceiverConstraints& ReceiverConstraints::operator=(
   if (other.remoting) {
     remoting = std::make_unique<RemotingConstraints>(*other.remoting);
   }
+  create_web_transport_server = other.create_web_transport_server;
   return *this;
 }
 
@@ -189,6 +190,9 @@ bool ReceiverConstraints::IsSupersetOf(const ReceiverConstraints& other) const {
     return false;
   } else if (other.remoting &&
              (!remoting || !remoting->IsSupersetOf(*other.remoting))) {
+    return false;
+  } else if (other.create_web_transport_server &&
+             !create_web_transport_server) {
     return false;
   }
 

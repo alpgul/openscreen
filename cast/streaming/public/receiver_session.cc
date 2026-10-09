@@ -177,6 +177,7 @@ ReceiverSession::~ReceiverSession() {
   // calls message_port_.ResetClient(). That MessagePort is destroyed before
   // OnReceiversDestroying returns. See crbug.com/374199735 for more details.
   messenger_.reset();
+  data_session_.reset();
   ResetReceivers(Client::kEndOfSession);
 }
 
@@ -388,6 +389,13 @@ void ReceiverSession::SelectStreams(const Offer& offer,
       properties->selected_video = SelectStream(constraints_.video_codecs,
                                                 *client_, offer.video_streams);
     }
+    if (constraints_.create_web_transport_server &&
+        offer.data_transport.has_value() &&
+        offer.data_transport->protocol ==
+            DataTransportProtocol::kWebTransport) {
+      properties->selected_data =
+          std::make_unique<DataTransport>(*offer.data_transport);
+    }
   } else {
     OSP_CHECK(offer.cast_mode == CastMode::kRemoting);
     if (offer.audio_streams.size() == 1) {
@@ -408,8 +416,14 @@ void ReceiverSession::InitializeSession(const PendingOffer& properties) {
                  properties.selected_video.get(), *environment_);
   }
 
+  // The data session must be (re)created before constructing the ANSWER, since
+  // the ANSWER advertises its port and certificate fingerprint.
+  ReceiverDataSession::Reset(data_session_);
+  InitializeDataSession(properties);
+
   Answer answer = ConstructAnswer(properties);
   if (!answer.IsValid()) {
+    ReceiverDataSession::Reset(data_session_);
     // If the answer message is invalid, there is no point in setting up a
     // negotiation because the sender won't be able to connect to it.
     SendErrorAnswerReply(properties.sender_id, properties.sequence_number,
@@ -623,6 +637,14 @@ Answer ReceiverSession::ConstructAnswer(const PendingOffer& properties) {
     }
   }
 
+  std::optional<Answer::DataTransportConfig> data_transport;
+  if (data_session_) {
+    data_transport = Answer::DataTransportConfig{
+        .protocol = DataTransportProtocol::kWebTransport,
+        .port = data_session_->port(),
+        .certificate_fingerprint = std::string(data_session_->fingerprint())};
+  }
+
   return Answer{
       .udp_port = environment_->GetBoundLocalEndpoint().port,
       .send_indexes = std::move(stream_indexes),
@@ -633,7 +655,8 @@ Answer ReceiverSession::ConstructAnswer(const PendingOffer& properties) {
       .receiver_rtcp_dscp = receiver_rtcp_dscp,
 
       // TODO(crbug.com/40238532): re-add support for adaptive playout delay??
-      .rtp_extensions = std::move(rtp_extensions)};
+      .rtp_extensions = std::move(rtp_extensions),
+      .data_transport = std::move(data_transport)};
 }
 
 ReceiverCapability ReceiverSession::CreateRemotingCapabilityV2() {
@@ -670,6 +693,41 @@ void ReceiverSession::SendErrorAnswerReply(const std::string& sender_id,
   if (!result.ok()) {
     client_->OnError(this, result);
   }
+}
+
+void ReceiverSession::InitializeDataSession(const PendingOffer& properties) {
+  if (!properties.selected_data) {
+    return;
+  }
+  // The data transport is only selected if create_web_transport_server is set.
+  OSP_CHECK(constraints_.create_web_transport_server);
+  TaskRunner& task_runner = environment_->task_runner();
+  const IPEndpoint local_endpoint{environment_->GetBoundLocalEndpoint().address,
+                                  0};
+  data_session_ = ReceiverDataSession::Create(
+      *this, task_runner, constraints_.create_web_transport_server(task_runner),
+      local_endpoint);
+  if (!data_session_) {
+    OSP_LOG_WARN << "Failed to set up the data session; the ANSWER will not "
+                    "include a data transport";
+  }
+}
+
+void ReceiverSession::OnNewDataChannel(DataSessionBase* data_session,
+                                       std::unique_ptr<DataChannel> channel) {
+  // Only the current data session reports here: Reset() detaches any previous
+  // one.
+  OSP_CHECK_EQ(data_session_.get(), data_session);
+  client_->OnNewDataChannel(this, std::move(channel));
+}
+
+void ReceiverSession::OnDataSessionClosed(DataSessionBase* data_session,
+                                          const Error& error) {
+  OSP_CHECK_EQ(data_session_.get(), data_session);
+  // Called from its own task, so the data session is not on the call stack.
+  data_session_.reset();
+  // The client may renegotiate or destroy this session from here.
+  client_->OnDataSessionClosed(this, error);
 }
 
 }  // namespace openscreen::cast

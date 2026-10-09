@@ -14,10 +14,13 @@
 
 #include "cast/common/public/message_port.h"
 #include "cast/streaming/capture_configs.h"
+#include "cast/streaming/impl/data_session_base.h"
+#include "cast/streaming/impl/sender_data_session.h"
 #include "cast/streaming/impl/statistics_analyzer.h"
 #include "cast/streaming/input.pb.h"
 #include "cast/streaming/public/answer_messages.h"
 #include "cast/streaming/public/capture_recommendations.h"
+#include "cast/streaming/public/data_session.h"
 #include "cast/streaming/public/protobuf_messenger.h"
 #include "cast/streaming/public/rpc_messenger.h"
 #include "cast/streaming/public/sender.h"
@@ -27,6 +30,7 @@
 #include "cast/streaming/remoting_capabilities.h"
 #include "cast/streaming/sender_packet_router.h"
 #include "json/value.h"
+#include "platform/api/web_transport.h"
 #include "platform/base/ip_address.h"
 #include "util/json/json_serialization.h"
 #include "util/raw_ptr.h"
@@ -37,7 +41,7 @@ namespace openscreen::cast {
 class Environment;
 class Sender;
 
-class SenderSession final {
+class SenderSession final : private DataSessionBase::Delegate {
  public:
   // Upon successful negotiation, a set of configured senders is constructed
   // for handling audio and video. Note that either sender may be null.
@@ -83,6 +87,29 @@ class SenderSession final {
     virtual void OnCapabilitiesDetermined(const SenderSession* session,
                                           RemotingCapabilities capabilities) {}
 
+    // Called when the data session negotiated in the last OFFER/ANSWER has
+    // been opened with the receiver. Only called if data channels were
+    // enabled via Configuration::create_web_transport_client and the
+    // receiver accepted them. Always called from its own task, after
+    // OnNegotiated(); `data_session` can be used to create channels right
+    // away.
+    //
+    // `data_session` is owned by this SenderSession and stays valid until
+    // the first of: OnDataSessionClosed(), the next Negotiate() or
+    // NegotiateRemoting() call, or destruction of this SenderSession.
+    virtual void OnDataSessionOpened(const SenderSession* session,
+                                     DataSession& data_session) {}
+
+    // Called when the data session negotiated in the last OFFER/ANSWER closes,
+    // or fails to connect, in which case OnDataSessionOpened() is not called.
+    // `error` is ok if the receiver closed it gracefully; otherwise it
+    // describes the failure. Data session failures are only reported here,
+    // never through OnError(), and don't affect streaming. Not called when
+    // the data session is dropped by Negotiate()/NegotiateRemoting() or
+    // destruction of this SenderSession.
+    virtual void OnDataSessionClosed(const SenderSession* session,
+                                     const Error& error) {}
+
     // Called whenever an error occurs. Cancels any in progress negotiation
     // and Negotiate()/NegotiateRemoting() must be called again to re-establish
     // streaming.
@@ -101,6 +128,10 @@ class SenderSession final {
    protected:
     virtual ~Client();
   };
+
+  // Creates the WebTransport client that carries DataChannels.
+  using CreateWebTransportClientCallback =
+      std::function<std::unique_ptr<WebTransportClient>(TaskRunner&)>;
 
   // The configuration information required to set up the session.
   struct Configuration {
@@ -143,6 +174,10 @@ class SenderSession final {
     // Optional override for the UDP socket send buffer size.
     // If set to > 0, sets SO_SNDBUF on the socket.
     std::optional<size_t> udp_send_buffer_size;
+
+    // If set, enables support for DataChannels backed by WebTransport. Leave
+    // unset if the embedder has no WebTransport implementation.
+    CreateWebTransportClientCallback create_web_transport_client;
   };
 
   // The SenderSession assumes that the passed in client, environment, and
@@ -278,6 +313,16 @@ class SenderSession final {
   // Spawn a set of configured senders from the currently stored negotiation.
   ConfiguredSenders SelectSenders(const Answer& answer);
 
+  // Connects to the data transport advertised in `answer`, if any and if
+  // data channels are enabled.
+  void InitializeDataSession(const Answer& answer);
+
+  // DataSessionBase::Delegate overrides, called only for `data_session_`.
+  // They forward to the Client methods of the same name.
+  void OnDataSessionOpened(DataSessionBase* data_session) override;
+  void OnDataSessionClosed(DataSessionBase* data_session,
+                           const Error& error) override;
+
   // This session's configuration.
   Configuration config_;
 
@@ -318,6 +363,9 @@ class SenderSession final {
   // The statistics client for this session. Must be set in order for statistics
   // to be calculated.
   raw_ptr<SenderStatsClient> stats_client_ = nullptr;
+
+  // The data session negotiated by the current OFFER/ANSWER, if any.
+  std::unique_ptr<SenderDataSession> data_session_;
 };  // namespace cast
 
 }  // namespace openscreen::cast

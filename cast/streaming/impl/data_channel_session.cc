@@ -115,7 +115,7 @@ void DataChannelSession::OnSessionClosed(WebTransportSession* session,
   }
 
   if (visitor_) {
-    visitor_->OnConnectionClosed();
+    visitor_->OnConnectionClosed(error);
   }
 }
 

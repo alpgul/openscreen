@@ -124,11 +124,11 @@ class DataChannelStream final : public WebTransportStream::Delegate {
   };
 
   std::unique_ptr<WebTransportStream> owned_stream_;
-  raw_ptr<WebTransportStream> stream_;
+  raw_ptr<WebTransportStream> stream_ = nullptr;
   std::string label_;
   DataChannel::State state_ = DataChannel::State::kConnecting;
-  raw_ptr<Delegate> delegate_;
-  raw_ptr<SessionDelegate> session_delegate_;
+  raw_ptr<Delegate> delegate_ = nullptr;
+  raw_ptr<SessionDelegate> session_delegate_ = nullptr;
 
   ParseState parse_state_ = ParseState::kReadingFrameType;
   uint8_t pending_frame_type_ = 0;

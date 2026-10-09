@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <format>
 #include <iterator>
+#include <limits>
+#include <span>
 #include <string>
 #include <utility>
 #include <variant>
@@ -144,7 +146,7 @@ VideoStream CreateStream(int index,
 
 template <typename S, typename C>
 void CreateStreamList(int offset_index,
-                      const std::vector<C>& configs,
+                      std::span<const C> configs,
                       bool use_android_rtp_hack,
                       std::optional<UdpSocket::DscpMode> dscp_mode,
                       bool supports_input_events,
@@ -157,56 +159,69 @@ void CreateStreamList(int offset_index,
   }
 }
 
-Offer CreateMirroringOffer(const std::vector<AudioCaptureConfig>& audio_configs,
-                           const std::vector<VideoCaptureConfig>& video_configs,
-                           bool use_android_rtp_hack,
-                           bool enable_dscp,
-                           bool supports_input_events) {
+// Options for creating an OFFER, derived from the session's configuration.
+struct OfferOptions {
+  bool use_android_rtp_hack = false;
+  bool enable_dscp = false;
+  bool supports_input_events = false;
+  // Ignored for remoting OFFERs.
+  bool enable_data_channels = false;
+};
+
+Offer CreateMirroringOffer(std::span<const AudioCaptureConfig> audio_configs,
+                           std::span<const VideoCaptureConfig> video_configs,
+                           const OfferOptions& options) {
   Offer offer;
   offer.cast_mode = CastMode::kMirroring;
 
   const bool has_audio = !audio_configs.empty();
   const bool has_video = !video_configs.empty();
   std::optional<UdpSocket::DscpMode> dscp_mode;
-  if (enable_dscp) {
+  if (options.enable_dscp) {
     dscp_mode = GetDscpSuggestion(has_audio, has_video);
   }
 
   // NOTE here: IDs will always follow the pattern:
   // [0.. audio streams... N - 1][N.. video streams.. K]
-  CreateStreamList(0, audio_configs, use_android_rtp_hack, dscp_mode,
-                   supports_input_events, &offer.audio_streams);
-  CreateStreamList(audio_configs.size(), video_configs, use_android_rtp_hack,
-                   dscp_mode, supports_input_events, &offer.video_streams);
+  CreateStreamList(0, audio_configs, options.use_android_rtp_hack, dscp_mode,
+                   options.supports_input_events, &offer.audio_streams);
+  CreateStreamList(audio_configs.size(), video_configs,
+                   options.use_android_rtp_hack, dscp_mode,
+                   options.supports_input_events, &offer.video_streams);
+
+  if (options.enable_data_channels) {
+    offer.data_transport =
+        DataTransport{.protocol = DataTransportProtocol::kWebTransport};
+  }
 
   return offer;
 }
 
 Offer CreateRemotingOffer(const AudioCaptureConfig& audio_config,
                           const VideoCaptureConfig& video_config,
-                          bool use_android_rtp_hack,
-                          bool enable_dscp,
-                          bool supports_input_events) {
+                          const OfferOptions& options) {
   Offer offer;
   offer.cast_mode = CastMode::kRemoting;
 
   std::optional<UdpSocket::DscpMode> dscp_mode;
-  if (enable_dscp) {
+  if (options.enable_dscp) {
     dscp_mode = GetDscpSuggestion(true, true);
   }
 
-  AudioStream audio_stream = CreateStream(0, audio_config, use_android_rtp_hack,
-                                          dscp_mode, supports_input_events);
+  AudioStream audio_stream =
+      CreateStream(0, audio_config, options.use_android_rtp_hack, dscp_mode,
+                   options.supports_input_events);
   audio_stream.codec = AudioCodec::kNotSpecified;
   audio_stream.stream.rtp_payload_type =
-      GetPayloadType(AudioCodec::kNotSpecified, use_android_rtp_hack);
+      GetPayloadType(AudioCodec::kNotSpecified, options.use_android_rtp_hack);
   offer.audio_streams.push_back(std::move(audio_stream));
 
-  VideoStream video_stream = CreateStream(1, video_config, use_android_rtp_hack,
-                                          dscp_mode, supports_input_events);
+  VideoStream video_stream =
+      CreateStream(1, video_config, options.use_android_rtp_hack, dscp_mode,
+                   options.supports_input_events);
   video_stream.codec = VideoCodec::kNotSpecified;
   video_stream.stream.rtp_payload_type =
-      GetPayloadType(VideoCodec::kNotSpecified, use_android_rtp_hack);
+      GetPayloadType(VideoCodec::kNotSpecified, options.use_android_rtp_hack);
   offer.video_streams.push_back(std::move(video_stream));
 
   return offer;
@@ -376,9 +391,12 @@ Error SenderSession::Negotiate(std::vector<AudioCaptureConfig> audio_configs,
     return Error(Error::Code::kParameterInvalid, "Invalid configs provided.");
   }
 
-  Offer offer = CreateMirroringOffer(
-      audio_configs, video_configs, config_.use_android_rtp_hack,
-      config_.enable_dscp, input_messenger_.receive_message_cb() != nullptr);
+  const OfferOptions options{
+      .use_android_rtp_hack = config_.use_android_rtp_hack,
+      .enable_dscp = config_.enable_dscp,
+      .supports_input_events = input_messenger_.receive_message_cb() != nullptr,
+      .enable_data_channels = config_.create_web_transport_client != nullptr};
+  Offer offer = CreateMirroringOffer(audio_configs, video_configs, options);
   return StartNegotiation(std::move(audio_configs), std::move(video_configs),
                           std::move(offer));
 }
@@ -392,9 +410,12 @@ Error SenderSession::NegotiateRemoting(AudioCaptureConfig audio_config,
                  "Passed invalid audio or video config.");
   }
 
-  Offer offer = CreateRemotingOffer(
-      audio_config, video_config, config_.use_android_rtp_hack,
-      config_.enable_dscp, input_messenger_.receive_message_cb() != nullptr);
+  const OfferOptions options{
+      .use_android_rtp_hack = config_.use_android_rtp_hack,
+      .enable_dscp = config_.enable_dscp,
+      .supports_input_events =
+          input_messenger_.receive_message_cb() != nullptr};
+  Offer offer = CreateRemotingOffer(audio_config, video_config, options);
   return StartNegotiation({audio_config}, {video_config}, std::move(offer));
 }
 
@@ -456,12 +477,16 @@ void SenderSession::SendInputMessage(const InputMessage& message) {
 void SenderSession::ResetState() {
   state_ = State::kIdle;
   current_negotiation_.reset();
+  SenderDataSession::Reset(data_session_);
 }
 
 Error SenderSession::StartNegotiation(
     std::vector<AudioCaptureConfig> audio_configs,
     std::vector<VideoCaptureConfig> video_configs,
     Offer offer) {
+  // Any data session belongs to the previous negotiation. Streaming state is
+  // left alone until the new ANSWER arrives.
+  SenderDataSession::Reset(data_session_);
   current_negotiation_ =
       std::unique_ptr<InProcessNegotiation>(new InProcessNegotiation{
           offer, std::move(audio_configs), std::move(video_configs)});
@@ -476,6 +501,7 @@ Error SenderSession::StartNegotiation(
 
 void SenderSession::OnAnswer(ErrorOr<ReceiverMessage> message) {
   if (!message) {
+    ResetState();
     // Answer timeouts are reported separately since API consumers
     // may wish to track them in metrics.
     if (message.error().code() == Error::Code::kMessageTimeout) {
@@ -488,6 +514,7 @@ void SenderSession::OnAnswer(ErrorOr<ReceiverMessage> message) {
 
   if (!message.value().valid ||
       message.value().type != ReceiverMessage::Type::kAnswer) {
+    ResetState();
     HandleErrorMessage(message.value(), InvalidAnswerError());
     return;
   }
@@ -496,6 +523,7 @@ void SenderSession::OnAnswer(ErrorOr<ReceiverMessage> message) {
   ConfiguredSenders senders = SelectSenders(answer);
   // If we didn't select any senders, the negotiation was unsuccessful.
   if (!senders.audio_sender && !senders.video_sender) {
+    ResetState();
     config_.client.OnError(this, Error(Error::Code::kNoStreamSelected,
                                        "Invalid answer response message"));
     return;
@@ -511,6 +539,12 @@ void SenderSession::OnAnswer(ErrorOr<ReceiverMessage> message) {
   } else {
     state_ = State::kRemoting;
   }
+
+  // Set up the data session before OnNegotiated(), so that a renegotiation
+  // started from inside it drops this data session. The data session reports
+  // to the client from separate tasks, never from inside this call.
+  SenderDataSession::Reset(data_session_);
+  InitializeDataSession(answer);
 
   config_.client.OnNegotiated(this, std::move(senders), recommendations);
 }
@@ -686,6 +720,41 @@ SenderSession::ConfiguredSenders SenderSession::SelectSenders(
     }
   }
   return senders;
+}
+
+void SenderSession::InitializeDataSession(const Answer& answer) {
+  if (!config_.create_web_transport_client ||
+      !answer.data_transport.has_value() ||
+      answer.data_transport->protocol != DataTransportProtocol::kWebTransport) {
+    return;
+  }
+  const int port = answer.data_transport->port;
+  if (port <= 0 || port > std::numeric_limits<uint16_t>::max()) {
+    OSP_LOG_WARN << "Ignoring data transport with invalid port: " << port;
+    return;
+  }
+  OSP_VLOG << "Data transport offered on port " << port;
+  TaskRunner& task_runner = config_.environment->task_runner();
+  data_session_ = SenderDataSession::Create(
+      *this, task_runner, config_.create_web_transport_client(task_runner),
+      IPEndpoint{config_.remote_address, static_cast<uint16_t>(port)},
+      answer.data_transport->certificate_fingerprint);
+}
+
+void SenderSession::OnDataSessionOpened(DataSessionBase* data_session) {
+  // Called from its own task, and only for the current data session: Reset()
+  // detaches any previous one.
+  OSP_CHECK_EQ(data_session_.get(), data_session);
+  config_.client.OnDataSessionOpened(this, *data_session_);
+}
+
+void SenderSession::OnDataSessionClosed(DataSessionBase* data_session,
+                                        const Error& error) {
+  OSP_CHECK_EQ(data_session_.get(), data_session);
+  // Called from its own task, so the data session is not on the call stack.
+  data_session_.reset();
+  // The client may renegotiate or destroy this session from here.
+  config_.client.OnDataSessionClosed(this, error);
 }
 
 }  // namespace openscreen::cast

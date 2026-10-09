@@ -32,12 +32,13 @@ class DataChannelSession final : public WebTransportSession::Delegate,
 
     virtual void OnConnectionEstablished() = 0;
 
-    // Called when the underlying transport session has closed.
+    // Called when the underlying transport session has closed. `error` is ok
+    // if the peer closed the session gracefully.
     //
     // This runs inside the transport's own closed-notification, so the
     // implementation must not destroy this DataChannelSession synchronously;
     // post the teardown to a task runner instead.
-    virtual void OnConnectionClosed() = 0;
+    virtual void OnConnectionClosed(const Error& error) = 0;
   };
 
   // Upper bound on simultaneously open channels. Without a cap a peer could
@@ -74,7 +75,7 @@ class DataChannelSession final : public WebTransportSession::Delegate,
 
  private:
   std::unique_ptr<WebTransportSession> session_;
-  raw_ptr<Visitor> visitor_;
+  raw_ptr<Visitor> visitor_ = nullptr;
   std::vector<std::unique_ptr<DataChannelStream>> active_streams_;
 
   WeakPtrFactory<DataChannelSession> weak_factory_{this};

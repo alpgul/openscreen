@@ -8,22 +8,28 @@
 #include <format>
 #include <functional>
 #include <memory>
+#include <optional>
+#include <string>
 #include <utility>
 
 #include "cast/streaming/capture_configs.h"
 #include "cast/streaming/impl/message_constants.h"
 #include "cast/streaming/input.pb.h"
 #include "cast/streaming/public/capture_recommendations.h"
+#include "cast/streaming/public/data_channel.h"
+#include "cast/streaming/public/data_session.h"
 #include "cast/streaming/public/protobuf_messenger.h"
 #include "cast/streaming/testing/mock_environment.h"
 #include "cast/streaming/testing/simple_message_port.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "platform/api/web_transport.h"
 #include "platform/base/ip_address.h"
 #include "platform/test/fake_clock.h"
 #include "platform/test/fake_task_runner.h"
 #include "util/chrono_helpers.h"
 #include "util/no_destructor.h"
+#include "util/weak_ptr.h"
 
 using ::testing::_;
 using ::testing::InSequence;
@@ -186,9 +192,104 @@ class FakeClient : public SenderSession::Client {
               (const SenderSession*, RemotingCapabilities),
               (override));
   MOCK_METHOD(void,
+              OnDataSessionOpened,
+              (const SenderSession*, DataSession&),
+              (override));
+  MOCK_METHOD(void,
+              OnDataSessionClosed,
+              (const SenderSession*, const Error&),
+              (override));
+  MOCK_METHOD(void,
               OnError,
               (const SenderSession*, const Error& error),
               (override));
+};
+
+class FakeWebTransportStream : public WebTransportStream {
+ public:
+  void SetDelegate(Delegate* delegate) override { delegate_ = delegate; }
+  bool Write(ByteView data) override { return true; }
+  void Close() override {}
+
+ private:
+  raw_ptr<Delegate> delegate_ = nullptr;
+};
+
+class FakeWebTransportSession : public WebTransportSession {
+ public:
+  void SetDelegate(Delegate* delegate) override { delegate_ = delegate; }
+
+  ErrorOr<std::unique_ptr<WebTransportStream>> CreateOutgoingStream() override {
+    return std::unique_ptr<WebTransportStream>(
+        std::make_unique<FakeWebTransportStream>());
+  }
+
+  void Close(const Error& error) override { SimulateClosed(error); }
+
+  // Like a real transport, keeps using its own state after notifying the
+  // delegate, so destroying this session from inside the notification is
+  // caught by ASAN.
+  void SimulateClosed(const Error& error) {
+    if (delegate_) {
+      delegate_->OnSessionClosed(this, error);
+    }
+    ++close_notification_count_;
+  }
+
+  WeakPtr<FakeWebTransportSession> GetWeakPtr() const {
+    return weak_factory_.GetWeakPtr();
+  }
+
+ private:
+  raw_ptr<Delegate> delegate_ = nullptr;
+  int close_notification_count_ = 0;
+  WeakPtrFactory<FakeWebTransportSession> weak_factory_{this};
+};
+
+// Completes Connect() synchronously, with either a new session or
+// `connect_error_`.
+class FakeWebTransportClient : public WebTransportClient {
+ public:
+  void Connect(std::string_view url,
+               const WebTransportOptions& options,
+               ConnectCallback callback) override {
+    last_url_ = std::string(url);
+    last_options_ = options;
+    if (connect_error_.has_value()) {
+      std::move(callback)(connect_error_.value());
+      return;
+    }
+    auto session = std::make_unique<FakeWebTransportSession>();
+    last_session_ = session->GetWeakPtr();
+    std::move(callback)(
+        std::unique_ptr<WebTransportSession>(std::move(session)));
+  }
+
+  WeakPtr<FakeWebTransportClient> GetWeakPtr() const {
+    return weak_factory_.GetWeakPtr();
+  }
+
+  std::string last_url_;
+  WebTransportOptions last_options_;
+  std::optional<Error> connect_error_;
+  WeakPtr<FakeWebTransportSession> last_session_;
+
+ private:
+  WeakPtrFactory<FakeWebTransportClient> weak_factory_{this};
+};
+
+// Runs `on_closed_`, if set, when the channel reports that it closed.
+class FakeDataChannelDelegate : public DataChannel::Delegate {
+ public:
+  void OnMessage(ByteView data) override {}
+  void OnStateChange(DataChannel::State state) override {
+    if (state == DataChannel::State::kClosed && on_closed_) {
+      on_closed_();
+    }
+  }
+  void OnWriteReady() override {}
+
+  std::function<void()> on_closed_;
 };
 
 // TODO(jophba): this matcher is likely more generally useful and should
@@ -240,13 +341,38 @@ class SenderSessionTest : public ::testing::Test {
     ASSERT_TRUE(error.ok());
   }
 
-  // Answers require specific fields from the original offer to be valid.
-  std::string ConstructAnswerFromOffer(CastMode mode) {
+  // Recreates `session_` with DataChannel support backed by a
+  // FakeWebTransportClient. Each client the session creates is exposed through
+  // `web_transport_client_` and fails to connect with `connect_error`, if set.
+  void CreateSessionWithDataChannels(
+      std::optional<Error> connect_error = std::nullopt) {
+    SenderSession::Configuration config{IPAddress::kV4LoopbackAddress(),
+                                        client_,
+                                        environment_.get(),
+                                        message_port_.get(),
+                                        "sender-12345",
+                                        "receiver-12345",
+                                        /* use_android_rtp_hack */ true,
+                                        /* use_dscp */ true};
+    config.create_web_transport_client = [this, connect_error](TaskRunner&) {
+      auto client = std::make_unique<FakeWebTransportClient>();
+      client->connect_error_ = connect_error;
+      web_transport_client_ = client->GetWeakPtr();
+      return client;
+    };
+    session_.reset();
+    session_ = std::make_unique<SenderSession>(std::move(config));
+  }
+
+  // Answers require specific fields from the original offer to be valid. The
+  // answer responds to the most recently sent OFFER.
+  std::string ConstructAnswerFromOffer(CastMode mode,
+                                       bool with_data_transport = false) {
     const auto& messages = message_port_->posted_messages();
-    if (messages.size() != 1) {
+    if (messages.empty()) {
       return {};
     }
-    auto message_body = json::Parse(messages[0]);
+    auto message_body = json::Parse(messages.back());
     if (message_body.is_error()) {
       return {};
     }
@@ -279,13 +405,44 @@ class SenderSessionTest : public ::testing::Test {
           "castMode": "{}",
           "udpPort": 1234,
           "sendIndexes": [{}, {}],
-          "ssrcs": [{}, {}]
+          "ssrcs": [{}, {}]{}
         }}
   }})";
+    static constexpr char kDataTransport[] = R"(,
+          "dataTransport": {
+            "protocol": "webtransport",
+            "port": 33534,
+            "certificateFingerprint":
+                "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY="
+          })";
     return std::format(kAnswerTemplate, offer["seqNum"].asInt(),
                        mode == CastMode::kMirroring ? "mirroring" : "remoting",
-                       audio_index, video_index, audio_ssrc + 1,
-                       video_ssrc + 1);
+                       audio_index, video_index, audio_ssrc + 1, video_ssrc + 1,
+                       with_data_transport ? kDataTransport : "");
+  }
+
+  // Negotiates mirroring and answers with a data transport, expecting the
+  // data session to be opened. If `channel` is set, a channel is created
+  // on the data session and stored there.
+  void NegotiateWithDataSession(
+      std::unique_ptr<DataChannel>* channel = nullptr) {
+    NegotiateMirroringWithValidConfigs();
+    const std::string answer =
+        ConstructAnswerFromOffer(CastMode::kMirroring, true);
+    EXPECT_CALL(client_, OnNegotiated(session_.get(), _, _));
+    EXPECT_CALL(client_, OnDataSessionOpened(session_.get(), _))
+        .WillOnce([channel](const SenderSession*, DataSession& data_session) {
+          if (channel) {
+            auto channel_or_error = data_session.CreateDataChannel("label");
+            ASSERT_TRUE(channel_or_error.is_value());
+            *channel = std::move(channel_or_error.value());
+          }
+        });
+    message_port_->ReceiveMessage(answer);
+    task_runner_.RunTasksUntilIdle();
+    ::testing::Mock::VerifyAndClearExpectations(&client_);
+    ASSERT_TRUE(web_transport_client_);
+    ASSERT_TRUE(web_transport_client_->last_session_);
   }
 
  protected:
@@ -295,6 +452,7 @@ class SenderSessionTest : public ::testing::Test {
   std::unique_ptr<SimpleMessagePort> message_port_;
   std::unique_ptr<SenderSession> session_;
   FakeTaskRunner task_runner_;
+  WeakPtr<FakeWebTransportClient> web_transport_client_;
 };
 
 TEST_F(SenderSessionTest, ConfiguresUdpBufferSizes) {
@@ -888,6 +1046,270 @@ TEST_F(SenderSessionTest, SendsInputMessage) {
   ASSERT_TRUE(message_body.is_value());
   EXPECT_EQ("INPUT", message_body.value()["type"].asString());
   EXPECT_FALSE(message_body.value()["input"].asString().empty());
+}
+
+TEST_F(SenderSessionTest, HandlesValidAnswerWithDataChannel) {
+  CreateSessionWithDataChannels();
+  NegotiateMirroringWithValidConfigs();
+
+  const auto& messages = message_port_->posted_messages();
+  ASSERT_EQ(1u, messages.size());
+  auto message_body = json::Parse(messages[0]);
+  ASSERT_TRUE(message_body.is_value());
+  const Json::Value& data_transport =
+      message_body.value()["offer"]["dataTransport"];
+  ASSERT_TRUE(data_transport.isObject());
+  EXPECT_EQ("webtransport", data_transport["protocol"].asString());
+
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _, _));
+  message_port_->ReceiveMessage(
+      ConstructAnswerFromOffer(CastMode::kMirroring, true));
+
+  ASSERT_TRUE(web_transport_client_);
+  EXPECT_EQ("https://127.0.0.1:33534/cast-mirroring",
+            web_transport_client_->last_url_);
+  ASSERT_EQ(
+      1u,
+      web_transport_client_->last_options_.server_certificate_hashes.size());
+  EXPECT_EQ("YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=",
+            web_transport_client_->last_options_.server_certificate_hashes[0]);
+
+  // The client is told about the data session from a separate task, even
+  // though the fake client connects synchronously, and must be able to create
+  // channels as soon as it is told.
+  std::unique_ptr<DataChannel> channel;
+  EXPECT_CALL(client_, OnDataSessionOpened(session_.get(), _))
+      .WillOnce([&](const SenderSession*, DataSession& data_session) {
+        auto channel_or_error = data_session.CreateDataChannel("test-label");
+        ASSERT_TRUE(channel_or_error.is_value());
+        channel = std::move(channel_or_error.value());
+      });
+  task_runner_.RunTasksUntilIdle();
+  ASSERT_NE(nullptr, channel);
+  EXPECT_EQ("test-label", channel->label());
+}
+
+TEST_F(SenderSessionTest, HandlesDataSessionGracefulClosure) {
+  CreateSessionWithDataChannels();
+  NegotiateWithDataSession();
+
+  // A graceful close is reported through OnDataSessionClosed() only, not as
+  // an error.
+  EXPECT_CALL(client_, OnDataSessionClosed(session_.get(),
+                                           CodeEquals(Error::Code::kNone)));
+  web_transport_client_->last_session_->SimulateClosed(Error::None());
+  task_runner_.RunTasksUntilIdle();
+
+  EXPECT_FALSE(web_transport_client_);
+}
+
+TEST_F(SenderSessionTest, HandlesDataSessionErrorClosureWithoutOnError) {
+  CreateSessionWithDataChannels();
+  NegotiateWithDataSession();
+
+  // An error close is reported through OnDataSessionClosed() only, not
+  // OnError().
+  EXPECT_CALL(client_,
+              OnDataSessionClosed(session_.get(),
+                                  CodeEquals(Error::Code::kConnectionFailed)));
+  EXPECT_CALL(client_, OnError(_, _)).Times(0);
+  web_transport_client_->last_session_->SimulateClosed(
+      Error(Error::Code::kConnectionFailed, "Transport connection reset"));
+  task_runner_.RunTasksUntilIdle();
+
+  EXPECT_FALSE(web_transport_client_);
+}
+
+TEST_F(SenderSessionTest, HandlesDataSessionConnectSynchronousFailure) {
+  CreateSessionWithDataChannels(
+      Error(Error::Code::kSocketConnectFailure, "Sync connect failure"));
+  NegotiateMirroringWithValidConfigs();
+
+  // OnDataSessionOpened() is never called for a failed connection, and the
+  // failure is reported through OnDataSessionClosed() only, not OnError().
+  InSequence s;
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _, _));
+  EXPECT_CALL(client_, OnDataSessionClosed(
+                           session_.get(),
+                           CodeEquals(Error::Code::kSocketConnectFailure)));
+  EXPECT_CALL(client_, OnError(_, _)).Times(0);
+  message_port_->ReceiveMessage(
+      ConstructAnswerFromOffer(CastMode::kMirroring, true));
+  task_runner_.RunTasksUntilIdle();
+
+  EXPECT_FALSE(web_transport_client_);
+}
+
+TEST_F(SenderSessionTest, NegotiateFromOnDataSessionClosedWithErrorIsSafe) {
+  CreateSessionWithDataChannels();
+  NegotiateWithDataSession();
+  WeakPtr<FakeWebTransportSession> old_session =
+      web_transport_client_->last_session_;
+
+  // Renegotiating after a data session failure must not destroy the data
+  // session while it is still reporting the closure.
+  EXPECT_CALL(client_,
+              OnDataSessionClosed(session_.get(),
+                                  CodeEquals(Error::Code::kConnectionFailed)))
+      .WillOnce([this](const SenderSession*, const Error&) {
+        NegotiateMirroringWithValidConfigs();
+      });
+  old_session->SimulateClosed(
+      Error(Error::Code::kConnectionFailed, "Transport connection reset"));
+  task_runner_.RunTasksUntilIdle();
+  EXPECT_FALSE(old_session);
+  ASSERT_EQ(2u, message_port_->posted_messages().size());
+
+  // The new negotiation gets its own data session.
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _, _));
+  EXPECT_CALL(client_, OnDataSessionOpened(session_.get(), _))
+      .WillOnce([](const SenderSession*, DataSession& data_session) {
+        EXPECT_TRUE(data_session.CreateDataChannel("test-label").is_value());
+      });
+  message_port_->ReceiveMessage(
+      ConstructAnswerFromOffer(CastMode::kMirroring, true));
+  task_runner_.RunTasksUntilIdle();
+}
+
+TEST_F(SenderSessionTest, NegotiateFromOnDataSessionClosedIsSafe) {
+  CreateSessionWithDataChannels();
+  NegotiateWithDataSession();
+  WeakPtr<FakeWebTransportSession> old_session =
+      web_transport_client_->last_session_;
+
+  EXPECT_CALL(client_, OnDataSessionClosed(session_.get(),
+                                           CodeEquals(Error::Code::kNone)))
+      .WillOnce([this](const SenderSession*, const Error&) {
+        NegotiateMirroringWithValidConfigs();
+      });
+  old_session->SimulateClosed(Error::None());
+  task_runner_.RunTasksUntilIdle();
+  EXPECT_FALSE(old_session);
+  EXPECT_EQ(2u, message_port_->posted_messages().size());
+}
+
+TEST_F(SenderSessionTest, DestroyFromOnDataSessionClosedIsSafe) {
+  CreateSessionWithDataChannels();
+  NegotiateWithDataSession();
+  WeakPtr<FakeWebTransportSession> old_session =
+      web_transport_client_->last_session_;
+
+  EXPECT_CALL(client_,
+              OnDataSessionClosed(session_.get(),
+                                  CodeEquals(Error::Code::kConnectionFailed)))
+      .WillOnce(
+          [this](const SenderSession*, const Error&) { session_.reset(); });
+  old_session->SimulateClosed(
+      Error(Error::Code::kConnectionFailed, "Transport connection reset"));
+  task_runner_.RunTasksUntilIdle();
+  EXPECT_FALSE(session_);
+  EXPECT_FALSE(old_session);
+}
+
+TEST_F(SenderSessionTest, NegotiateFromDataChannelCloseIsSafe) {
+  CreateSessionWithDataChannels();
+  // Declared before `channel` so that it outlives it.
+  FakeDataChannelDelegate delegate;
+  std::unique_ptr<DataChannel> channel;
+  NegotiateWithDataSession(&channel);
+  ASSERT_TRUE(channel);
+  WeakPtr<FakeWebTransportSession> old_session =
+      web_transport_client_->last_session_;
+  channel->SetDelegate(&delegate);
+
+  // The channel reports its closure from inside the data session's own
+  // closure handling, so renegotiating here must not destroy the data session
+  // synchronously. The renegotiation drops the data session, so its closure
+  // is not reported.
+  delegate.on_closed_ = [this] { NegotiateMirroringWithValidConfigs(); };
+  old_session->SimulateClosed(Error::None());
+  EXPECT_TRUE(old_session);
+  EXPECT_EQ(DataChannel::State::kClosed, channel->state());
+
+  task_runner_.RunTasksUntilIdle();
+  EXPECT_FALSE(old_session);
+  EXPECT_EQ(2u, message_port_->posted_messages().size());
+}
+
+TEST_F(SenderSessionTest, RenegotiationDropsPreviousDataSession) {
+  CreateSessionWithDataChannels();
+  NegotiateWithDataSession();
+  WeakPtr<FakeWebTransportSession> old_session =
+      web_transport_client_->last_session_;
+
+  NegotiateMirroringWithValidConfigs();
+
+  // Events from the previous data session are no longer reported, even before
+  // it has been destroyed.
+  ASSERT_TRUE(old_session);
+  old_session->SimulateClosed(
+      Error(Error::Code::kConnectionFailed, "Transport connection reset"));
+  task_runner_.RunTasksUntilIdle();
+  EXPECT_FALSE(old_session);
+}
+
+TEST_F(SenderSessionTest, NegotiateFromOnNegotiatedDropsStaleDataSession) {
+  CreateSessionWithDataChannels();
+  NegotiateMirroringWithValidConfigs();
+
+  // Renegotiating from inside OnNegotiated() supersedes the answer being
+  // handled, so its data session must be dropped and never reported.
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _, _))
+      .WillOnce([this](const SenderSession*, SenderSession::ConfiguredSenders,
+                       capture_recommendations::Recommendations) {
+        NegotiateMirroringWithValidConfigs();
+      });
+  message_port_->ReceiveMessage(
+      ConstructAnswerFromOffer(CastMode::kMirroring, true));
+  task_runner_.RunTasksUntilIdle();
+
+  EXPECT_FALSE(web_transport_client_);
+  EXPECT_EQ(2u, message_port_->posted_messages().size());
+}
+
+TEST_F(SenderSessionTest, OfferOmitsDataTransportWhenDisabled) {
+  NegotiateMirroringWithValidConfigs();
+
+  const auto& messages = message_port_->posted_messages();
+  ASSERT_EQ(1u, messages.size());
+  auto message_body = json::Parse(messages[0]);
+  ASSERT_TRUE(message_body.is_value());
+  EXPECT_TRUE(message_body.value()["offer"]["dataTransport"].isNull());
+}
+
+TEST_F(SenderSessionTest, DoesNotOpenDataSessionWhenDisabled) {
+  NegotiateMirroringWithValidConfigs();
+
+  // Even if the receiver answers with a data transport, no data session is
+  // set up, so the client only sees OnNegotiated().
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _, _));
+  message_port_->ReceiveMessage(
+      ConstructAnswerFromOffer(CastMode::kMirroring, true));
+  task_runner_.RunTasksUntilIdle();
+}
+
+TEST_F(SenderSessionTest, DoesNotOpenDataSessionWithoutClient) {
+  SenderSession::Configuration config{IPAddress::kV4LoopbackAddress(),
+                                      client_,
+                                      environment_.get(),
+                                      message_port_.get(),
+                                      "sender-12345",
+                                      "receiver-12345",
+                                      /* use_android_rtp_hack */ true,
+                                      /* use_dscp */ true};
+  config.create_web_transport_client = [](TaskRunner&) {
+    return std::unique_ptr<WebTransportClient>();
+  };
+  session_.reset();
+  session_ = std::make_unique<SenderSession>(std::move(config));
+  NegotiateMirroringWithValidConfigs();
+
+  // No WebTransport client could be created, so neither
+  // OnDataSessionOpened() nor OnDataSessionClosed() is called.
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _, _));
+  message_port_->ReceiveMessage(
+      ConstructAnswerFromOffer(CastMode::kMirroring, true));
+  task_runner_.RunTasksUntilIdle();
 }
 
 }  // namespace openscreen::cast

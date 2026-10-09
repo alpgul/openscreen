@@ -6,13 +6,19 @@
 #define CAST_STREAMING_PUBLIC_RECEIVER_CONSTRAINTS_H_
 
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <vector>
 
 #include "cast/streaming/public/constants.h"
 #include "cast/streaming/resolution.h"
+#include "platform/api/web_transport.h"
 
 namespace openscreen::cast {
+
+// Creates the WebTransport server that carries DataChannels.
+using CreateWebTransportServerCallback =
+    std::function<std::unique_ptr<WebTransportServer>(TaskRunner&)>;
 
 // Information about the display the receiver is attached to.
 struct Display {
@@ -177,6 +183,13 @@ class ReceiverConstraints {
 
   // If true, the receiver supports sending input events to the sender.
   bool supports_input_events = false;
+
+  // If set, enables support for DataChannels backed by WebTransport: the
+  // receiver accepts a data transport offered by the sender and reports
+  // incoming channels through ReceiverSession::Client::OnNewDataChannel().
+  // Leave unset if the embedder has no WebTransport implementation, in which
+  // case the ANSWER never includes a data transport.
+  CreateWebTransportServerCallback create_web_transport_server;
 };
 
 }  // namespace openscreen::cast

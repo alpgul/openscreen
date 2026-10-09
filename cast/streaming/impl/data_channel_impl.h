@@ -34,9 +34,13 @@ class DataChannelImpl final : public DataChannel,
   void OnDestroyed() override;
 
  private:
-  // Owned by the DataChannelSession; cleared via OnDestroyed().
-  raw_ptr<DataChannelStream> stream_;
-  raw_ptr<DataChannel::Delegate> delegate_;
+  // Owned by the DataChannelSession. If the stream is destroyed first, it
+  // nulls this out via OnDestroyed(). If it is still set when this object is
+  // destroyed, the destructor detaches from the stream and closes it.
+  raw_ptr<DataChannelStream> stream_ = nullptr;
+  // Owned by the client, which must keep it alive or clear it via
+  // SetDelegate() while callbacks may arrive. Not used by the destructor.
+  raw_ptr<DataChannel::Delegate> delegate_ = nullptr;
   std::string cached_label_;
   State cached_state_ = State::kConnecting;
 };

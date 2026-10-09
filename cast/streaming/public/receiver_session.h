@@ -13,9 +13,12 @@
 
 #include "cast/common/public/message_port.h"
 #include "cast/streaming/capture_configs.h"
+#include "cast/streaming/impl/data_session_base.h"
+#include "cast/streaming/impl/receiver_data_session.h"
 #include "cast/streaming/impl/receiver_packet_router.h"
 #include "cast/streaming/input.pb.h"
 #include "cast/streaming/public/constants.h"
+#include "cast/streaming/public/data_channel.h"
 #include "cast/streaming/public/environment.h"
 #include "cast/streaming/public/offer_messages.h"
 #include "cast/streaming/public/protobuf_messenger.h"
@@ -45,7 +48,8 @@ class Receiver;
 // the UDP socket to be ready. In this case, the receivers and the answer
 // message will not be configured and sent until the UDP socket has finished
 // binding.
-class ReceiverSession final : public Environment::SocketSubscriber {
+class ReceiverSession final : public Environment::SocketSubscriber,
+                              private DataSessionBase::Delegate {
  public:
   // Upon successful negotiation, a set of configured receivers is constructed
   // for handling audio and video. Note that either receiver may be null.
@@ -130,6 +134,23 @@ class ReceiverSession final : public Environment::SocketSubscriber {
     virtual void OnError(const ReceiverSession* session,
                          const Error& error) = 0;
 
+    // Called when the sender opens a new data channel. Only called if data
+    // channels were enabled via ReceiverConstraints and negotiated in the
+    // OFFER/ANSWER. The delegate must be set on `channel` before returning,
+    // or messages that arrived with the channel are dropped. The default
+    // implementation drops the channel.
+    virtual void OnNewDataChannel(const ReceiverSession* session,
+                                  std::unique_ptr<DataChannel> channel) {}
+
+    // Called when the data session negotiated with the sender closes. `error`
+    // is ok if the sender closed it gracefully; otherwise it describes the
+    // failure. Data session failures are only reported here, never through
+    // OnError(), and don't affect streaming. Channels from OnNewDataChannel()
+    // move to DataChannel::State::kClosed. A new data session is only set up
+    // by a later OFFER.
+    virtual void OnDataSessionClosed(const ReceiverSession* session,
+                                     const Error& error) {}
+
     // Called to verify whether a given codec parameter is supported by
     // this client. If not overriden, this always assumes true.
     // This method is used only for secondary matching, e.g.
@@ -195,9 +216,11 @@ class ReceiverSession final : public Environment::SocketSubscriber {
     // The sender that provided the OFFER.
     std::string sender_id;
 
-    // The selected audio and video streams from the original OFFER message.
+    // The selected audio and video streams, and data transport, from the
+    // original OFFER message.
     std::unique_ptr<AudioStream> selected_audio;
     std::unique_ptr<VideoStream> selected_video;
+    std::unique_ptr<DataTransport> selected_data;
 
     // The sequence number of the OFFER that produced these properties.
     int sequence_number;
@@ -234,6 +257,17 @@ class ReceiverSession final : public Environment::SocketSubscriber {
   // based on our ANSWER.
   ConfiguredReceivers SpawnReceivers(const PendingOffer& properties,
                                      const Resolution& max_video_resolution);
+
+  // Starts a WebTransport server for DataChannels on the bound local address,
+  // if `properties` selected a data transport.
+  void InitializeDataSession(const PendingOffer& properties);
+
+  // DataSessionBase::Delegate overrides, called only for `data_session_`.
+  // They forward to the Client methods of the same name.
+  void OnNewDataChannel(DataSessionBase* data_session,
+                        std::unique_ptr<DataChannel> channel) override;
+  void OnDataSessionClosed(DataSessionBase* data_session,
+                           const Error& error) override;
 
   // Creates an ANSWER object. Assumes at least one stream is not nullptr.
   Answer ConstructAnswer(const PendingOffer& properties);
@@ -282,6 +316,9 @@ class ReceiverSession final : public Environment::SocketSubscriber {
   // The INPUT messenger, which uses the session messenger for sending INPUT
   // messages.
   ProtobufMessenger<InputMessage> input_messenger_;
+
+  // The data session negotiated by the current OFFER/ANSWER, if any.
+  std::unique_ptr<ReceiverDataSession> data_session_;
 };
 
 }  // namespace openscreen::cast

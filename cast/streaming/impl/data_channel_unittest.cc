@@ -20,6 +20,7 @@ namespace {
 
 using ::testing::_;
 using ::testing::NiceMock;
+using ::testing::Property;
 using ::testing::StrictMock;
 
 class FakeWebTransportStream : public WebTransportStream {
@@ -113,7 +114,7 @@ class MockSessionVisitor : public DataChannelSession::Visitor {
               (std::unique_ptr<DataChannel> channel),
               (override));
   MOCK_METHOD(void, OnConnectionEstablished, (), (override));
-  MOCK_METHOD(void, OnConnectionClosed, (), (override));
+  MOCK_METHOD(void, OnConnectionClosed, (const Error&), (override));
 };
 
 class MockChannelDelegate : public DataChannel::Delegate {
@@ -316,6 +317,19 @@ TEST_F(DataChannelTest, OnConnectionClosed_AbruptClose_ChannelsClosed) {
 
   EXPECT_EQ(client_channel->state(), DataChannel::State::kClosed);
   EXPECT_EQ(server_channel->state(), DataChannel::State::kClosed);
+}
+
+TEST_F(DataChannelTest, OnSessionClosedForwardsErrorToVisitor) {
+  EXPECT_CALL(client_session_visitor_,
+              OnConnectionClosed(Property(&Error::code, Error::Code::kNone)));
+  client_data_session_->OnSessionClosed(client_session_raw_,
+                                        Error(Error::Code::kNone, "closed"));
+
+  EXPECT_CALL(server_session_visitor_,
+              OnConnectionClosed(
+                  Property(&Error::code, Error::Code::kConnectionFailed)));
+  server_data_session_->OnSessionClosed(
+      server_session_raw_, Error(Error::Code::kConnectionFailed, "failed"));
 }
 
 TEST_F(DataChannelTest, OnCanWrite_WriteUnblocked_OnWriteReadyCalled) {

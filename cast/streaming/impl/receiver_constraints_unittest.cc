@@ -8,6 +8,7 @@
 
 #include "cast/streaming/public/constants.h"
 #include "gtest/gtest.h"
+#include "platform/api/web_transport.h"
 
 namespace openscreen::cast {
 
@@ -185,6 +186,17 @@ TEST(ReceiverConstraintsTest, ReceiverConstraintsIsSupersetOf) {
   EXPECT_FALSE(first.IsSupersetOf(second));
   EXPECT_TRUE(second.IsSupersetOf(first));
   second = first;
+
+  // Modified `create_web_transport_server`.
+  first.create_web_transport_server = [](TaskRunner&) {
+    return std::unique_ptr<WebTransportServer>();
+  };
+  EXPECT_TRUE(first.IsSupersetOf(second));
+  EXPECT_FALSE(second.IsSupersetOf(first));
+  second = first;
+  EXPECT_TRUE(second.create_web_transport_server);
+  EXPECT_TRUE(first.IsSupersetOf(second));
+  EXPECT_TRUE(second.IsSupersetOf(first));
 
   // Modified `video_codecs`.
   first.video_codecs = {VideoCodec::kVp8, VideoCodec::kVp9};

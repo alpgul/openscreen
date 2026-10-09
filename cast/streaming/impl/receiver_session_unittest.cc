@@ -6,21 +6,26 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
+#include <string>
 #include <utility>
 
 #include "cast/streaming/impl/message_constants.h"
 #include "cast/streaming/input.pb.h"
+#include "cast/streaming/public/data_channel.h"
 #include "cast/streaming/public/receiver.h"
 #include "cast/streaming/testing/mock_environment.h"
 #include "cast/streaming/testing/simple_message_port.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "platform/api/web_transport.h"
 #include "platform/base/ip_address.h"
 #include "platform/test/fake_clock.h"
 #include "platform/test/fake_task_runner.h"
 #include "util/chrono_helpers.h"
 #include "util/json/json_serialization.h"
 #include "util/std_util.h"
+#include "util/weak_ptr.h"
 
 using ::testing::_;
 using ::testing::InSequence;
@@ -456,6 +461,14 @@ class FakeClient : public ReceiverSession::Client {
               OnError,
               (const ReceiverSession*, const Error& error),
               (override));
+  MOCK_METHOD(void,
+              OnNewDataChannel,
+              (const ReceiverSession*, std::unique_ptr<DataChannel> channel),
+              (override));
+  MOCK_METHOD(void,
+              OnDataSessionClosed,
+              (const ReceiverSession*, const Error& error),
+              (override));
   MOCK_METHOD(bool,
               SupportsCodecParameter,
               (const std::string& parameter),
@@ -496,6 +509,59 @@ MATCHER_P(
     "Checks that a set of ConfiguredReceivers are from a specific sender") {
   return sender_id == arg.sender_id;
 }
+
+MATCHER_P(CodeEquals, code, "Checks error codes but not messages.") {
+  return arg.code() == code;
+}
+
+constexpr char kValidOfferMessageWithDataChannel[] = R"({
+  "type": "OFFER",
+  "seqNum": 1337,
+  "offer": {
+    "castMode": "mirroring",
+    "supportedStreams": [
+      {
+        "index": 31338,
+        "type": "video_source",
+        "codecName": "vp8",
+        "rtpProfile": "cast",
+        "rtpPayloadType": 127,
+        "ssrc": 19088745,
+        "maxFrameRate": "60000/1000",
+        "timeBase": "1/90000",
+        "maxBitRate": 5000000,
+        "profile": "main",
+        "level": "4",
+        "aesKey": "040d756791711fd3adb939066e6d8690",
+        "aesIvMask": "9ff0f022a959150e70a2d05a6c184aed",
+        "receiverRtcpDscp": 46,
+        "resolutions": [
+          {
+            "width": 1280,
+            "height": 720
+          }
+        ]
+      },
+      {
+        "index": 1337,
+        "type": "audio_source",
+        "codecName": "opus",
+        "rtpProfile": "cast",
+        "rtpPayloadType": 97,
+        "ssrc": 19088747,
+        "bitRate": 124000,
+        "timeBase": "1/48000",
+        "channels": 2,
+        "aesKey": "51027e4e2347cbcb49d57ef10177aebc",
+        "aesIvMask": "7f12a19be62a36c04ae4116caaeff6d1",
+        "receiverRtcpDscp": 46
+      }
+    ],
+    "dataTransport": {
+      "protocol": "webtransport"
+    }
+  }
+})";
 
 }  // namespace
 
@@ -1448,6 +1514,466 @@ TEST_F(ReceiverSessionTest, HandlesInputMessengerReceivesMessage) {
 TEST_F(ReceiverSessionTest, UnsubscribesFromEnvironmentOnDestruction) {
   session_.reset();
   environment_->SetSocketStateForTesting(Environment::SocketState::kReady);
+}
+
+class FakeWebTransportStream : public WebTransportStream {
+ public:
+  void SetDelegate(Delegate* delegate) override {
+    delegate_ = delegate;
+    FlushIncomingBytes();
+  }
+
+  bool Write(ByteView data) override { return true; }
+  void Close() override {}
+
+  void BufferIncomingBytes(std::vector<uint8_t> bytes) {
+    incoming_buffer_.insert(incoming_buffer_.end(), bytes.begin(), bytes.end());
+    FlushIncomingBytes();
+  }
+
+ private:
+  void FlushIncomingBytes() {
+    if (delegate_ && !incoming_buffer_.empty()) {
+      std::vector<uint8_t> data = std::move(incoming_buffer_);
+      incoming_buffer_.clear();
+      delegate_->OnRead(this, ByteView(data.data(), data.size()));
+    }
+  }
+
+  raw_ptr<Delegate> delegate_ = nullptr;
+  std::vector<uint8_t> incoming_buffer_;
+};
+
+class FakeWebTransportSession : public WebTransportSession {
+ public:
+  // If set, `close_error` records the error passed to Close(); it must outlive
+  // this session.
+  explicit FakeWebTransportSession(std::optional<Error>* close_error = nullptr)
+      : close_error_(close_error) {}
+
+  void SetDelegate(Delegate* delegate) override { delegate_ = delegate; }
+
+  ErrorOr<std::unique_ptr<WebTransportStream>> CreateOutgoingStream() override {
+    return std::unique_ptr<WebTransportStream>(
+        std::make_unique<FakeWebTransportStream>());
+  }
+
+  void Close(const Error& error) override {
+    if (close_error_) {
+      *close_error_ = error;
+    }
+    SimulateClosed(error);
+  }
+
+  // Like a real transport, keeps using its own state after notifying the
+  // delegate, so destroying this session from inside the notification is
+  // caught by ASAN.
+  void SimulateClosed(const Error& error) {
+    if (delegate_) {
+      delegate_->OnSessionClosed(this, error);
+    }
+    ++close_notification_count_;
+  }
+
+  void AddIncomingStream(std::unique_ptr<WebTransportStream> stream) {
+    auto* ptr = stream.get();
+    incoming_streams_.push_back(std::move(stream));
+    if (delegate_) {
+      delegate_->OnIncomingStream(ptr);
+    }
+  }
+
+  WeakPtr<FakeWebTransportSession> GetWeakPtr() const {
+    return weak_factory_.GetWeakPtr();
+  }
+
+ private:
+  raw_ptr<std::optional<Error>> close_error_ = nullptr;
+  raw_ptr<Delegate> delegate_ = nullptr;
+  int close_notification_count_ = 0;
+  std::vector<std::unique_ptr<WebTransportStream>> incoming_streams_;
+  WeakPtrFactory<FakeWebTransportSession> weak_factory_{this};
+};
+
+class FakeWebTransportServer : public WebTransportServer {
+ public:
+  // If set, `stop_count` counts calls to Stop(); it must outlive this server.
+  FakeWebTransportServer(std::string fingerprint, int* stop_count)
+      : fingerprint_(std::move(fingerprint)), stop_count_(stop_count) {}
+
+  void SetDelegate(Delegate* delegate) override { delegate_ = delegate; }
+  uint16_t Start(const IPEndpoint& local_endpoint) override { return 33534; }
+  void Stop() override {
+    if (stop_count_) {
+      ++*stop_count_;
+    }
+  }
+  std::string GetCertificateFingerprint() const override {
+    return fingerprint_;
+  }
+
+  // Simulates a sender connecting to this server.
+  void AcceptSession(std::unique_ptr<WebTransportSession> session) {
+    ASSERT_TRUE(delegate_);
+    delegate_->OnSessionCreated(std::move(session));
+  }
+
+  WeakPtr<FakeWebTransportServer> GetWeakPtr() const {
+    return weak_factory_.GetWeakPtr();
+  }
+
+ private:
+  const std::string fingerprint_;
+  raw_ptr<int> stop_count_ = nullptr;
+  raw_ptr<Delegate> delegate_ = nullptr;
+  WeakPtrFactory<FakeWebTransportServer> weak_factory_{this};
+};
+
+// Returns a callback whose most recently created server is exposed through
+// `server`. `stop_count`, if set, counts calls to Stop() on the servers and
+// must outlive them.
+CreateWebTransportServerCallback MakeFakeServerCallback(
+    WeakPtr<FakeWebTransportServer>* server,
+    int* stop_count = nullptr,
+    std::string fingerprint = "fingerprint") {
+  return [server, stop_count, fingerprint](TaskRunner&) {
+    auto fake =
+        std::make_unique<FakeWebTransportServer>(fingerprint, stop_count);
+    *server = fake->GetWeakPtr();
+    return fake;
+  };
+}
+
+// Returns default constraints with DataChannels enabled through
+// `create_server`.
+ReceiverConstraints MakeDataChannelConstraints(
+    CreateWebTransportServerCallback create_server) {
+  ReceiverConstraints constraints;
+  constraints.create_web_transport_server = std::move(create_server);
+  return constraints;
+}
+
+TEST_F(ReceiverSessionTest, CanNegotiateWithDataChannel) {
+  WeakPtr<FakeWebTransportServer> server;
+  SetUpWithConstraints(
+      MakeDataChannelConstraints(MakeFakeServerCallback(&server)));
+
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _))
+      .WillOnce([](const ReceiverSession* session_,
+                   ReceiverSession::ConfiguredReceivers cr) {
+        EXPECT_TRUE(cr.audio_receiver);
+        EXPECT_TRUE(cr.video_receiver);
+      });
+
+  message_port_->ReceiveMessage(kValidOfferMessageWithDataChannel);
+
+  const std::vector<std::string>& messages = message_port_->posted_messages();
+  ASSERT_EQ(1u, messages.size());
+
+  Json::Value message = ExpectIsValidAnswer(messages[0]);
+  EXPECT_EQ("ANSWER", message["type"].asString());
+  EXPECT_EQ(1337, message["seqNum"].asInt());
+
+  const Json::Value& answer = message["answer"];
+  EXPECT_TRUE(answer.isObject());
+  EXPECT_FALSE(answer["dataTransport"].isNull());
+  EXPECT_TRUE(answer["dataTransport"].isObject());
+  EXPECT_EQ("webtransport", answer["dataTransport"]["protocol"].asString());
+  EXPECT_EQ(33534, answer["dataTransport"]["port"].asInt());
+  EXPECT_EQ("fingerprint",
+            answer["dataTransport"]["certificateFingerprint"].asString());
+
+  ASSERT_TRUE(server);
+  auto session = std::make_unique<FakeWebTransportSession>();
+  WeakPtr<FakeWebTransportSession> weak_session = session->GetWeakPtr();
+  server->AcceptSession(std::move(session));
+  ASSERT_TRUE(weak_session);
+
+  auto incoming_stream = std::make_unique<FakeWebTransportStream>();
+  // Send Open Frame: Type (0x01) + Length (0x0005) + "label"
+  incoming_stream->BufferIncomingBytes({1, 0, 5, 'l', 'a', 'b', 'e', 'l'});
+
+  EXPECT_CALL(client_, OnNewDataChannel(session_.get(), _))
+      .WillOnce(
+          [](const ReceiverSession*, std::unique_ptr<DataChannel> channel) {
+            ASSERT_NE(channel, nullptr);
+            EXPECT_EQ(channel->label(), "label");
+            EXPECT_EQ(channel->state(), DataChannel::State::kOpen);
+          });
+  weak_session->AddIncomingStream(std::move(incoming_stream));
+
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
+}
+
+TEST_F(ReceiverSessionTest, RejectsSecondDataSessionWhenActive) {
+  WeakPtr<FakeWebTransportServer> server;
+  SetUpWithConstraints(
+      MakeDataChannelConstraints(MakeFakeServerCallback(&server)));
+
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  message_port_->ReceiveMessage(kValidOfferMessageWithDataChannel);
+  ASSERT_TRUE(server);
+
+  std::optional<Error> first_close_error;
+  auto first_session =
+      std::make_unique<FakeWebTransportSession>(&first_close_error);
+  WeakPtr<FakeWebTransportSession> weak_first_session =
+      first_session->GetWeakPtr();
+  server->AcceptSession(std::move(first_session));
+
+  std::optional<Error> second_close_error;
+  server->AcceptSession(
+      std::make_unique<FakeWebTransportSession>(&second_close_error));
+
+  // The second session is closed and the first one is kept.
+  ASSERT_TRUE(second_close_error.has_value());
+  EXPECT_EQ(Error::Code::kSocketInvalidState, second_close_error->code());
+  EXPECT_TRUE(weak_first_session);
+  EXPECT_FALSE(first_close_error.has_value());
+
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
+}
+
+TEST_F(ReceiverSessionTest, AnswerOmitsDataTransportWhenFingerprintEmpty) {
+  WeakPtr<FakeWebTransportServer> server;
+  int stop_count = 0;
+  SetUpWithConstraints(MakeDataChannelConstraints(
+      MakeFakeServerCallback(&server, &stop_count, /*fingerprint=*/"")));
+
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  message_port_->ReceiveMessage(kValidOfferMessageWithDataChannel);
+
+  const std::vector<std::string>& messages = message_port_->posted_messages();
+  ASSERT_EQ(1u, messages.size());
+  Json::Value message = ExpectIsValidAnswer(messages[0]);
+  EXPECT_TRUE(message["answer"]["dataTransport"].isNull());
+
+  // The unusable server is stopped exactly once and discarded.
+  EXPECT_FALSE(server);
+  EXPECT_EQ(1, stop_count);
+
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
+}
+
+TEST_F(ReceiverSessionTest, AnswerOmitsDataTransportWhenServerCreationFails) {
+  SetUpWithConstraints(MakeDataChannelConstraints(
+      [](TaskRunner&) { return std::unique_ptr<WebTransportServer>(); }));
+
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  message_port_->ReceiveMessage(kValidOfferMessageWithDataChannel);
+
+  const std::vector<std::string>& messages = message_port_->posted_messages();
+  ASSERT_EQ(1u, messages.size());
+  Json::Value message = ExpectIsValidAnswer(messages[0]);
+  EXPECT_TRUE(message["answer"]["dataTransport"].isNull());
+
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
+}
+
+TEST_F(ReceiverSessionTest, HandlesDataSessionGracefulClosure) {
+  WeakPtr<FakeWebTransportServer> server;
+  SetUpWithConstraints(
+      MakeDataChannelConstraints(MakeFakeServerCallback(&server)));
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  message_port_->ReceiveMessage(kValidOfferMessageWithDataChannel);
+
+  ASSERT_TRUE(server);
+  auto session = std::make_unique<FakeWebTransportSession>();
+  WeakPtr<FakeWebTransportSession> weak_session = session->GetWeakPtr();
+  server->AcceptSession(std::move(session));
+  ASSERT_TRUE(weak_session);
+
+  // A graceful close is reported through OnDataSessionClosed() only, not as
+  // an error.
+  EXPECT_CALL(client_, OnDataSessionClosed(session_.get(),
+                                           CodeEquals(Error::Code::kNone)));
+  weak_session->SimulateClosed(Error::None());
+  task_runner_.RunTasksUntilIdle();
+  EXPECT_FALSE(weak_session);
+  EXPECT_FALSE(server);
+
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
+}
+
+TEST_F(ReceiverSessionTest, HandlesDataSessionErrorClosureWithoutOnError) {
+  WeakPtr<FakeWebTransportServer> server;
+  SetUpWithConstraints(
+      MakeDataChannelConstraints(MakeFakeServerCallback(&server)));
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  message_port_->ReceiveMessage(kValidOfferMessageWithDataChannel);
+
+  ASSERT_TRUE(server);
+  auto session = std::make_unique<FakeWebTransportSession>();
+  WeakPtr<FakeWebTransportSession> weak_session = session->GetWeakPtr();
+  server->AcceptSession(std::move(session));
+  ASSERT_TRUE(weak_session);
+
+  // An error close is reported through OnDataSessionClosed() only, not
+  // OnError().
+  EXPECT_CALL(client_,
+              OnDataSessionClosed(session_.get(),
+                                  CodeEquals(Error::Code::kConnectionFailed)));
+  EXPECT_CALL(client_, OnError(_, _)).Times(0);
+  weak_session->SimulateClosed(
+      Error(Error::Code::kConnectionFailed, "Session reset"));
+  task_runner_.RunTasksUntilIdle();
+  EXPECT_FALSE(weak_session);
+  EXPECT_FALSE(server);
+
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
+}
+
+TEST_F(ReceiverSessionTest, DestroyFromOnDataSessionClosedIsSafe) {
+  WeakPtr<FakeWebTransportServer> server;
+  SetUpWithConstraints(
+      MakeDataChannelConstraints(MakeFakeServerCallback(&server)));
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  message_port_->ReceiveMessage(kValidOfferMessageWithDataChannel);
+
+  ASSERT_TRUE(server);
+  auto session = std::make_unique<FakeWebTransportSession>();
+  WeakPtr<FakeWebTransportSession> weak_session = session->GetWeakPtr();
+  server->AcceptSession(std::move(session));
+  ASSERT_TRUE(weak_session);
+
+  // Destroying ReceiverSession from inside OnDataSessionClosed() must not
+  // cause a use-after-free while the data session is reporting the closure.
+  EXPECT_CALL(client_,
+              OnDataSessionClosed(session_.get(),
+                                  CodeEquals(Error::Code::kConnectionFailed)))
+      .WillOnce([this](const ReceiverSession*, const Error&) {
+        EXPECT_CALL(client_, OnReceiversDestroying(
+                                 session_.get(),
+                                 ReceiverSession::Client::kEndOfSession));
+        session_.reset();
+      });
+  weak_session->SimulateClosed(
+      Error(Error::Code::kConnectionFailed, "Session reset"));
+  task_runner_.RunTasksUntilIdle();
+  EXPECT_FALSE(session_);
+  EXPECT_FALSE(weak_session);
+}
+
+TEST_F(ReceiverSessionTest, RenegotiationDropsPreviousDataSession) {
+  WeakPtr<FakeWebTransportServer> server;
+  SetUpWithConstraints(
+      MakeDataChannelConstraints(MakeFakeServerCallback(&server)));
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  message_port_->ReceiveMessage(kValidOfferMessageWithDataChannel);
+
+  ASSERT_TRUE(server);
+  auto session = std::make_unique<FakeWebTransportSession>();
+  WeakPtr<FakeWebTransportSession> weak_session = session->GetWeakPtr();
+  server->AcceptSession(std::move(session));
+  ASSERT_TRUE(weak_session);
+
+  // A new OFFER without data transport renegotiates and drops the previous
+  // data session.
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kRenegotiated));
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  message_port_->ReceiveMessage(kValidOfferMessage);
+
+  // Events from the previous data session must not be reported to the client.
+  ASSERT_TRUE(weak_session);
+  weak_session->SimulateClosed(
+      Error(Error::Code::kConnectionFailed, "Session reset"));
+  task_runner_.RunTasksUntilIdle();
+  EXPECT_FALSE(weak_session);
+  EXPECT_FALSE(server);
+
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
+}
+
+TEST_F(ReceiverSessionTest, OfferFromOnDataSessionClosedWithErrorIsSafe) {
+  WeakPtr<FakeWebTransportServer> server;
+  SetUpWithConstraints(
+      MakeDataChannelConstraints(MakeFakeServerCallback(&server)));
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  message_port_->ReceiveMessage(kValidOfferMessageWithDataChannel);
+
+  ASSERT_TRUE(server);
+  auto session = std::make_unique<FakeWebTransportSession>();
+  WeakPtr<FakeWebTransportSession> weak_session = session->GetWeakPtr();
+  server->AcceptSession(std::move(session));
+  ASSERT_TRUE(weak_session);
+
+  // A new OFFER handled from inside OnDataSessionClosed() sets up a new data
+  // session without destroying the old one while it is reporting the closure.
+  EXPECT_CALL(client_,
+              OnDataSessionClosed(session_.get(),
+                                  CodeEquals(Error::Code::kConnectionFailed)))
+      .WillOnce([this](const ReceiverSession*, const Error&) {
+        EXPECT_CALL(client_, OnReceiversDestroying(
+                                 session_.get(),
+                                 ReceiverSession::Client::kRenegotiated));
+        EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+        message_port_->ReceiveMessage(kValidOfferMessageWithDataChannel);
+      });
+
+  weak_session->SimulateClosed(
+      Error(Error::Code::kConnectionFailed, "Session reset"));
+  task_runner_.RunTasksUntilIdle();
+  EXPECT_FALSE(weak_session);
+
+  const std::vector<std::string>& messages = message_port_->posted_messages();
+  ASSERT_EQ(2u, messages.size());
+  Json::Value message = ExpectIsValidAnswer(messages[1]);
+  EXPECT_FALSE(message["answer"]["dataTransport"].isNull());
+
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
+}
+
+TEST_F(ReceiverSessionTest, AnswerOmitsDataTransportWhenDisabled) {
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+
+  message_port_->ReceiveMessage(kValidOfferMessageWithDataChannel);
+
+  const std::vector<std::string>& messages = message_port_->posted_messages();
+  ASSERT_EQ(1u, messages.size());
+  Json::Value message = ExpectIsValidAnswer(messages[0]);
+  EXPECT_TRUE(message["answer"]["dataTransport"].isNull());
+
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
+}
+
+TEST_F(ReceiverSessionTest, AnswerOmitsDataTransportWhenNotOffered) {
+  WeakPtr<FakeWebTransportServer> server;
+  SetUpWithConstraints(
+      MakeDataChannelConstraints(MakeFakeServerCallback(&server)));
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+
+  message_port_->ReceiveMessage(kValidOfferMessage);
+
+  const std::vector<std::string>& messages = message_port_->posted_messages();
+  ASSERT_EQ(1u, messages.size());
+  Json::Value message = ExpectIsValidAnswer(messages[0]);
+  EXPECT_TRUE(message["answer"]["dataTransport"].isNull());
+  // No server is created for an OFFER without a data transport.
+  EXPECT_FALSE(server);
+
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
 }
 
 }  // namespace openscreen::cast
