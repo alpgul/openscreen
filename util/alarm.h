@@ -28,13 +28,15 @@ namespace openscreen {
 // Task executing after the object is destroyed).
 //
 // Design: In order to support efficient, arbitrary canceling and re-scheduling
-// by the client, the Alarm posts a cancelable functor to the TaskRunner which,
-// when invoked, then checks to see whether the Alarm instance still exists and,
-// if so, calls its TryInvoke() method. The TryInvoke() method then determines:
-// a) whether the invocation time of the client's Task has changed; and b)
-// whether the Alarm was canceled in the meantime. From this, it either: a) does
-// nothing; b) re-posts a new cancelable functor to the TaskRunner, to try
-// running the client's Task later; or c) runs the client's Task.
+// by the client, the Alarm posts a task to the TaskRunner that holds a WeakPtr
+// to the Alarm and the ID of the firing it represents. When run, the task
+// checks whether the Alarm instance still exists and whether its firing is
+// still the current one (a newer firing may have superseded it), and if so
+// calls TryInvoke(). The TryInvoke() method then determines: a) whether the
+// invocation time of the client's Task has changed; and b) whether the Alarm
+// was canceled in the meantime. From this, it either: a) does nothing; b)
+// posts a new firing to the TaskRunner, to try running the client's Task later;
+// or c) runs the client's Task.
 class Alarm {
  public:
   Alarm(ClockNowFunctionPtr now_function, TaskRunner& task_runner);
@@ -76,10 +78,12 @@ class Alarm {
   static constexpr Clock::time_point kImmediately = Clock::time_point::min();
 
  private:
-  // Posts a delayed call to OnFire() to the TaskRunner.
+  // Posts a delayed call to OnFire() to the TaskRunner, superseding any
+  // previously-posted one.
   void InvokeLater(Clock::time_point now, Clock::time_point fire_time);
 
-  // Called when a posted TaskRunner event fires.
+  // Called by the task posted by InvokeLater(). Calls TryInvoke(), unless
+  // `fire_id` has been superseded by a later call to InvokeLater().
   void OnFire(uint64_t fire_id);
 
   // Examines whether to invoke the client's Task now; or try again later; or
@@ -95,16 +99,18 @@ class Alarm {
   Clock::time_point alarm_time_{};
 
   // True when there is a task in the TaskRunner's queue that will call
-  // OnFire() some time in the future.
+  // OnFire() with `current_fire_id_` some time in the future.
   bool has_queued_fire_ = false;
 
-  // The ID of the currently active queued fire event.
+  // The ID of the most recently posted firing. Firings with any other ID have
+  // been superseded, and are no-ops when they run.
   uint64_t current_fire_id_ = 0;
 
-  // When the active queued fire event is scheduled to run. It may possibly
-  // execute later than this, if the TaskRunner is falling behind.
+  // When the current firing is scheduled to run. It may possibly execute later
+  // than this, if the TaskRunner is falling behind.
   Clock::time_point next_fire_time_{};
 
+  // Must be the last member, so that WeakPtrs are invalidated first.
   WeakPtrFactory<Alarm> weak_factory_{this};
 };
 

@@ -6,6 +6,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <functional>
+#include <memory>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "platform/test/fake_clock.h"
@@ -143,6 +146,66 @@ TEST_F(AlarmTest, CancelsAndRearms) {
     ASSERT_EQ(0, count1);
     ASSERT_EQ(1, count2);
   }
+}
+
+// Tests that repeatedly canceling and re-scheduling an Alarm, to a time no
+// earlier than the originally-scheduled one, reuses the already-queued firing
+// instead of posting more tasks to the TaskRunner.
+TEST_F(AlarmTest, CancelAndRescheduleReusesQueuedFiring) {
+  constexpr Clock::duration kDelay = milliseconds(20);
+  const Clock::time_point alarm_time = FakeClock::now() + kDelay;
+
+  int count = 0;
+  alarm()->Schedule([&] { ++count; }, alarm_time);
+  ASSERT_EQ(1, task_runner()->delayed_task_count());
+
+  for (int i = 0; i < 10; ++i) {
+    alarm()->Cancel();
+    alarm()->Schedule([&] { ++count; }, alarm_time);
+  }
+  EXPECT_EQ(1, task_runner()->delayed_task_count());
+
+  clock()->Advance(kDelay);
+  EXPECT_EQ(1, count);
+  EXPECT_EQ(0, task_runner()->delayed_task_count());
+  EXPECT_EQ(0, task_runner()->ready_task_count());
+}
+
+// Tests that the client's Task can re-schedule the Alarm from within itself.
+TEST_F(AlarmTest, CanRescheduleFromWithinTask) {
+  constexpr Clock::duration kDelay = milliseconds(20);
+  constexpr int kNumRuns = 3;
+
+  std::vector<Clock::time_point> run_times;
+  std::function<void()> task = [&] {
+    run_times.push_back(FakeClock::now());
+    if (run_times.size() < kNumRuns) {
+      alarm()->ScheduleFromNow(task, kDelay);
+    }
+  };
+  const Clock::time_point start_time = FakeClock::now();
+  alarm()->ScheduleFromNow(task, kDelay);
+
+  clock()->Advance(kDelay * kNumRuns * 10);
+  ASSERT_EQ(static_cast<size_t>(kNumRuns), run_times.size());
+  for (int i = 0; i < kNumRuns; ++i) {
+    EXPECT_EQ(start_time + kDelay * (i + 1), run_times[i]);
+  }
+}
+
+// Tests that the Alarm can be destroyed by the client's Task.
+TEST_F(AlarmTest, CanBeDestroyedFromWithinTask) {
+  auto scoped_alarm = std::make_unique<Alarm>(&FakeClock::now, *task_runner());
+  bool did_run = false;
+  scoped_alarm->Schedule(
+      [&] {
+        did_run = true;
+        scoped_alarm.reset();
+      },
+      Alarm::kImmediately);
+  task_runner()->RunTasksUntilIdle();
+  EXPECT_TRUE(did_run);
+  EXPECT_FALSE(scoped_alarm);
 }
 
 }  // namespace

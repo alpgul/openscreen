@@ -15,12 +15,13 @@ Alarm::Alarm(ClockNowFunctionPtr now_function, TaskRunner& task_runner)
   OSP_CHECK(now_function_);
 }
 
+// Destroying `weak_factory_` turns any queued firing into a no-op.
 Alarm::~Alarm() = default;
 
 void Alarm::Cancel() {
+  // Any queued firing is left in place: it will be a no-op unless the Alarm is
+  // re-scheduled before it runs, in which case it may be reused.
   scheduled_task_ = TaskRunner::Task();
-  has_queued_fire_ = false;
-  ++current_fire_id_;
 }
 
 void Alarm::ScheduleWithTask(TaskRunner::Task task,
@@ -32,11 +33,10 @@ void Alarm::ScheduleWithTask(TaskRunner::Task task,
   const Clock::time_point now = now_function_();
   alarm_time_ = std::max(now, desired_alarm_time);
 
-  // Ensure that a later firing will occur, and not too late.
-  if (has_queued_fire_) {
-    if (next_fire_time_ <= alarm_time_) {
-      return;
-    }
+  // Ensure that a later firing will occur, and not too late. If the queued
+  // firing is too late, InvokeLater() supersedes it.
+  if (has_queued_fire_ && next_fire_time_ <= alarm_time_) {
+    return;
   }
   InvokeLater(now, alarm_time_);
 }
@@ -46,9 +46,9 @@ void Alarm::InvokeLater(Clock::time_point now, Clock::time_point fire_time) {
   next_fire_time_ = fire_time;
   const uint64_t fire_id = ++current_fire_id_;
   task_runner_->PostTaskWithDelay(
-      [weak_this = weak_factory_.GetWeakPtr(), fire_id]() {
-        if (auto* self = weak_this.get()) {
-          self->OnFire(fire_id);
+      [weak_this = weak_factory_.GetWeakPtr(), fire_id] {
+        if (weak_this) {
+          weak_this->OnFire(fire_id);
         }
       },
       fire_time - now);
@@ -56,7 +56,7 @@ void Alarm::InvokeLater(Clock::time_point now, Clock::time_point fire_time) {
 
 void Alarm::OnFire(uint64_t fire_id) {
   if (fire_id != current_fire_id_) {
-    return;  // Superceded by a newer scheduling or canceled.
+    return;  // Superseded by a later firing.
   }
   has_queued_fire_ = false;
   TryInvoke();
