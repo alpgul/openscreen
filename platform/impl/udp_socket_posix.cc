@@ -215,6 +215,9 @@ void UdpSocketPosix::Bind() {
   }
 
   if (is_bound) {
+    // Resolve any OS-assigned port now, before the client is notified, so
+    // that later GetLocalEndpoint() calls don't need to modify
+    // `local_endpoint_`.
     if (local_endpoint_.port == 0) {
       GetLocalEndpoint();
     }

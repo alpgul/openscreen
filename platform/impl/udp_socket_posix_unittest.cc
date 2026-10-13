@@ -56,5 +56,31 @@ TEST(UdpSocketPosixTest, SetsBufferSizes) {
   EXPECT_GE(static_cast<size_t>(sndbuf), kTestSendBufferSize);
 }
 
+// Tests that binding to an ephemeral port resolves the OS-assigned port, and
+// that the socket's IP version is unaffected by resolving the local endpoint.
+TEST(UdpSocketPosixTest, BindResolvesEphemeralPort) {
+  const uint8_t kIpV4Loopback[4] = {127, 0, 0, 1};
+  FakeClock clock(Clock::now());
+  FakeTaskRunner task_runner(clock);
+  testing::StrictMock<FakeUdpSocket::MockClient> client;
+  ErrorOr<std::unique_ptr<UdpSocket>> create_result = UdpSocket::Create(
+      task_runner, &client, IPEndpoint{IPAddress(kIpV4Loopback), 0});
+  ASSERT_TRUE(create_result) << create_result.error();
+  const auto socket = std::move(create_result.value());
+  ASSERT_TRUE(socket->IsIPv4());
+
+  IPEndpoint endpoint_when_bound;
+  EXPECT_CALL(client, OnBound(socket.get())).WillOnce([&](UdpSocket* s) {
+    endpoint_when_bound = s->GetLocalEndpoint();
+  });
+  socket->Bind();
+
+  EXPECT_NE(0, endpoint_when_bound.port);
+  EXPECT_EQ(IPAddress(kIpV4Loopback), endpoint_when_bound.address);
+  EXPECT_EQ(endpoint_when_bound, socket->GetLocalEndpoint());
+  EXPECT_TRUE(socket->IsIPv4());
+  EXPECT_FALSE(socket->IsIPv6());
+}
+
 }  // namespace
 }  // namespace openscreen

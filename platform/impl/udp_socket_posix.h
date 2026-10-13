@@ -82,6 +82,10 @@ class UdpSocketPosix : public UdpSocket {
   // port is non-zero, it is assumed never to change again.
   mutable IPEndpoint local_endpoint_;
 
+  // The IP version of `local_endpoint_`, which never changes. This is kept
+  // separately because it is read from the socket reader thread (in
+  // ReceiveMessage()), while `local_endpoint_` may be rewritten on the task
+  // runner thread.
   const Version version_;
 
   WeakPtrFactory<UdpSocketPosix> weak_factory_{this};
