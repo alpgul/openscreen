@@ -210,6 +210,33 @@ TEST_F(StatisticsAnalyzerTest, FrameEncoded) {
                    (kDefaultStatIntervalMs * kDefaultNumEvents)));
 }
 
+// Tests that statistics which cannot be computed (here, because there were no
+// audio events at all) are reported as zero, rather than as uninitialized
+// values.
+TEST_F(StatisticsAnalyzerTest, UncomputableStatisticsAreZero) {
+  analyzer_->ScheduleAnalysis();
+
+  RtpTimeTicks rtp_timestamp;
+  for (int i = 0; i < kDefaultNumEvents; i++) {
+    collector_->CollectFrameEvent(MakeFrameEvent(i, rtp_timestamp));
+    fake_clock_.Advance(milliseconds(kDefaultStatIntervalMs));
+    rtp_timestamp += RtpTimeDelta::FromTicks(90);
+  }
+
+  EXPECT_CALL(stats_client_, OnStatisticsUpdated(_))
+      .WillOnce([](const SenderStats& stats) {
+        for (size_t i = 0; i < stats.audio_statistics.size(); ++i) {
+          const auto type = static_cast<StatisticType>(i);
+          EXPECT_EQ(0.0, stats.audio_statistics[i])
+              << GetEnumName(kStatisticTypeNames, type).value();
+        }
+      });
+
+  fake_clock_.Advance(
+      milliseconds(kDefaultStatsAnalysisIntervalMs -
+                   (kDefaultStatIntervalMs * kDefaultNumEvents)));
+}
+
 TEST_F(StatisticsAnalyzerTest, FrameEncodedAndAckSent) {
   analyzer_->ScheduleAnalysis();
 

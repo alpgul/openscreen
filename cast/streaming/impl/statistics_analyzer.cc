@@ -539,7 +539,9 @@ void StatisticsAnalyzer::PopulateSessionStats(
     SenderStats::StatisticsList& stats_list) {
   SessionStats& session_stats = session_stats_.Get(media_type);
 
-  if (session_stats.first_event_time != Clock::time_point::min()) {
+  // Note: `first_event_time` starts at max(), not min(), since it tracks the
+  // minimum event time seen so far.
+  if (session_stats.first_event_time != Clock::time_point::max()) {
     stats_list[static_cast<int>(StatisticType::kFirstEventTimeMs)] =
         InMilliseconds(session_stats.first_event_time.time_since_epoch());
   }
