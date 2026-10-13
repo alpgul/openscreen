@@ -4,11 +4,16 @@
 
 #include "cast/common/public/cast_socket.h"
 
+#include <memory>
+#include <utility>
+#include <vector>
+
 #include "cast/common/channel/message_framer.h"
 #include "cast/common/channel/proto/cast_channel.pb.h"
 #include "cast/common/channel/testing/fake_cast_socket.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "platform/test/mock_tls_connection.h"
 
 namespace openscreen::cast {
 
@@ -141,6 +146,28 @@ TEST_F(CastSocketTest, ReadMultipleMessagesPerBlock) {
         EXPECT_EQ(message2.SerializeAsString(), message.SerializeAsString());
       });
   connection().OnRead(std::move(send_data));
+}
+
+// Tests that the socket stops processing buffered messages, without touching
+// any of its state, if the client destroys the socket from within its
+// OnMessage() callback.
+TEST_F(CastSocketTest, StopsReadingIfDestroyedDuringOnMessage) {
+  MockCastSocketClient client;
+  auto owned_connection = std::make_unique<MockTlsConnection>(
+      IPEndpoint{{10, 0, 1, 7}, 1234}, IPEndpoint{{10, 0, 1, 9}, 4321});
+  MockTlsConnection* const connection = owned_connection.get();
+  auto socket =
+      std::make_unique<CastSocket>(std::move(owned_connection), &client);
+
+  // Two complete messages arrive in the same block. The client destroys the
+  // socket after the first one, so the second must never be delivered.
+  std::vector<uint8_t> two_messages = frame_serial_;
+  two_messages.insert(two_messages.end(), frame_serial_.begin(),
+                      frame_serial_.end());
+  EXPECT_CALL(client, OnMessage(_, _))
+      .WillOnce([&socket](CastSocket*, CastMessage) { socket.reset(); });
+  connection->OnRead(std::move(two_messages));
+  EXPECT_FALSE(socket);
 }
 
 TEST_F(CastSocketTest, SanitizedAddress) {

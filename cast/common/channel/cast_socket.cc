@@ -87,6 +87,7 @@ void CastSocket::OnRead(Connection* connection, std::vector<uint8_t> block) {
     read_buffer_.erase(read_buffer_.begin(),
                        read_buffer_.begin() + message_or_error.value().length);
     client_->OnMessage(this, std::move(message_or_error.value().message));
+    // The client may have destroyed this socket from within OnMessage().
     if (!self) {
       return;
     }
