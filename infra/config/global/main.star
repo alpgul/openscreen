@@ -376,6 +376,7 @@ def builder(builder_type, name, os, cpu, properties):
             "linux_arm64",
             "linux_arm64_cast_receiver",
             "win_x64",
+            "chromium_mac_arm64",
             "chromium_win_x64",
         ]:
             experiment_percentage = 100
