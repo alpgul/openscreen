@@ -65,7 +65,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling libprotobuf-mutator
   # and whatever else without interference from each other.
-  'libprotobuf_mutator_revision': 'de71fa996f5335343b479b494be712c9c5381696',
+  'libprotobuf_mutator_revision': 'a0448e5055e4740774e00d496f016d9fcd572200',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling zlib
   # and whatever else without interference from each other.
