@@ -211,8 +211,11 @@ void ReceiverSession::SendInputMessage(const InputMessage& message) {
 
 void ReceiverSession::OnSocketReady() {
   if (pending_offer_) {
-    InitializeSession(*pending_offer_);
-    pending_offer_.reset();
+    // InitializeSession() may notify the client, which is allowed to destroy
+    // `this`, so take the pending offer out of our members first and don't
+    // touch any members after this call.
+    const std::unique_ptr<PendingOffer> offer = std::move(pending_offer_);
+    InitializeSession(*offer);
   }
 }
 
@@ -447,7 +450,12 @@ void ReceiverSession::InitializeSession(const PendingOffer& properties) {
                       properties.sequence_number, true /* valid */,
                       std::move(answer)});
   if (!result.ok()) {
+    // Negotiation failed, so tear down the data session we just created.
+    ReceiverDataSession::Reset(data_session_);
+    // NOTE: the client is allowed to destroy `this` in OnError(), so this
+    // must be the last thing we do.
     client_->OnError(this, result);
+    return;
   }
 
   ConfiguredReceivers receivers =
@@ -690,8 +698,13 @@ void ReceiverSession::SendErrorAnswerReply(const std::string& sender_id,
       sender_id,
       ReceiverMessage{ReceiverMessage::Type::kAnswer, sequence_number,
                       false /* valid */, ReceiverError(error)});
+
+  // NOTE: we intentionally do not notify the client here. The client is
+  // allowed to destroy `this` from OnError(), and callers of this method may
+  // still access `this` afterwards. Callers that need to surface an error to
+  // the client are responsible for doing so as their final action.
   if (!result.ok()) {
-    client_->OnError(this, result);
+    OSP_LOG_WARN << "Failed to send error ANSWER to sender: " << result;
   }
 }
 

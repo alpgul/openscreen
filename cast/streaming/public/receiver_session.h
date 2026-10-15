@@ -131,6 +131,9 @@ class ReceiverSession final : public Environment::SocketSubscriber,
     // Called whenever an error that the client may care about occurs.
     // Recoverable errors are usually logged by the receiver session instead
     // of reported here.
+    //
+    // The client may destroy the session from within this callback, so the
+    // session must not access any of its members after calling it.
     virtual void OnError(const ReceiverSession* session,
                          const Error& error) = 0;
 

@@ -345,6 +345,13 @@ void ReceiverSessionMessenger::OnMessage(const std::string& source_id,
     return;
   }
 
+  // Every message we handle in these namespaces may require a reply, and we
+  // cannot send messages to an empty destination ID, so drop the message.
+  if (source_id.empty()) {
+    OSP_DLOG_WARN << "Dropping message received without a source ID.";
+    return;
+  }
+
   // If the message is bad JSON, the sender is in a funky state so we
   // report an error.
   ErrorOr<Json::Value> message_body = json::Parse(message);

@@ -439,6 +439,26 @@ TEST_F(SessionMessengerTest, ReceiverCannotSendToEmptyId) {
   EXPECT_EQ(Error::Code::kInitializationFailure, error.code());
 }
 
+TEST_F(SessionMessengerTest, ReceiverDropsMessagesWithEmptySenderId) {
+  receiver_pipe_end().ReceiveMessage("", kCastWebrtcNamespace, R"({
+        "seqNum": 820263769,
+        "type": "GET_CAPABILITIES"
+      })");
+  receiver_pipe_end().ReceiveMessage("", kCastWebrtcNamespace, R"({
+        "type": "OFFER",
+        "seqNum": 1,
+        "offer": 42
+      })");
+  receiver_pipe_end().ReceiveMessage("", kCastRemotingNamespace, R"({
+        "seqNum": 12345,
+        "type": "RPC",
+        "rpc": "SGVsbG8gZnJvbSB0aGUgQ2FzdCBTZW5kZXIh"
+      })");
+
+  EXPECT_TRUE(message_store_.errors.empty());
+  EXPECT_TRUE(message_store_.sender_messages.empty());
+}
+
 TEST_F(SessionMessengerTest, ErrorMessageLoggedIfTimeout) {
   ASSERT_TRUE(
       sender_messenger_

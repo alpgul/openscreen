@@ -1114,6 +1114,37 @@ TEST_F(ReceiverSessionTest, HandlesNullOffer) {
   AssertGotAnErrorAnswerResponse();
 }
 
+// The client is allowed to destroy the session from OnError(), so the session
+// must only notify the client once and not access itself afterwards.
+TEST_F(ReceiverSessionTest, HandlesClientDestroyingSessionOnMalformedOffer) {
+  EXPECT_CALL(client_, OnError(session_.get(), _))
+      .WillOnce(
+          [this](const ReceiverSession*, const Error&) { session_.reset(); });
+  message_port_->ReceiveMessage(kValidJsonInvalidFormatOfferMessage);
+  EXPECT_FALSE(session_);
+  AssertGotAnErrorAnswerResponse();
+}
+
+// We can't respond to an OFFER without a sender ID, so it should be dropped
+// without notifying the client. Previously this resulted in the client being
+// notified twice, which caused a use-after-free if the client destroyed the
+// session in OnError().
+TEST_F(ReceiverSessionTest, DropsMalformedOfferWithEmptySenderId) {
+  ON_CALL(client_, OnError(_, _))
+      .WillByDefault(
+          [this](const ReceiverSession*, const Error&) { session_.reset(); });
+  EXPECT_CALL(client_, OnError(_, _)).Times(0);
+  message_port_->ReceiveMessage("", kCastWebrtcNamespace,
+                                kValidJsonInvalidFormatOfferMessage);
+  EXPECT_TRUE(session_);
+  EXPECT_TRUE(message_port_->posted_messages().empty());
+}
+
+TEST_F(ReceiverSessionTest, DropsValidOfferWithEmptySenderId) {
+  message_port_->ReceiveMessage("", kCastWebrtcNamespace, kValidOfferMessage);
+  EXPECT_TRUE(message_port_->posted_messages().empty());
+}
+
 TEST_F(ReceiverSessionTest, HandlesInvalidSequenceNumber) {
   // We should just discard messages with an invalid sequence number.
   message_port_->ReceiveMessage(kInvalidSequenceNumberMessage);
