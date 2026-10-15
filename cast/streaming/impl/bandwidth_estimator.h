@@ -19,12 +19,17 @@ namespace openscreen::cast {
 // Two metrics are tracked by the BandwidthEstimator, over a "recent history"
 // time window:
 //
-//   1. The number of packets sent during bursts (see SenderPacketRouter for
+//   1. The number of bytes sent during bursts (see SenderPacketRouter for
 //      explanation of what a "burst" is). These track when the network was
 //      actually in-use for transmission and the magnitude of each burst. When
 //      computing bandwidth, the estimator assumes the timeslices where the
 //      network was not in-use could have been used to send even more bytes at
 //      the same rate.
+//
+//      NOTE: This is tracked in bytes, not packets, so that the estimate does
+//      not depend on the size of the packets being sent. Otherwise, periods
+//      with only small packets (e.g., audio and RTCP while the video content is
+//      static) would produce estimates far below the network's capacity.
 //
 //   2. Successful receipt of payload bytes over time, or a lack thereof.
 //      Packets that include acknowledgements from the Receivers are providing
@@ -60,10 +65,11 @@ namespace openscreen::cast {
 //      that is reasonable for the application).
 class BandwidthEstimator {
  public:
-  // `max_packets_per_timeslice` and `timeslice_duration` should match the burst
-  // configuration in SenderPacketRouter. `start_time` should be a recent
-  // point-in-time before the first packet is sent.
-  BandwidthEstimator(int max_packets_per_timeslice,
+  // `max_bytes_per_timeslice` and `timeslice_duration` should match the burst
+  // configuration in SenderPacketRouter (i.e., the maximum number of packets
+  // per burst multiplied by the maximum packet size). `start_time` should be a
+  // recent point-in-time before the first packet is sent.
+  BandwidthEstimator(int max_bytes_per_timeslice,
                      Clock::duration timeslice_duration,
                      Clock::time_point start_time);
 
@@ -74,11 +80,11 @@ class BandwidthEstimator {
   Clock::duration history_window() const { return history_window_; }
 
   // Records `when` burst-sending was active or inactive. For the active case,
-  // `num_packets_sent` should include all network packets sent, including
-  // non-payload packets (since both affect the modeled utilization/capacity).
-  // For the inactive case, this method should be called with zero for
-  // `num_packets_sent`.
-  void OnBurstComplete(int num_packets_sent, Clock::time_point when);
+  // `num_bytes_sent` should include the bytes of all network packets sent,
+  // including non-payload packets (since both affect the modeled
+  // utilization/capacity). For the inactive case, this method should be called
+  // with zero for `num_bytes_sent`.
+  void OnBurstComplete(int num_bytes_sent, Clock::time_point when);
 
   // Records when a RTCP packet was received. It's important for Senders to call
   // this any time a packet comes in from the Receivers, even if no payload is
@@ -150,9 +156,9 @@ class BandwidthEstimator {
     index_mod_256_t tail_ = 0;
   };
 
-  // The maximum number of packet sends that could possibly be attempted during
-  // the recent-history time window.
-  const int max_packets_per_history_window_;
+  // The maximum number of bytes that could possibly be sent during the
+  // recent-history time window.
+  const int64_t max_bytes_per_history_window_;
 
   // The range of time being tracked.
   const Clock::duration history_window_;

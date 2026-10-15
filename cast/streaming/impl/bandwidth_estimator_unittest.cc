@@ -20,6 +20,8 @@ using clock_operators::operator<<;
 
 // BandwidthEstimator configuration common to all tests.
 constexpr int kMaxPacketsPerTimeslice = 10;
+constexpr int kPacketSize = 1000;
+constexpr int kMaxBytesPerTimeslice = kMaxPacketsPerTimeslice * kPacketSize;
 constexpr Clock::duration kTimesliceDuration = milliseconds(10);
 constexpr int kTimeslicesPerSecond = seconds(1) / kTimesliceDuration;
 
@@ -35,7 +37,7 @@ constexpr int kFuzzUpperBoundClockTicks = kMaxFuzzOffset.count();
 class BandwidthEstimatorTest : public testing::Test {
  public:
   BandwidthEstimatorTest()
-      : estimator_(kMaxPacketsPerTimeslice, kTimesliceDuration, kStartTime) {}
+      : estimator_(kMaxBytesPerTimeslice, kTimesliceDuration, kStartTime) {}
 
   BandwidthEstimator* estimator() { return &estimator_; }
 
@@ -67,7 +69,7 @@ TEST_F(BandwidthEstimatorTest, DoesNotEstimateWithoutFeedback) {
   for (int i = 0; i < 3; ++i) {
     const Clock::time_point end = now + estimator()->history_window();
     for (; now < end; now += kTimesliceDuration) {
-      estimator()->OnBurstComplete(i, now);
+      estimator()->OnBurstComplete(i * kPacketSize, now);
       EXPECT_EQ(0, estimator()->ComputeNetworkBandwidth());
     }
     now = end;
@@ -84,7 +86,7 @@ TEST_F(BandwidthEstimatorTest, DoesNotEstimateIfNothingSuccessfullyReceived) {
   for (int i = 0; i < 3; ++i) {
     const Clock::time_point end = now + estimator()->history_window();
     for (; now < end; now += kTimesliceDuration) {
-      estimator()->OnBurstComplete(i, now);
+      estimator()->OnBurstComplete(i * kPacketSize, now);
       estimator()->OnRtcpReceived(now + kRoundTripTime, kRoundTripTime);
       EXPECT_EQ(0, estimator()->ComputeNetworkBandwidth());
     }
@@ -123,7 +125,8 @@ TEST_F(BandwidthEstimatorTest, EstimatesAtVariousBurstSaturations) {
 
     const Clock::time_point end = now + estimator()->history_window();
     for (; now < end; now += kTimesliceDuration) {
-      estimator()->OnBurstComplete(kMaxPacketsPerTimeslice / divisor, now);
+      estimator()->OnBurstComplete(
+          kMaxPacketsPerTimeslice / divisor * kPacketSize, now);
       const Clock::time_point rtcp_arrival_time = now + kRoundTripTime;
       estimator()->OnPayloadReceived(kReceivedBytesPerTimeslice,
                                      rtcp_arrival_time, kRoundTripTime);
@@ -163,7 +166,7 @@ TEST_F(BandwidthEstimatorTest, EstimatesIndependentOfFeedbackDelays) {
 
     const Clock::time_point end = now + estimator()->history_window();
     for (; now < end; now += kTimesliceDuration) {
-      estimator()->OnBurstComplete(kPacketsPerBurst, now);
+      estimator()->OnBurstComplete(kPacketsPerBurst * kPacketSize, now);
       const Clock::time_point rtcp_arrival_time =
           AddFuzz(now + round_trip_time);
       estimator()->OnPayloadReceived(kReceivedBytesPerTimeslice,
@@ -208,7 +211,7 @@ TEST_F(BandwidthEstimatorTest, ClampsEstimateToMaxInt) {
 
     const Clock::time_point end = now + estimator()->history_window() / 4;
     for (; now < end; now += kTimesliceDuration) {
-      estimator()->OnBurstComplete(kPacketsPerBurst, now);
+      estimator()->OnBurstComplete(kPacketsPerBurst * kPacketSize, now);
       const Clock::time_point rtcp_arrival_time = AddFuzz(now + kRoundTripTime);
       estimator()->OnPayloadReceived(int_bytes, rtcp_arrival_time,
                                      kRoundTripTime);

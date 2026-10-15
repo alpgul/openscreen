@@ -157,14 +157,20 @@ class SenderPacketRouter : public BandwidthEstimator,
   // Performs a burst-send of packets. This is called whenever the Alarm fires.
   void SendBurstOfPackets();
 
+  // The number of packets, and their total size in bytes, sent during a burst.
+  struct SendCounts {
+    int num_packets = 0;
+    int num_bytes = 0;
+  };
+
   // Send an RTCP packet from each Sender that has one ready, and return the
-  // number of packets sent.
-  int SendJustTheRtcpPackets(Clock::time_point send_time);
+  // number of packets and bytes sent.
+  SendCounts SendJustTheRtcpPackets(Clock::time_point send_time);
 
   // Send zero or more RTP packets from each Sender, up to a maximum of
-  // `num_packets_to_send`, and return the number of packets sent.
-  int SendJustTheRtpPackets(Clock::time_point send_time,
-                            int num_packets_to_send);
+  // `num_packets_to_send`, and return the number of packets and bytes sent.
+  SendCounts SendJustTheRtpPackets(Clock::time_point send_time,
+                                   int num_packets_to_send);
 
   // Returns the maximum number of packets to send in one burst, based on the
   // given parameters.

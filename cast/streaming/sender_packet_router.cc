@@ -32,7 +32,7 @@ SenderPacketRouter::SenderPacketRouter(Environment& environment,
 SenderPacketRouter::SenderPacketRouter(Environment& environment,
                                        int max_packets_per_burst,
                                        milliseconds burst_interval)
-    : BandwidthEstimator(max_packets_per_burst,
+    : BandwidthEstimator(max_packets_per_burst * environment.GetMaxPacketSize(),
                          burst_interval,
                          environment.now()),
       environment_(environment),
@@ -160,21 +160,22 @@ void SenderPacketRouter::SendBurstOfPackets() {
   // on the number to send. Practically, this will always be limited by the
   // number of Senders; so, this won't be a huge number of packets.
   const Clock::time_point burst_time = environment_->now();
-  const int num_rtcp_packets_sent = SendJustTheRtcpPackets(burst_time);
+  const SendCounts rtcp_sent = SendJustTheRtcpPackets(burst_time);
   // Now send all the RTP packets, up to the maximum number allowed in a burst.
   // Higher priority Senders' RTP packets are sent first.
-  const int num_rtp_packets_sent = SendJustTheRtpPackets(
-      burst_time, max_packets_per_burst_ - num_rtcp_packets_sent);
+  const SendCounts rtp_sent = SendJustTheRtpPackets(
+      burst_time, max_packets_per_burst_ - rtcp_sent.num_packets);
   last_burst_time_ = burst_time;
 
-  BandwidthEstimator::OnBurstComplete(
-      num_rtcp_packets_sent + num_rtp_packets_sent, burst_time);
+  BandwidthEstimator::OnBurstComplete(rtcp_sent.num_bytes + rtp_sent.num_bytes,
+                                      burst_time);
 
   ScheduleNextBurst();
 }
 
-int SenderPacketRouter::SendJustTheRtcpPackets(Clock::time_point send_time) {
-  int num_sent = 0;
+SenderPacketRouter::SendCounts SenderPacketRouter::SendJustTheRtcpPackets(
+    Clock::time_point send_time) {
+  SendCounts sent;
   for (SenderEntry& entry : senders_) {
     if (entry.next_rtcp_send_time > send_time) {
       continue;
@@ -193,26 +194,28 @@ int SenderPacketRouter::SendJustTheRtcpPackets(Clock::time_point send_time) {
           PacketMetadata{.stream_type = entry.sender->GetStreamType(),
                          .rtp_timestamp = entry.sender->GetLastRtpTimestamp()});
       entry.next_rtcp_send_time = send_time + kRtcpReportInterval;
-      ++num_sent;
+      ++sent.num_packets;
+      sent.num_bytes += static_cast<int>(packet.size());
     }
   }
 
-  return num_sent;
+  return sent;
 }
 
-int SenderPacketRouter::SendJustTheRtpPackets(Clock::time_point send_time,
-                                              int num_packets_to_send) {
+SenderPacketRouter::SendCounts SenderPacketRouter::SendJustTheRtpPackets(
+    Clock::time_point send_time,
+    int num_packets_to_send) {
   TRACE_DEFAULT_SCOPED(TraceCategory::kSender);
-  int num_sent = 0;
+  SendCounts sent;
   for (SenderEntry& entry : senders_) {
-    if (num_sent >= num_packets_to_send) {
+    if (sent.num_packets >= num_packets_to_send) {
       break;
     }
     if (entry.next_rtp_send_time > send_time) {
       continue;
     }
 
-    for (; num_sent < num_packets_to_send; ++num_sent) {
+    for (; sent.num_packets < num_packets_to_send; ++sent.num_packets) {
       const ByteBuffer packet = entry.sender->GetRtpPacketForImmediateSend(
           send_time, ByteBuffer(packet_buffer_.get(), packet_buffer_size_));
       if (packet.empty()) {
@@ -222,11 +225,12 @@ int SenderPacketRouter::SendJustTheRtpPackets(Clock::time_point send_time,
           ByteView(packet.data(), packet.size()),
           PacketMetadata{.stream_type = entry.sender->GetStreamType(),
                          .rtp_timestamp = entry.sender->GetLastRtpTimestamp()});
+      sent.num_bytes += static_cast<int>(packet.size());
     }
     entry.next_rtp_send_time = entry.sender->GetRtpResumeTime();
   }
 
-  return num_sent;
+  return sent;
 }
 
 namespace {

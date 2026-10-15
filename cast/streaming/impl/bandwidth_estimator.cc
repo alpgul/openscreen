@@ -32,24 +32,24 @@ int ToClampedBitsPerSecond(int32_t bytes, Clock::duration time_window) {
 
 }  // namespace
 
-BandwidthEstimator::BandwidthEstimator(int max_packets_per_timeslice,
+BandwidthEstimator::BandwidthEstimator(int max_bytes_per_timeslice,
                                        Clock::duration timeslice_duration,
                                        Clock::time_point start_time)
-    : max_packets_per_history_window_(max_packets_per_timeslice *
-                                      kNumTimeslices),
+    : max_bytes_per_history_window_(int64_t{max_bytes_per_timeslice} *
+                                    kNumTimeslices),
       history_window_(timeslice_duration * kNumTimeslices),
       burst_history_(timeslice_duration, start_time),
       feedback_history_(timeslice_duration, start_time) {
-  OSP_CHECK_GT(max_packets_per_timeslice, 0);
+  OSP_CHECK_GT(max_bytes_per_timeslice, 0);
   OSP_CHECK_GT(timeslice_duration, Clock::duration::zero());
 }
 
 BandwidthEstimator::~BandwidthEstimator() = default;
 
-void BandwidthEstimator::OnBurstComplete(int num_packets_sent,
+void BandwidthEstimator::OnBurstComplete(int num_bytes_sent,
                                          Clock::time_point when) {
-  OSP_CHECK_GE(num_packets_sent, 0);
-  burst_history_.Accumulate(num_packets_sent, when);
+  OSP_CHECK_GE(num_bytes_sent, 0);
+  burst_history_.Accumulate(num_bytes_sent, when);
 }
 
 void BandwidthEstimator::OnRtcpReceived(
@@ -88,14 +88,19 @@ int BandwidthEstimator::ComputeNetworkBandwidth() const {
     return 0;
   }
 
-  const int32_t num_packets_transmitted = burst_history_.Sum();
-  if (num_packets_transmitted <= 0) {
+  const int32_t num_bytes_transmitted = burst_history_.Sum();
+  if (num_bytes_transmitted <= 0) {
     // Cannot estimate because there have been no transmissions recently.
     return 0;
   }
-  const Clock::duration transmit_duration = history_window_ *
-                                            num_packets_transmitted /
-                                            max_packets_per_history_window_;
+  // The amount of time the network was in use, assuming each burst was sent at
+  // the maximum burst rate. Since this is based on bytes rather than packets,
+  // the estimate is independent of the size of the packets being sent.
+  const Clock::duration transmit_duration =
+      history_window_ * num_bytes_transmitted / max_bytes_per_history_window_;
+  if (transmit_duration <= Clock::duration::zero()) {
+    return 0;
+  }
   const int32_t num_bytes_received = feedback_history_.Sum();
   return ToClampedBitsPerSecond(num_bytes_received, transmit_duration);
 }

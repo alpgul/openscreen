@@ -201,6 +201,66 @@ TEST_F(SenderPacketRouterTest, IsConfiguredFromBurstParameters) {
   EXPECT_GE(2147483647, router()->max_burst_bitrate());
 }
 
+// Tests that the network bandwidth estimate does not depend on the size of the
+// packets being sent. Previously, the estimate was computed in terms of packets
+// rather than bytes, so periods where only small packets were sent (e.g., audio
+// and RTCP while the video content is static) produced estimates far below the
+// network's capacity, even when every byte was successfully received.
+TEST_F(SenderPacketRouterTest, BandwidthEstimateIsIndependentOfPacketSize) {
+  env()->set_remote_endpoint(kRemoteEndpoint);
+  router()->OnSenderCreated(kVideoReceiverSsrc, video_sender());
+
+  constexpr auto kRoundTripTime = milliseconds(5);
+
+  // Sends one packet of `packet_size` bytes per burst for two full history
+  // windows, simulating perfect delivery of every byte, and then returns the
+  // resulting bandwidth estimate.
+  const auto send_and_estimate = [&](int packet_size) {
+    bool sent_this_burst = false;
+    ON_CALL(*video_sender(), GetRtpPacketForImmediateSend(_, _))
+        .WillByDefault([&](Clock::time_point send_time, ByteBuffer buffer) {
+          if (sent_this_burst) {
+            return buffer.subspan(0, 0);
+          }
+          sent_this_burst = true;
+          return buffer.subspan(0, packet_size);
+        });
+    ON_CALL(*video_sender(), GetRtpResumeTime()).WillByDefault([&] {
+      return env()->now();
+    });
+
+    router()->RequestRtpSend(kVideoReceiverSsrc);
+    RunTasksUntilIdle();
+    const Clock::time_point end = env()->now() + 2 * router()->history_window();
+    while (env()->now() < end) {
+      if (sent_this_burst) {
+        const Clock::time_point ack_arrival_time =
+            env()->now() + kRoundTripTime;
+        router()->OnPayloadReceived(packet_size, ack_arrival_time,
+                                    kRoundTripTime);
+        router()->OnRtcpReceived(ack_arrival_time, kRoundTripTime);
+        sent_this_burst = false;
+      }
+      AdvanceClockAndRunTasks(kBurstInterval);
+    }
+    return router()->ComputeNetworkBandwidth();
+  };
+
+  const int full_packet_estimate =
+      send_and_estimate(router()->max_packet_size());
+  const int small_packet_estimate = send_and_estimate(160);
+
+  // When every byte sent is received, the estimate should be close to the
+  // maximum burst bitrate, regardless of packet size.
+  const int max_error = router()->max_burst_bitrate() / 20;  // 5%
+  EXPECT_NEAR(router()->max_burst_bitrate(), full_packet_estimate, max_error);
+  EXPECT_NEAR(router()->max_burst_bitrate(), small_packet_estimate, max_error);
+
+  // Clear the default actions, which reference variables local to the lambda.
+  Mock::VerifyAndClear(video_sender());
+  router()->OnSenderDestroyed(kVideoReceiverSsrc);
+}
+
 TEST_F(SenderPacketRouterTest, IgnoresPacketsFromUnexpectedSources) {
   env()->set_remote_endpoint(kRemoteEndpoint);
   router()->OnSenderCreated(kAudioReceiverSsrc, audio_sender());
