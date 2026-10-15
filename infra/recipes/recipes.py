@@ -36,6 +36,7 @@ import urllib.parse as urlparse
 
 from collections import namedtuple
 
+
 # The dependency entry for the recipe_engine in the client repo's recipes.cfg
 #
 # url (str) - the url to the engine repo we want to use.
@@ -222,12 +223,11 @@ def main():
         os.path.dirname(os.path.dirname(recipes_cfg_path)))
   else:
     # find repo_root with git and calculate recipes_cfg_path
-    repo_root = (_git_output(['rev-parse', '--show-toplevel'],
-                             cwd=os.path.abspath(
-                                 os.path.dirname(__file__))).strip())
+    repo_root = (
+        _git_output(['rev-parse', '--show-toplevel'],
+                    cwd=os.path.abspath(os.path.dirname(__file__))).strip())
     repo_root = os.path.abspath(repo_root).decode()
-    recipes_cfg_path = os.path.join(repo_root, 'infra', 'config',
-                                    'recipes.cfg')
+    recipes_cfg_path = os.path.join(repo_root, 'infra', 'config', 'recipes.cfg')
     args = ['--package', recipes_cfg_path] + args
   engine_path = checkout_engine(engine_override, repo_root, recipes_cfg_path)
 
