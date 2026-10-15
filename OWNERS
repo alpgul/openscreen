@@ -7,6 +7,8 @@ taesuny@google.com
 
 per-file DEPS=*
 
+per-file recipes.py=file:/ROLLER_OWNERS
+
 # Git submodules managed by autorollers
 per-file third_party/clang-format/script=*
 per-file third_party/googletest/src=*
