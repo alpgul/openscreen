@@ -45,7 +45,10 @@ luci.project(
         ),
         acl.entry(
             roles = acl.CQ_COMMITTER,
-            groups = "project-openscreen-committers",
+            groups = [
+                "project-openscreen-committers",
+                "service-account-recipe-roller",
+            ],
         ),
         acl.entry(
             roles = acl.CQ_DRY_RUNNER,
