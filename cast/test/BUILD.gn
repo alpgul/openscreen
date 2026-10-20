@@ -53,7 +53,10 @@ if (is_posix && !build_with_chromium) {
 
   openscreen_source_set("e2e_tests") {
     testonly = true
-    sources = [ "cast_socket_e2e_test.cc" ]
+    sources = [
+      "cast_socket_e2e_test.cc",
+      "in_process_streaming_e2e_test.cc",
+    ]
 
     deps = [
       "../../platform",
@@ -67,9 +70,13 @@ if (is_posix && !build_with_chromium) {
       "../common:certificate",
       "../common:certificate_boringssl",
       "../common:channel",
+      "../common:public",
       "../common:test_helpers",
       "../receiver:channel",
       "../sender:channel",
+      "../streaming:common",
+      "../streaming:receiver",
+      "../streaming:sender",
     ]
     if (enable_rust) {
       deps += [ ":cast_e2e_rust_tests" ]
