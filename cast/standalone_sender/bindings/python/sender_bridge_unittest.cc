@@ -77,4 +77,20 @@ TEST_F(SenderBridgeTest, TeardownSafeWhenNotStreaming) {
   bridge_.Teardown();
 }
 
+TEST_F(SenderBridgeTest, GetStreamingStartTimeReturnsNulloptWhenNotStreaming) {
+  EXPECT_FALSE(bridge_.GetStreamingStartTime().has_value());
+}
+
+TEST_F(SenderBridgeTest, GetStreamingStartTimeReturnsNulloptBeforeNegotiation) {
+  CastRuntime runtime;
+  CastSenderBridge bridge(runtime.task_runner(),
+                          IPAddress::Parse("127.0.0.1").value(), 8009, "");
+  CastSenderBridge::StreamConfig config;
+  config.file_path = "test.mp4";
+  config.codec_name = "vp8";
+  ASSERT_TRUE(bridge.StreamVideo(config, /*is_debug=*/false));
+  EXPECT_FALSE(bridge.GetStreamingStartTime().has_value());
+  bridge.Teardown();
+}
+
 }  // namespace openscreen::cast

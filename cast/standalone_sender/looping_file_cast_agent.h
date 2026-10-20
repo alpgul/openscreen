@@ -109,6 +109,10 @@ class LoopingFileCastAgent final
   // multiple times.
   void RequestStop();
 
+  // Returns the monotonic clock timestamp at which the first media frame is
+  // scheduled to be captured, or std::nullopt if streaming has not started yet.
+  std::optional<Clock::time_point> GetStreamingStartTime() const;
+
  private:
   // SenderSocketFactory::Client overrides.
   void OnConnected(SenderSocketFactory* factory,

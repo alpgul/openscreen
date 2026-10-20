@@ -55,6 +55,10 @@ class LoopingFileSender final : public FileSender,
 
   void OnInputMessage(InputMessage message) override;
 
+  std::optional<Clock::time_point> GetStreamingStartTime() const override {
+    return capture_begin_time_;
+  }
+
   // SimulatedAudioCapturer::Client overrides.
   void OnAudioData(const float* interleaved_samples,
                    int num_samples,
@@ -115,8 +119,8 @@ class LoopingFileSender final : public FileSender,
   std::unique_ptr<StreamingVideoEncoder> video_encoder_;
 
   int num_capturers_running_ = 0;
-  Clock::time_point capture_begin_time_{};
-  Clock::time_point latest_frame_time_{};
+  std::optional<Clock::time_point> capture_begin_time_;
+  std::optional<Clock::time_point> latest_frame_time_;
 
   // The resolution negotiated with the receiver, if any. This is an upper
   // bound: frames larger than this are downscaled, smaller ones are sent at

@@ -7,9 +7,11 @@
 
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 
+#include "platform/api/time.h"
 #include "platform/base/ip_address.h"
 #include "util/raw_ptr.h"
 #include "util/thread_annotations.h"
@@ -66,6 +68,11 @@ class CastSenderBridge {
   // false on immediate validation failure (e.g. invalid codec).
   bool StreamVideo(const StreamConfig& config, bool is_debug);
 
+  // Returns the monotonic clock timestamp at which the first media frame is
+  // scheduled to be captured, or std::nullopt if the session has not started
+  // streaming frames yet.
+  std::optional<Clock::time_point> GetStreamingStartTime() const;
+
   // Thread-safe method to asynchronously signal the active Open Screen
   // TaskRunner to terminate the running media session and shut down all network
   // sockets.
@@ -77,7 +84,7 @@ class CastSenderBridge {
   IPAddress ip_address_;
   int port_;
   std::string cert_path_;
-  std::mutex mutex_;
+  mutable std::mutex mutex_;
   const raw_ptr<TaskRunner> task_runner_;
   std::unique_ptr<LoopingFileCastAgent> cast_agent_ OSP_GUARDED_BY(mutex_);
 };

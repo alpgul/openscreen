@@ -212,15 +212,15 @@ void LoopingFileSender::SendFileAgain() {
   if (settings_.should_include_audio) {
     audio_capturer_ = std::make_unique<SimulatedAudioCapturer>(
         env_, settings_.path_to_file.c_str(), audio_encoder_->num_channels(),
-        audio_encoder_->sample_rate(), capture_begin_time_, *this);
+        audio_encoder_->sample_rate(), *capture_begin_time_, *this);
   }
   video_capturer_ = std::make_unique<SimulatedVideoCapturer>(
-      env_, settings_.path_to_file.c_str(), capture_begin_time_, *this);
+      env_, settings_.path_to_file.c_str(), *capture_begin_time_, *this);
 
   next_task_.ScheduleFromNow([this] { ControlForNetworkCongestion(); },
                              kCongestionCheckInterval);
   console_update_task_.Schedule([this] { UpdateStatusOnConsole(); },
-                                capture_begin_time_);
+                                *capture_begin_time_);
 }
 
 void LoopingFileSender::OnAudioData(const float* interleaved_samples,
@@ -231,7 +231,8 @@ void LoopingFileSender::OnAudioData(const float* interleaved_samples,
   TRACE_SCOPED2(TraceCategory::kStandaloneSender, "OnAudioData", "num_samples",
                 std::to_string(num_samples), "reference_time",
                 ToString(reference_time));
-  latest_frame_time_ = std::max(reference_time, latest_frame_time_);
+  latest_frame_time_ =
+      std::max(reference_time, latest_frame_time_.value_or(reference_time));
   if (audio_encoder_) {
     audio_encoder_->EncodeAndSend(interleaved_samples, num_samples,
                                   capture_begin_time, capture_end_time,
@@ -245,7 +246,8 @@ void LoopingFileSender::OnVideoFrame(const AVFrame& av_frame,
                                      Clock::time_point reference_time) {
   TRACE_SCOPED1(TraceCategory::kStandaloneSender, "OnVideoFrame",
                 "reference_time", ToString(reference_time));
-  latest_frame_time_ = std::max(reference_time, latest_frame_time_);
+  latest_frame_time_ =
+      std::max(reference_time, latest_frame_time_.value_or(reference_time));
 
   YuvPlanes planes = GetVisiblePlanes(av_frame);
   if (target_resolution_) {
@@ -281,7 +283,9 @@ void LoopingFileSender::OnVideoFrame(const AVFrame& av_frame,
 }
 
 void LoopingFileSender::UpdateStatusOnConsole() {
-  const Clock::duration elapsed = latest_frame_time_ - capture_begin_time_;
+  const Clock::duration elapsed =
+      latest_frame_time_.value_or(Clock::time_point{}) -
+      capture_begin_time_.value_or(Clock::time_point{});
   // The control codes here attempt to erase the current line the cursor is
   // on, and then print out the updated status text. If the terminal does not
   // support simple ANSI escape codes, the following will still work, but

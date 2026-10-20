@@ -594,4 +594,9 @@ void LoopingFileCastAgent::RequestStop() {
   Shutdown();
 }
 
+std::optional<Clock::time_point> LoopingFileCastAgent::GetStreamingStartTime()
+    const {
+  return file_sender_ ? file_sender_->GetStreamingStartTime() : std::nullopt;
+}
+
 }  // namespace openscreen::cast

@@ -7,9 +7,11 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 
 #include "cast/standalone_sender/connection_settings.h"
 #include "cast/streaming/public/sender_session.h"
+#include "platform/api/time.h"
 
 namespace openscreen {
 class Environment;
@@ -33,6 +35,13 @@ class FileSender {
 
   virtual void SetPlaybackRate(double rate) = 0;
   virtual void OnInputMessage(InputMessage message) = 0;
+
+  // Returns the monotonic clock timestamp at which the first media frame is
+  // scheduled to be captured, or std::nullopt if capture has not been
+  // scheduled.
+  virtual std::optional<Clock::time_point> GetStreamingStartTime() const {
+    return std::nullopt;
+  }
 };
 
 }  // namespace cast

@@ -377,5 +377,39 @@ TEST_F(LoopingFileSenderTest, OddDimensionsAreMaskedToEvenWithoutOverflow) {
   EXPECT_EQ(planes.v.stride % 32, 0);
 }
 
+TEST_F(LoopingFileSenderTest,
+       GetStreamingStartTimeIsNulloptBeforeCaptureScheduled) {
+  FakeVideoEncoder* fake_encoder = nullptr;
+  auto sender = CreateSenderWithTargetResolution({1920, 1080}, &fake_encoder);
+  EXPECT_FALSE(sender->GetStreamingStartTime().has_value());
+}
+
+TEST_F(LoopingFileSenderTest,
+       GetStreamingStartTimeReturnsScheduledFirstFrameTime) {
+  ConnectionSettings settings;
+  settings.path_to_file = "nonexistent_test_file.webm";
+  settings.should_include_audio = false;
+  settings.codec = VideoCodec::kVp8;
+  settings.max_bitrate = 5000000;
+
+  SenderSession::ConfiguredSenders senders;
+  senders.video_sender = std::make_unique<FakeSender>();
+  senders.video_config.codec = VideoCodec::kVp8;
+  senders.video_config.resolutions = {Resolution{1920, 1080}};
+
+  auto fake_encoder = std::make_unique<FakeVideoEncoder>(
+      task_runner_, std::make_unique<FakeSender>());
+  LoopingFileSender sender(
+      env_, settings, /*session=*/nullptr, std::move(senders),
+      /*shutdown_callback=*/[] {}, std::move(fake_encoder));
+
+  const Clock::time_point expected_start =
+      clock_.now() + std::chrono::seconds(1);
+  task_runner_.RunTasksUntilIdle();
+
+  ASSERT_TRUE(sender.GetStreamingStartTime().has_value());
+  EXPECT_EQ(*sender.GetStreamingStartTime(), expected_start);
+}
+
 }  // namespace
 }  // namespace openscreen::cast

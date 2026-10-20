@@ -154,6 +154,36 @@ bool CastSenderBridge::StreamVideo(const StreamConfig& config, bool is_debug) {
   return true;
 }
 
+std::optional<Clock::time_point> CastSenderBridge::GetStreamingStartTime()
+    const {
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (state_ != State::kStreaming) {
+      return std::nullopt;
+    }
+  }
+
+  OSP_CHECK(!task_runner_->IsRunningOnTaskRunner());
+
+  std::promise<std::optional<Clock::time_point>> start_time_promise;
+  std::future<std::optional<Clock::time_point>> start_time_future =
+      start_time_promise.get_future();
+
+  task_runner_->PostTask(
+      [this, promise = std::move(start_time_promise)]() mutable {
+        std::optional<Clock::time_point> result;
+        {
+          std::lock_guard<std::mutex> lock(mutex_);
+          if (cast_agent_) {
+            result = cast_agent_->GetStreamingStartTime();
+          }
+        }
+        promise.set_value(result);
+      });
+
+  return start_time_future.get();
+}
+
 void CastSenderBridge::Teardown() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -175,7 +205,8 @@ void CastSenderBridge::Teardown() {
           cast_agent_.reset();
           state_ = State::kInitializing;
         }
-        promise.set_value();
+        task_runner_->PostTask(
+            [promise = std::move(promise)]() mutable { promise.set_value(); });
       });
 
   destroy_future.wait();

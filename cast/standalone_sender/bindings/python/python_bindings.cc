@@ -3,12 +3,16 @@
 // found in the LICENSE file.
 
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 
 #include "cast/standalone_sender/bindings/python/cast_runtime.h"
 #include "cast/standalone_sender/bindings/python/sender_bridge.h"
+#include "platform/api/time.h"
 
 namespace py = pybind11;
 
@@ -86,6 +90,20 @@ PYBIND11_MODULE(cast_sender, m) {
           py::call_guard<py::gil_scoped_release>(),
           "Establish connection and stream video file. Safely releases the "
           "Python GIL during execution.")
+      .def(
+          "get_streaming_elapsed_time_us",
+          [](const CastSenderBridge& self) -> std::optional<int64_t> {
+            const std::optional<openscreen::Clock::time_point> start_time =
+                self.GetStreamingStartTime();
+            if (!start_time.has_value()) {
+              return std::nullopt;
+            }
+            return (openscreen::Clock::now() - *start_time).count();
+          },
+          py::call_guard<py::gil_scoped_release>(),
+          "Returns the elapsed duration (in microseconds) since the first "
+          "frame was scheduled to be captured (negative during the initial "
+          "pre-capture delay), or None if streaming has not started yet.")
       .def("teardown", &CastSenderBridge::Teardown,
            py::call_guard<py::gil_scoped_release>(),
            "Teardown the streaming task runner and gracefully stop active "
