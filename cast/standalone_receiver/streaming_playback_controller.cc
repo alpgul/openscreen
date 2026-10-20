@@ -100,6 +100,9 @@ void StreamingPlaybackController::OnReceiversDestroying(
   OSP_LOG_INFO << "Receivers are currently destroying, resetting SDL players.";
   audio_player_.reset();
   video_player_.reset();
+  // The remoting receiver holds a raw pointer to the session's RpcMessenger,
+  // which is destroyed along with the receivers.
+  remoting_receiver_.reset();
   session_ = nullptr;
 }
 

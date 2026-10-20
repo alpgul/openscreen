@@ -6,7 +6,7 @@
 
 use std::fs;
 use std::io::Read;
-use std::net::TcpListener;
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -119,19 +119,14 @@ impl ManagedChild {
     }
 
     /// Waits for the process to exit up to `timeout`, draining its pipe
-    /// streams.
+    /// streams. On timeout, the process is killed and the error includes
+    /// everything it logged.
     fn wait_timeout(&mut self, timeout: Duration) -> Result<ProcessOutput, String> {
         let start = Instant::now();
         loop {
             match self.child.try_wait() {
                 Ok(Some(status)) => {
-                    if let Some(thread) = self.stdout_thread.take() {
-                        let _ = thread.join();
-                    }
-                    if let Some(thread) = self.stderr_thread.take() {
-                        let _ = thread.join();
-                    }
-
+                    self.join_pipe_threads();
                     return Ok(ProcessOutput {
                         exit_code: status.code(),
                         stdout: self.stdout_to_string(),
@@ -140,14 +135,28 @@ impl ManagedChild {
                 }
                 Ok(None) => {
                     if start.elapsed() > timeout {
-                        let _ = self.child.kill();
-                        let _ = self.child.wait();
-                        return Err(format!("Process timed out after {timeout:?}"));
+                        self.kill();
+                        return Err(format!(
+                            "Process timed out after {timeout:?}.\nStderr:\n{}\nStdout:\n{}",
+                            self.stderr_to_string(),
+                            self.stdout_to_string()
+                        ));
                     }
                     thread::sleep(Duration::from_millis(100));
                 }
                 Err(e) => return Err(format!("Error waiting for process: {e}")),
             }
+        }
+    }
+
+    /// Joins the pipe-draining threads. They exit once the process has exited
+    /// and its pipes are closed.
+    fn join_pipe_threads(&mut self) {
+        if let Some(thread) = self.stdout_thread.take() {
+            let _ = thread.join();
+        }
+        if let Some(thread) = self.stderr_thread.take() {
+            let _ = thread.join();
         }
     }
 
@@ -198,12 +207,7 @@ impl ManagedChild {
             }
         }
 
-        if let Some(thread) = self.stdout_thread.take() {
-            let _ = thread.join();
-        }
-        if let Some(thread) = self.stderr_thread.take() {
-            let _ = thread.join();
-        }
+        self.join_pipe_threads();
 
         ProcessOutput {
             exit_code,
@@ -218,12 +222,7 @@ impl ManagedChild {
             let _ = self.child.kill();
             let _ = self.child.wait();
         }
-        if let Some(thread) = self.stdout_thread.take() {
-            let _ = thread.join();
-        }
-        if let Some(thread) = self.stderr_thread.take() {
-            let _ = thread.join();
-        }
+        self.join_pipe_threads();
     }
 }
 
@@ -233,18 +232,54 @@ impl Drop for ManagedChild {
     }
 }
 
+/// Markers that sanitizer runtimes print when they detect an error.
+const SANITIZER_MARKERS: &[&str] = &[
+    "ERROR: AddressSanitizer",
+    "ERROR: LeakSanitizer",
+    "WARNING: MemorySanitizer",
+    "WARNING: ThreadSanitizer",
+    "SUMMARY: UndefinedBehaviorSanitizer",
+];
+
+/// Returns the first sanitizer error marker found in `log`, if any.
+pub fn find_sanitizer_report(log: &str) -> Option<&'static str> {
+    SANITIZER_MARKERS.iter().copied().find(|marker| log.contains(marker))
+}
+
+/// A uniquely-named temporary directory that is deleted when dropped.
+struct TempDir {
+    path: PathBuf,
+}
+
+impl TempDir {
+    fn new() -> Result<Self, String> {
+        let id = RUNNER_ID.fetch_add(1, Ordering::SeqCst);
+        let path =
+            std::env::temp_dir().join(format!("openscreen_e2e_{}_{}", std::process::id(), id));
+        fs::create_dir_all(&path).map_err(|e| format!("Failed to create temp dir: {e}"))?;
+        Ok(Self { path })
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
 /// Helper struct for spawning and managing `cast_receiver` and `cast_sender`
 /// child processes with RAII cleanup, ephemeral port allocation, and isolated
 /// certificates.
 pub struct CastProcessRunner {
     build_dir: PathBuf,
-    temp_dir: PathBuf,
     cert_path: PathBuf,
     key_path: PathBuf,
     video_path: PathBuf,
     port: u16,
     receiver: Option<ManagedChild>,
-    sender: Option<ManagedChild>,
+    // Declared last so that it is deleted only after the receiver process,
+    // which uses files in it, has been killed by Drop.
+    _temp_dir: TempDir,
 }
 
 impl CastProcessRunner {
@@ -258,14 +293,11 @@ impl CastProcessRunner {
             return Err(format!("cast_receiver not found at {}", receiver_bin.display()));
         }
 
-        let id = RUNNER_ID.fetch_add(1, Ordering::SeqCst);
-        let temp_dir =
-            std::env::temp_dir().join(format!("openscreen_e2e_{}_{}", std::process::id(), id));
-        fs::create_dir_all(&temp_dir).map_err(|e| format!("Failed to create temp dir: {e}"))?;
-
+        // Create the temp dir first, so it is cleaned up on any later error.
+        let temp_dir = TempDir::new()?;
         let port = Self::allocate_free_port()?;
-        let cert_path = temp_dir.join("generated_root_cast_receiver.crt");
-        let key_path = temp_dir.join("generated_root_cast_receiver.key");
+        let cert_path = temp_dir.path.join("generated_root_cast_receiver.crt");
+        let key_path = temp_dir.path.join("generated_root_cast_receiver.key");
 
         // Generate self-signed test credentials in the current working
         // directory, then move them to the isolated temporary
@@ -304,13 +336,12 @@ impl CastProcessRunner {
 
         Ok(Self {
             build_dir,
-            temp_dir,
             cert_path,
             key_path,
             video_path,
             port,
             receiver: None,
-            sender: None,
+            _temp_dir: temp_dir,
         })
     }
 
@@ -333,33 +364,43 @@ impl CastProcessRunner {
 
         let mut managed = ManagedChild::spawn(cmd)?;
 
-        // Wait until receiver is running and listening.
+        // "CastService is running." is logged before the CastService is
+        // created, so after seeing it, wait until the receiver is actually
+        // accepting connections on its port.
         let start = Instant::now();
         let timeout = Duration::from_secs(15);
-        let mut ready = false;
-        while start.elapsed() < timeout {
+        let address = SocketAddr::from(([127, 0, 0, 1], self.port));
+        let mut saw_running_log = false;
+        loop {
             if let Ok(Some(status)) = managed.child.try_wait() {
-                let log = managed.stderr_to_string();
-                let out = managed.stdout_to_string();
+                managed.join_pipe_threads();
                 return Err(format!(
-                    "Receiver exited prematurely with status {status:?}.\nStderr:\n{log}\nStdout:\n{out}"
+                    "Receiver exited prematurely with status {status:?}.\nStderr:\n{}\nStdout:\n{}",
+                    managed.stderr_to_string(),
+                    managed.stdout_to_string()
                 ));
             }
-            let log = managed.stderr_to_string();
-            if log.contains("CastService is running.") {
-                ready = true;
+            if !saw_running_log {
+                saw_running_log = managed.stderr_to_string().contains("CastService is running.");
+            }
+            if saw_running_log
+                && TcpStream::connect_timeout(&address, Duration::from_millis(100)).is_ok()
+            {
                 break;
+            }
+            if start.elapsed() > timeout {
+                // Kill the process and join its pipe threads so that the
+                // captured output is complete.
+                managed.kill();
+                return Err(format!(
+                    "Receiver failed to start listening within {timeout:?}.\nStderr:\n{}\nStdout:\n{}",
+                    managed.stderr_to_string(),
+                    managed.stdout_to_string()
+                ));
             }
             thread::sleep(Duration::from_millis(50));
         }
 
-        if !ready {
-            let log = managed.stderr_to_string();
-            return Err(format!("Receiver failed to start within 15s. Full stderr:\n{log}"));
-        }
-
-        // Settling time for TLS listener setup.
-        thread::sleep(Duration::from_millis(200));
         self.receiver = Some(managed);
         Ok(())
     }
@@ -367,7 +408,7 @@ impl CastProcessRunner {
     /// Spawns the `cast_sender` process, waits for it to finish, and returns
     /// its collected output.
     pub fn run_sender(
-        &mut self,
+        &self,
         extra_args: &[&str],
         timeout: Duration,
     ) -> Result<ProcessOutput, String> {
@@ -386,10 +427,9 @@ impl CastProcessRunner {
             .arg("-v")
             .args(extra_args);
 
-        let mut managed = ManagedChild::spawn(cmd)?;
-        let output = managed.wait_timeout(timeout)?;
-        self.sender = Some(managed);
-        Ok(output)
+        // `wait_timeout` returns only once the process has exited or been
+        // killed, so there is no need to keep `managed` around afterwards.
+        ManagedChild::spawn(cmd)?.wait_timeout(timeout)
     }
 
     /// Stops the `cast_receiver` process gracefully and returns its captured
@@ -486,12 +526,8 @@ impl CastProcessRunner {
 
 impl Drop for CastProcessRunner {
     fn drop(&mut self) {
-        if let Some(mut child) = self.sender.take() {
-            child.kill();
-        }
         if let Some(mut child) = self.receiver.take() {
             child.kill();
         }
-        let _ = fs::remove_dir_all(&self.temp_dir);
     }
 }

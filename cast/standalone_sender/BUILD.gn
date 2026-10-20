@@ -120,7 +120,10 @@ if (!build_with_chromium) {
 
   openscreen_executable("cast_sender") {
     testonly = true
-    visibility += [ "../..:gn_all" ]
+    visibility += [
+      "../..:gn_all",
+      "../test:cast_e2e_rust_tests",
+    ]
     deps = [
       ":cast_sender_core",
       "../../third_party/getopt",

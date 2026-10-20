@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/rust.gni")
 import("//build_overrides/build.gni")
 import("../../gni/openscreen.gni")
 
@@ -24,20 +25,29 @@ openscreen_source_set("unittests") {
 }
 
 if (is_posix && !build_with_chromium) {
-  openscreen_rust_static_library("cast_e2e_rust_tests") {
-    testonly = true
-    is_gtest_unittests = true
-    crate_name = "cast_e2e_rust_tests"
-    crate_root = "e2e/lib.rs"
-    allow_unsafe = true
-    sources = [
-      "e2e/lib.rs",
-      "e2e/runner.rs",
-    ]
-    deps = [ "//testing/rust_gtest_interop" ]
-    if (is_posix) {
-      # Used to send SIGTERM for graceful child process shutdown.
-      deps += [ "//third_party/rust/libc/v0_2:lib" ]
+  if (enable_rust) {
+    # Rust-driven E2E tests that launch the cast_sender and cast_receiver
+    # standalone applications as subprocesses.
+    openscreen_rust_static_library("cast_e2e_rust_tests") {
+      testonly = true
+      is_gtest_unittests = true
+      crate_name = "cast_e2e_rust_tests"
+      crate_root = "e2e/lib.rs"
+
+      # For sending SIGTERM to the child processes.
+      allow_unsafe = true
+      sources = [
+        "e2e/lib.rs",
+        "e2e/runner.rs",
+      ]
+      deps = [
+        "//testing/rust_gtest_interop",
+        "//third_party/rust/libc/v0_2:lib",
+      ]
+      data_deps = [
+        "../standalone_receiver:cast_receiver",
+        "../standalone_sender:cast_sender",
+      ]
     }
   }
 
@@ -46,7 +56,6 @@ if (is_posix && !build_with_chromium) {
     sources = [ "cast_socket_e2e_test.cc" ]
 
     deps = [
-      ":cast_e2e_rust_tests",
       "../../platform",
       "../../platform:standalone_impl",
       "../../testing/util",
@@ -62,6 +71,9 @@ if (is_posix && !build_with_chromium) {
       "../receiver:channel",
       "../sender:channel",
     ]
+    if (enable_rust) {
+      deps += [ ":cast_e2e_rust_tests" ]
+    }
   }
 
   openscreen_executable("make_crl_tests") {

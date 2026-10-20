@@ -12,7 +12,8 @@ visibility = [ "./*" ]
 # standalone platform implementation; since this is itself a standalone
 # application.
 #
-# See [external_libraries.md](../../build/config/external_libraries.md) for more information.
+# See [external_libraries.md](../../build/config/external_libraries.md) for more
+# information.
 
 openscreen_source_set("cast_receiver_lib") {
   testonly = true
@@ -66,7 +67,10 @@ openscreen_source_set("cast_receiver_lib") {
 
 openscreen_executable("cast_receiver") {
   testonly = true
-  visibility += [ "../..:gn_all" ]
+  visibility += [
+    "../..:gn_all",
+    "../test:cast_e2e_rust_tests",
+  ]
   sources = [ "main.cc" ]
 
   deps = [
