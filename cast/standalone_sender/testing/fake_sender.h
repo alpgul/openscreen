@@ -10,6 +10,7 @@
 
 #include <array>
 #include <chrono>
+#include <vector>
 
 #include "cast/streaming/public/encoded_frame.h"
 #include "cast/streaming/public/frame_id.h"
@@ -48,6 +49,7 @@ class FakeSender : public Sender {
   }
   EnqueueFrameResult EnqueueFrame(const EncodedFrame& frame) override {
     enqueued_count_++;
+    dependencies_.push_back(frame.dependency);
     next_frame_id_++;
     return OK;
   }
@@ -56,11 +58,15 @@ class FakeSender : public Sender {
   }
 
   int enqueued_count() const { return enqueued_count_; }
+  const std::vector<EncodedFrame::Dependency>& dependencies() const {
+    return dependencies_;
+  }
 
  private:
   SessionConfig config_;
   FrameId next_frame_id_ = FrameId::first();
   int enqueued_count_ = 0;
+  std::vector<EncodedFrame::Dependency> dependencies_;
 };
 
 }  // namespace openscreen::cast

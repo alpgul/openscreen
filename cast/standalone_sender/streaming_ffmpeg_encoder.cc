@@ -154,6 +154,22 @@ AVFrameUniquePtr CloneAsAVFrame(
 
 }  // namespace
 
+bool ShouldReinitHevcEncoder(int64_t current_bitrate,
+                             int64_t target_bitrate,
+                             int stable_target_frames) {
+  OSP_CHECK_GT(current_bitrate, 0);
+  OSP_CHECK_GT(target_bitrate, 0);
+  if (target_bitrate >= current_bitrate * kHevcBitrateReinitRatio ||
+      current_bitrate >= target_bitrate * kHevcBitrateReinitRatio) {
+    return true;
+  }
+  const int64_t bitrate_diff = target_bitrate > current_bitrate
+                                   ? target_bitrate - current_bitrate
+                                   : current_bitrate - target_bitrate;
+  return stable_target_frames >= kHevcBitrateNumFramesBeforeSettling &&
+         bitrate_diff >= current_bitrate * kHevcBitrateSettlingFactor;
+}
+
 StreamingFfmpegEncoder::StreamingFfmpegEncoder(const Parameters& params,
                                                TaskRunner& task_runner,
                                                std::unique_ptr<Sender> sender)
@@ -302,8 +318,11 @@ void StreamingFfmpegEncoder::ProcessWorkUnitsUntilTimeToQuit() {
     TRACE_FLOW_STEP_WITH_TIME(TraceCategory::kStandaloneSender,
                               "Frame.Encode.End",
                               work_unit.rtp_timestamp.value(), encode_end_time);
-    ComputeFrameEncodeStats(encode_end_time - encode_start_time, target_bitrate,
-                            work_unit);
+    const int effective_bitrate =
+        encoder_ ? static_cast<int>(encoder_->context->bit_rate)
+                 : target_bitrate;
+    ComputeFrameEncodeStats(encode_end_time - encode_start_time,
+                            effective_bitrate, work_unit);
     UpdateSpeedSettingForNextFrame(work_unit.stats);
 
     main_task_runner_.PostTask([weak_this = weak_factory_.GetWeakPtr(),
@@ -377,16 +396,21 @@ void StreamingFfmpegEncoder::PrepareEncoder(int width,
     }
 
     auto packet = MakeUniqueAVPacket();
-    encoder_ = std::make_unique<EncoderContext>(
-        EncoderContext{std::move(context), std::move(packet)});
-  } else if (params_.codec == VideoCodec::kHevc &&
-             encoder_->context->bit_rate != target_bitrate) {
-    // libx265 does not support dynamic bitrate mutation on an open
-    // AVCodecContext; recreate the encoder context when the target bitrate
-    // changes.
-    DestroyEncoder();
-    PrepareEncoder(width, height, target_bitrate);
-    return;
+    encoder_ = std::make_unique<EncoderContext>(EncoderContext{
+        std::move(context), std::move(packet), target_bitrate, 1});
+  } else if (params_.codec == VideoCodec::kHevc) {
+    if (target_bitrate == encoder_->last_target_bitrate) {
+      ++encoder_->stable_target_frames;
+    } else {
+      encoder_->last_target_bitrate = target_bitrate;
+      encoder_->stable_target_frames = 1;
+    }
+    if (ShouldReinitHevcEncoder(encoder_->context->bit_rate, target_bitrate,
+                                encoder_->stable_target_frames)) {
+      DestroyEncoder();
+      PrepareEncoder(width, height, target_bitrate);
+      return;
+    }
   } else {
     // libx264 dynamically handles bitrate updates via x264_encoder_reconfig.
     encoder_->context->bit_rate = target_bitrate;
@@ -407,11 +431,19 @@ void StreamingFfmpegEncoder::EncodeFrame(bool force_key_frame,
       (work_unit.rtp_timestamp - RtpTimeTicks()) / RtpTimeDelta::FromTicks(1);
   if (force_key_frame) {
     frame->pict_type = AV_PICTURE_TYPE_I;
+#if defined(AV_FRAME_FLAG_KEY)
     frame->flags |= AV_FRAME_FLAG_KEY;
+#else
+    frame->key_frame = 1;
+#endif
   } else {
     // Set dependent frames as forward predictive P-frames.
     frame->pict_type = AV_PICTURE_TYPE_P;
+#if defined(AV_FRAME_FLAG_KEY)
     frame->flags &= ~AV_FRAME_FLAG_KEY;
+#else
+    frame->key_frame = 0;
+#endif
   }
 
   const int send_result = avcodec_send_frame(encoder_->context.get(), frame);

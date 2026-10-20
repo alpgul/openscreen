@@ -6,6 +6,7 @@
 #define CAST_STANDALONE_SENDER_STREAMING_FFMPEG_ENCODER_H_
 
 #include <condition_variable>  // NOLINT
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -31,6 +32,18 @@ class TaskRunner;
 namespace cast {
 
 class Sender;
+
+// libx265 does not support updating the bitrate on an open AVCodecContext.
+// Recreate the encoder immediately when the bitrate changes by 2x or more, or
+// once `target_bitrate` stays unchanged for 60 frames (~2s at 30 FPS) while
+// differing from `current_bitrate` by at least 20%.
+inline constexpr int64_t kHevcBitrateReinitRatio = 2;
+inline constexpr int kHevcBitrateNumFramesBeforeSettling = 60;
+inline constexpr double kHevcBitrateSettlingFactor = 0.2;
+
+bool ShouldReinitHevcEncoder(int64_t current_bitrate,
+                             int64_t target_bitrate,
+                             int stable_target_frames);
 
 // Uses FFmpeg (libavcodec) to encode H.264 or H.265 (HEVC) video and streams it
 // to a Sender. Includes logic for fine-tuning the encoder parameters in
@@ -98,6 +111,8 @@ class StreamingFfmpegEncoder : public StreamingVideoEncoder {
   struct EncoderContext {
     AVCodecContextUniquePtr context;
     AVPacketUniquePtr packet;
+    int last_target_bitrate = 0;
+    int stable_target_frames = 0;
   };
 
   bool is_encoder_initialized() const { return encoder_ != nullptr; }
