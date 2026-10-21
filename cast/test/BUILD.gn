@@ -5,6 +5,7 @@
 import("//build/config/rust.gni")
 import("//build_overrides/build.gni")
 import("../../gni/openscreen.gni")
+import("../streaming/external_libraries.gni")
 
 openscreen_source_set("unittests") {
   testonly = true
@@ -48,6 +49,30 @@ if (is_posix && !build_with_chromium) {
         "../standalone_receiver:cast_receiver",
         "../standalone_sender:cast_sender",
       ]
+
+      # The codecs that the cast_sender and cast_receiver binaries can handle
+      # depend on the external media libraries they are built with. These
+      # cfgs let the tests only run where both binaries handle their codec.
+      # The conditions must match ../standalone_sender/BUILD.gn and
+      # ../standalone_receiver/BUILD.gn.
+      rustflags = []
+
+      # The sender encodes the test video with libvpx, libaom, or FFmpeg,
+      # instead of sending synthetic frames.
+      if (have_ffmpeg && have_libopus && have_libvpx) {
+        rustflags += [ "--cfg=cast_sender_has_external_libs" ]
+      }
+
+      # The sender can encode AV1 when it uses the external libraries.
+      if (have_libaom) {
+        rustflags += [ "--cfg=cast_sender_has_libaom" ]
+      }
+
+      # The receiver decodes with FFmpeg and plays with SDL2, instead of
+      # discarding the frames.
+      if (have_ffmpeg && have_libsdl2) {
+        rustflags += [ "--cfg=cast_receiver_has_external_libs" ]
+      }
     }
   }
 

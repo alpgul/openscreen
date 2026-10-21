@@ -155,6 +155,12 @@ void StreamingPlaybackController::Initialize(
       case VideoCodec::kAv1:
         OSP_LOG_INFO << "Found codec: libaom-av1 (known to FFMPEG as av1)";
         break;
+      case VideoCodec::kH264:
+        OSP_LOG_INFO << "Found codec: h264 (known to FFMPEG as h264)";
+        break;
+      case VideoCodec::kHevc:
+        OSP_LOG_INFO << "Found codec: hevc (known to FFMPEG as hevc)";
+        break;
       default:
         break;
     }

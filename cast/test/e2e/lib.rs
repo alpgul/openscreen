@@ -19,6 +19,15 @@ const TEST_TIMEOUT: Duration = Duration::from_secs(60);
 const FOUND_OPUS: &str = "Found codec: opus (";
 const FOUND_VP8: &str = "Found codec: vp8 (";
 const FOUND_VP9: &str = "Found codec: vp9 (";
+#[cfg(all(
+    not(cast_receiver_has_external_libs),
+    any(not(cast_sender_has_external_libs), cast_sender_has_libaom)
+))]
+const FOUND_AV1: &str = "Found codec: libaom-av1 (";
+#[cfg(not(any(cast_sender_has_external_libs, cast_receiver_has_external_libs)))]
+const FOUND_H264: &str = "Found codec: h264 (";
+#[cfg(not(any(cast_sender_has_external_libs, cast_receiver_has_external_libs)))]
+const FOUND_HEVC: &str = "Found codec: hevc (";
 
 /// Expects that neither of a process's output streams contains a sanitizer
 /// error report or a fatal log message.
@@ -109,6 +118,46 @@ fn test_vp8_codec() -> Result<(), Box<dyn std::error::Error>> {
 #[gtest(StandaloneE2ETest, Vp9Codec)]
 fn test_vp9_codec() -> Result<(), Box<dyn std::error::Error>> {
     run_e2e_session(&["-c", "vp9"], &[FOUND_OPUS, FOUND_VP9])
+}
+
+// The remaining video codecs are only tested in build configurations in which
+// both binaries handle them deterministically, using the cfgs set in
+// //cast/test/BUILD.gn:
+//
+// * Without the external media libraries, the sender sends synthetic frames for
+//   any codec, and the receiver discards all frames, logging the codec for VP8,
+//   VP9, AV1 (as libaom-av1), H.264, and HEVC.
+// * With them, the sender can only encode AV1 with libaom (and otherwise hits a
+//   fatal error), and encodes H.264/HEVC with whichever encoder the system
+//   FFmpeg provides (libx264/libx265, VideoToolbox, or none). The receiver
+//   decodes with the system FFmpeg, which only has the libaom-av1 decoder if it
+//   was built with libaom. Tests that pass or fail depending on how FFmpeg was
+//   built are deliberately not registered, and neither are tests that would
+//   feed synthetic frames to the FFmpeg decoders.
+
+/// Validates explicit AV1 video codec flag. The receiver logs AV1 under the
+/// name of the FFmpeg decoder it would use, libaom-av1.
+#[cfg(all(
+    not(cast_receiver_has_external_libs),
+    any(not(cast_sender_has_external_libs), cast_sender_has_libaom)
+))]
+#[gtest(StandaloneE2ETest, Av1Codec)]
+fn test_av1_codec() -> Result<(), Box<dyn std::error::Error>> {
+    run_e2e_session(&["-c", "av1"], &[FOUND_OPUS, FOUND_AV1])
+}
+
+/// Validates explicit H.264 video codec flag.
+#[cfg(not(any(cast_sender_has_external_libs, cast_receiver_has_external_libs)))]
+#[gtest(StandaloneE2ETest, H264Codec)]
+fn test_h264_codec() -> Result<(), Box<dyn std::error::Error>> {
+    run_e2e_session(&["-c", "h264"], &[FOUND_OPUS, FOUND_H264])
+}
+
+/// Validates explicit HEVC video codec flag.
+#[cfg(not(any(cast_sender_has_external_libs, cast_receiver_has_external_libs)))]
+#[gtest(StandaloneE2ETest, HevcCodec)]
+fn test_hevc_codec() -> Result<(), Box<dyn std::error::Error>> {
+    run_e2e_session(&["-c", "hevc"], &[FOUND_OPUS, FOUND_HEVC])
 }
 
 /// Validates remoting mode protocol handshake and streaming. In remoting mode,
