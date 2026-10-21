@@ -45,7 +45,6 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::InvokeWithoutArgs;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
@@ -524,11 +523,11 @@ TEST_F(SenderTest, SendsFramesEfficiently) {
       });
 
   // Simulate normal frame ACK'ing behavior.
-  ON_CALL(*receiver(), OnFrameComplete(_)).WillByDefault(InvokeWithoutArgs([&] {
+  ON_CALL(*receiver(), OnFrameComplete(_)).WillByDefault([&] {
     if (receiver()->AutoAdvanceCheckpoint()) {
       receiver()->TransmitRtcpFeedbackPacket();
     }
-  }));
+  });
 
   StrictMock<MockObserver> observer;
   EXPECT_CALL(observer, OnFrameCanceled(FrameId::first()));
@@ -593,12 +592,11 @@ TEST_F(SenderTest, WaitsUntilEndOfReportToUpdateObservers) {
 
   // Don't ACK frames and return a report until the third frame.
   EXPECT_CALL(*receiver(), OnFrameComplete(_)).Times(2);
-  EXPECT_CALL(*receiver(), OnFrameComplete(FrameId::first() + 2))
-      .WillOnce(InvokeWithoutArgs([&] {
-        if (receiver()->AutoAdvanceCheckpoint()) {
-          receiver()->TransmitRtcpFeedbackPacket();
-        }
-      }));
+  EXPECT_CALL(*receiver(), OnFrameComplete(FrameId::first() + 2)).WillOnce([&] {
+    if (receiver()->AutoAdvanceCheckpoint()) {
+      receiver()->TransmitRtcpFeedbackPacket();
+    }
+  });
 
   sender()->SetObserver(&observer);
 
@@ -1352,13 +1350,11 @@ TEST_F(SenderTest, ResendsIndividuallyNackedPackets) {
   // checkpoint forward to notify the Sender of frames that are now completely
   // received. Also, confirm that only the three specifically-NACK'ed packets
   // were retransmitted.
-  EXPECT_CALL(*receiver(), OnFrameComplete(_))
-      .Times(3)
-      .WillRepeatedly(InvokeWithoutArgs([&] {
-        if (receiver()->AutoAdvanceCheckpoint()) {
-          receiver()->TransmitRtcpFeedbackPacket();
-        }
-      }));
+  EXPECT_CALL(*receiver(), OnFrameComplete(_)).Times(3).WillRepeatedly([&] {
+    if (receiver()->AutoAdvanceCheckpoint()) {
+      receiver()->TransmitRtcpFeedbackPacket();
+    }
+  });
   EXPECT_CALL(*receiver(), OnRtpPacket(_))
       .Times(3)
       .WillRepeatedly([&](const RtpPacketParser::ParseResult& packet) {
@@ -1415,10 +1411,10 @@ TEST_F(SenderTest, ResendsMissingFrames) {
   Sequence completion_sequence;
   EXPECT_CALL(*receiver(), OnFrameComplete(FrameId::first()))
       .InSequence(completion_sequence)
-      .WillOnce(InvokeWithoutArgs([&] {
+      .WillOnce([&] {
         receiver()->SetCheckpointFrame(FrameId::first());
         receiver()->TransmitRtcpFeedbackPacket();
-      }));
+      });
   // Since all of the packets for the second frame are being dropped, the third
   // frame will finish next. The Receiver responds by NACKing the second frame
   // and ACKing the third frame. The checkpoint does not move forward because
@@ -1427,21 +1423,21 @@ TEST_F(SenderTest, ResendsMissingFrames) {
   // NETWORK CHANGE: After the third frame is received, stop dropping packets.
   EXPECT_CALL(*receiver(), OnFrameComplete(FrameId::first() + 2))
       .InSequence(completion_sequence)
-      .WillOnce(InvokeWithoutArgs([&] {
+      .WillOnce([&] {
         receiver()->SetNacksAndAcks(dropped_packets,
                                     std::vector<FrameId>{FrameId::first() + 2});
         receiver()->TransmitRtcpFeedbackPacket();
         receiver()->SetIgnoreList({});
-      }));
+      });
   // Finally, the Sender should respond to the whole-frame NACK by re-sending
   // all of the packets for the second frame, and so the Receiver should
   // completely receive the frame.
   EXPECT_CALL(*receiver(), OnFrameComplete(FrameId::first() + 1))
       .InSequence(completion_sequence)
-      .WillOnce(InvokeWithoutArgs([&] {
+      .WillOnce([&] {
         receiver()->SetCheckpointFrame(FrameId::first() + 2);
         receiver()->TransmitRtcpFeedbackPacket();
-      }));
+      });
 
   // From the Sender's perspective, the Receiver will ACK the first frame, then
   // the third frame, then the second frame.

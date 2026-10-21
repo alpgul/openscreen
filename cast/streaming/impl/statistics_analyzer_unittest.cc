@@ -19,7 +19,6 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::InvokeWithoutArgs;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
