@@ -31,7 +31,7 @@ SyntheticFileSender::SyntheticFileSender(
                << settings_.max_bitrate;
   OSP_LOG_INFO << "Launching Mirroring App on the Cast Receiver";
 
-  // Match standalone_e2e.py expected log string
+  // Match StandaloneE2ETest expected log string
   const std::string video_name = settings_.path_to_file.empty()
                                      ? "bbb_sunflower_2160p_60fps_normal.mp4"
                                      : settings_.path_to_file;

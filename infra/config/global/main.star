@@ -346,13 +346,17 @@ def builder(builder_type, name, os, cpu, properties):
             ),
         ]
 
+    cipd_package = (
+        "infra/recipe_bundles/chromium.googlesource.com/openscreen" if recipe_id == "openscreen" else "infra/recipe_bundles/chromium.googlesource.com/chromium/tools/build"
+    )
+
     luci.builder(
         name = name,
         bucket = builder_type,
         executable = luci.recipe(
             name = recipe_id,
             recipe = recipe_id,
-            cipd_package = "infra/recipe_bundles/chromium.googlesource.com/chromium/tools/build",
+            cipd_package = cipd_package,
             cipd_version = "refs/heads/main",
             use_bbagent = True,
         ),

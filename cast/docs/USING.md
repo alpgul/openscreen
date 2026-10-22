@@ -170,9 +170,12 @@ the path is typically
 > **fully qualified path**!
 >
 
-## The `standalone_e2e.py` script: a helpful reference
+## End-to-End Tests: `e2e_tests`
 
-If you have any issues with the above documentation, or just want to see an
-example usage of it, the [`standalone_e2e.py`](../standalone_e2e.py) script
-exercises the Cast Sender sender and receiver through some basic end to
-end test scenarios, using the same steps as above.
+To see an example of the standalone sender and receiver running together, or to
+verify your build end-to-end, run the `StandaloneE2ETest` suite in `e2e_tests`:
+
+```sh
+autoninja -C out/Default e2e_tests cast_sender cast_receiver
+./out/Default/e2e_tests --gtest_filter="StandaloneE2ETest.*"
+```

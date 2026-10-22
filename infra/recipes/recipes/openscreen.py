@@ -80,7 +80,6 @@ class TEST_DEPS(RecipeTestApi):
 BUILD_CONFIG = 'Default'
 UNIT_TEST_BINARY_NAME = 'openscreen_unittests'
 E2E_TEST_BINARY_NAME = 'e2e_tests'
-CAST_E2E_TEST_SCRIPT_NAME = 'standalone_e2e.py'
 CAST_SENDER_BINARY_NAME = 'cast_sender'
 CAST_RECEIVER_BINARY_NAME = 'cast_receiver'
 DEFAULT_BUILD_TARGETS = [
@@ -114,8 +113,6 @@ class RepositoryPaths:
         UNIT_TEST_BINARY_NAME)
     self.e2e_test_binary_path = self._generate_binary_path(
         E2E_TEST_BINARY_NAME)
-    self.cast_e2e_test_script_path = (self.checkout_path / 'cast' /
-                                      CAST_E2E_TEST_SCRIPT_NAME)
     self.cast_sender_binary_path = self._generate_binary_path(
         CAST_SENDER_BINARY_NAME)
     self.cast_receiver_binary_path = self._generate_binary_path(
@@ -201,7 +198,6 @@ def UploadOpenscreenTestFilesToCas(api: DEPS, paths: RepositoryPaths) -> str:
       paths.checkout_path,
       paths.unit_test_binary_path,
       paths.e2e_test_binary_path,
-      paths.cast_e2e_test_script_path,
       paths.cast_sender_binary_path,
       paths.cast_receiver_binary_path,
       paths.test_data_path,
@@ -247,12 +243,6 @@ def SwarmTests(api: DEPS, paths: RepositoryPaths, dimensions: dict[str, str]):
                    'e2e tests'),
   }
 
-  if api.properties.get('cast_allow_developer_certificate'):
-    requests['cast streaming e2e tests'] = SwarmRequest(
-        cas_digest,
-        f'./cast/{CAST_E2E_TEST_SCRIPT_NAME}',
-        'cast streaming e2e tests',
-    )
 
   # Trigger all tests in parallel.
   metadata = {
@@ -689,7 +679,6 @@ def GenTests(api: recipe_api.RecipeTestApi):
       api.buildbucket.try_build('openscreen', 'try'),
       api.properties(
           target_cpu='arm64',
-          cast_allow_developer_certificate=True,
           gn_args=[
               'cast_allow_developer_certificate=true',
               'have_ffmpeg=true',
