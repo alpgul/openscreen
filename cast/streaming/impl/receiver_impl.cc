@@ -128,7 +128,7 @@ void ReceiverImpl::RequestKeyFrame() {
   }
 }
 
-std::optional<int> ReceiverImpl::AdvanceToFrameIfReady(
+std::optional<size_t> ReceiverImpl::AdvanceToFrameIfReady(
     FrameId f,
     FrameId immediate_next_frame,
     const PendingFrame& entry) {
@@ -150,7 +150,7 @@ std::optional<int> ReceiverImpl::AdvanceToFrameIfReady(
         DropAllFramesBefore(f);
       }
       TRACE_FLOW_STEP(TraceCategory::kReceiver, "Frame.Ready", f);
-      return static_cast<int>(entry.collector.GetFramePayloadSize());
+      return entry.collector.GetFramePayloadSize();
     }
   }
   return std::nullopt;
