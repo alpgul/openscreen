@@ -5,8 +5,11 @@
 #include "cast/standalone_sender/remoting_sender.h"
 
 #include <utility>
+#include <variant>
+#include <vector>
 
 #include "cast/streaming/message_fields.h"
+#include "util/osp_logging.h"
 
 namespace openscreen::cast {
 
@@ -44,16 +47,26 @@ AudioDecoderConfig::Codec ToProtoCodec(AudioCodec value) {
 
 RemotingSender::Client::~Client() = default;
 
-RemotingSender::RemotingSender(RpcMessenger& messenger,
+RemotingSender::RemotingSender(SenderSessionMessenger& session_messenger,
                                AudioCodec audio_codec,
                                VideoCodec video_codec,
                                Client* client)
-    : messenger_(messenger),
+    : session_messenger_(session_messenger),
+      rpc_messenger_([this](std::vector<uint8_t> message) {
+        const Error error = this->session_messenger_.SendRpcMessage(message);
+        if (!error.ok()) {
+          OSP_LOG_WARN << "Failed to send RPC message: " << error;
+        }
+      }),
       audio_codec_(audio_codec),
       video_codec_(video_codec),
       client_(client) {
   OSP_CHECK(client_);
-  messenger_.RegisterMessageReceiverCallback(
+  session_messenger_.SetHandler(ReceiverMessage::Type::kRpc,
+                                [this](ErrorOr<ReceiverMessage> message) {
+                                  this->OnRpcMessage(std::move(message));
+                                });
+  rpc_messenger_.RegisterMessageReceiverCallback(
       RpcMessenger::kAcquireRendererHandle,
       [this](std::unique_ptr<RpcMessage> message) {
         OSP_CHECK(message);
@@ -62,8 +75,23 @@ RemotingSender::RemotingSender(RpcMessenger& messenger,
 }
 
 RemotingSender::~RemotingSender() {
-  messenger_.UnregisterMessageReceiverCallback(
+  session_messenger_.ResetHandler(ReceiverMessage::Type::kRpc);
+  rpc_messenger_.UnregisterMessageReceiverCallback(
       RpcMessenger::kAcquireRendererHandle);
+}
+
+void RemotingSender::OnRpcMessage(ErrorOr<ReceiverMessage> message) {
+  if (!message) {
+    OSP_LOG_WARN << "Failed to receive RPC message: " << message.error();
+    return;
+  }
+  if (!message.value().valid ||
+      message.value().type != ReceiverMessage::Type::kRpc) {
+    OSP_LOG_WARN << "Received invalid RPC message.";
+    return;
+  }
+  const auto& body = std::get<std::vector<uint8_t>>(message.value().body);
+  rpc_messenger_.ProcessMessageFromRemote(body);
 }
 
 void RemotingSender::OnMessage(const RpcMessage& message) {
@@ -99,7 +127,7 @@ void RemotingSender::OnInitializeMessage(const RpcMessage& message) {
   OSP_DLOG_INFO << "Initializing receiver handle " << receiver_handle_
                 << " with audio codec " << CodecToString(audio_codec_)
                 << " and video codec " << CodecToString(video_codec_);
-  messenger_.SendMessageToRemote(callback_message);
+  rpc_messenger_.SendMessageToRemote(callback_message);
 
   client_->OnReady();
 }

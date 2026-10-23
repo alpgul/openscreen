@@ -870,11 +870,10 @@ TEST_F(SenderSessionTest, SuccessfulRemotingNegotiationYieldsValidObject) {
 
   message_port_->ReceiveMessage(answer);
 
-  // The messenger is tested elsewhere, but we can sanity check that we got a
-  // valid one here.
-  const RpcMessenger::Handle handle =
-      session_->rpc_messenger().GetUniqueHandle();
-  EXPECT_NE(RpcMessenger::kInvalidHandle, handle);
+  EXPECT_NE(nullptr, senders.audio_sender);
+  EXPECT_EQ(senders.audio_config.codec, AudioCodec::kAac);
+  EXPECT_NE(nullptr, senders.video_sender);
+  EXPECT_EQ(senders.video_config.codec, VideoCodec::kHevc);
 }
 
 TEST_F(SenderSessionTest, RemotingNegotiationPopulatesCaptureRecommendations) {

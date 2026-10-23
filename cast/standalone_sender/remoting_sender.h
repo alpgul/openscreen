@@ -8,7 +8,10 @@
 #include <memory>
 
 #include "cast/streaming/public/constants.h"
+#include "cast/streaming/public/receiver_message.h"
 #include "cast/streaming/public/rpc_messenger.h"
+#include "cast/streaming/public/session_messenger.h"
+#include "platform/base/error.h"
 #include "util/raw_ptr.h"
 
 namespace openscreen::cast {
@@ -38,22 +41,23 @@ class RemotingSender {
     virtual void OnPlaybackRateChange(double rate) = 0;
   };
 
-  RemotingSender(RpcMessenger& messenger,
+  RemotingSender(SenderSessionMessenger& session_messenger,
                  AudioCodec audio_codec,
                  VideoCodec video_codec,
                  Client* client);
   ~RemotingSender();
 
  private:
+  // Helper for handling raw RPC ReceiverMessages from `session_messenger_`.
+  void OnRpcMessage(ErrorOr<ReceiverMessage> message);
+
   // Helper for parsing any received RPC messages.
   void OnMessage(const RpcMessage& message);
   void OnInitializeMessage(const RpcMessage& message);
   void OnPlaybackRateMessage(const RpcMessage& message);
 
-  // The messenger is the only caller of OnInitializeMessage, so there are no
-  // lifetime concerns. However, if this class outlives `messenger_`, it will
-  // no longer receive initialization messages.
-  RpcMessenger& messenger_;
+  SenderSessionMessenger& session_messenger_;
+  RpcMessenger rpc_messenger_;
 
   // Unlike in Chrome, here we should know the video and audio codecs before any
   // of the remoting code gets set up, and for simplicity's sake we can only

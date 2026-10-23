@@ -58,13 +58,6 @@ const Error& AnswerTimeoutError() {
   return *kError;
 }
 
-// Default error message for a bad RPC message.
-const Error& InvalidRpcError() {
-  static const openscreen::NoDestructor<Error> kError(
-      Error::Code::kJsonParseError, "Invalid RPC message.");
-  return *kError;
-}
-
 // Default error message for a bad INPUT message.
 const Error& InvalidInputError() {
   static const openscreen::NoDestructor<Error> kError(
@@ -343,12 +336,6 @@ SenderSession::SenderSession(Configuration config)
             config_.client.OnError(this, error);
           },
           config_.environment->task_runner()),
-      rpc_messenger_([this](std::vector<uint8_t> message) {
-        const Error error = this->messenger_.SendRpcMessage(message);
-        if (!error.ok()) {
-          OSP_LOG_WARN << "Failed to send RPC message: " << error;
-        }
-      }),
       input_messenger_([this](std::vector<uint8_t> message) {
         const Error error = this->messenger_.SendInputMessage(message);
         if (!error.ok()) {
@@ -356,13 +343,6 @@ SenderSession::SenderSession(Configuration config)
         }
       }),
       packet_router_(*config_.environment) {
-  // We may or may not do remoting this session, however our RPC handler
-  // is not negotiation-specific and registering on construction here allows us
-  // to record any unexpected RPC messages.
-  messenger_.SetHandler(ReceiverMessage::Type::kRpc,
-                        [this](ErrorOr<ReceiverMessage> message) {
-                          this->OnRpcMessage(std::move(message));
-                        });
   messenger_.SetHandler(ReceiverMessage::Type::kInput,
                         [this](ErrorOr<ReceiverMessage> message) {
                           this->OnInputMessage(std::move(message));
@@ -582,22 +562,6 @@ void SenderSession::OnCapabilitiesResponse(ErrorOr<ReceiverMessage> message) {
   }
 
   config_.client.OnCapabilitiesDetermined(this, ToCapabilities(caps));
-}
-
-void SenderSession::OnRpcMessage(ErrorOr<ReceiverMessage> message) {
-  if (!message) {
-    config_.client.OnError(this, message.error());
-    return;
-  }
-
-  if (!message.value().valid ||
-      message.value().type != ReceiverMessage::Type::kRpc) {
-    HandleErrorMessage(message.value(), InvalidRpcError());
-    return;
-  }
-
-  const auto& body = std::get<std::vector<uint8_t>>(message.value().body);
-  rpc_messenger_.ProcessMessageFromRemote(body);
 }
 
 void SenderSession::OnInputMessage(ErrorOr<ReceiverMessage> message) {

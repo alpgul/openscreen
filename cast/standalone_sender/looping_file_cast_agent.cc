@@ -358,7 +358,7 @@ void LoopingFileCastAgent::CreateAndStartSession() {
   if (connection_settings_->use_remoting) {
     cast_mode_ = CastMode::kRemoting;
     remoting_sender_ = std::make_unique<RemotingSender>(
-        current_session_->rpc_messenger(), AudioCodec::kOpus,
+        current_session_->session_messenger(), AudioCodec::kOpus,
         connection_settings_->codec, this);
 
     negotiation_error =

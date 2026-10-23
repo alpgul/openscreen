@@ -22,7 +22,6 @@
 #include "cast/streaming/public/capture_recommendations.h"
 #include "cast/streaming/public/data_session.h"
 #include "cast/streaming/public/protobuf_messenger.h"
-#include "cast/streaming/public/rpc_messenger.h"
 #include "cast/streaming/public/sender.h"
 #include "cast/streaming/public/session_config.h"
 #include "cast/streaming/public/session_messenger.h"
@@ -232,13 +231,9 @@ class SenderSession final : private DataSessionBase::Delegate {
   // Sends an input message to the remote.
   void SendInputMessage(const InputMessage& message);
 
-  // The RPC messenger for this session. NOTE: RPC messages may come at
-  // any time from the receiver, so subscriptions to RPC remoting messages
-  // should be done before calling `NegotiateRemoting`.
-  RpcMessenger& rpc_messenger() { return rpc_messenger_; }
-
-  // TODO(https://crbug.com/1357839): remove this as part of refactoring Chrome
-  // to rely on `rpc_messenger()` instead.
+  // Exposed so embedders can subscribe to and send raw RPC messages (for
+  // example, in multi-process embedders like Chrome where RpcMessenger lives
+  // in another process across an IPC boundary).
   SenderSessionMessenger& session_messenger() { return messenger_; }
 
  private:
@@ -287,7 +282,6 @@ class SenderSession final : private DataSessionBase::Delegate {
   // Specific message type handler methods.
   void OnAnswer(ErrorOr<ReceiverMessage> message);
   void OnCapabilitiesResponse(ErrorOr<ReceiverMessage> message);
-  void OnRpcMessage(ErrorOr<ReceiverMessage> message);
   void OnInputMessage(ErrorOr<ReceiverMessage> message);
 
   // Handles an error `message` response from a receiver. If the receiver does
@@ -330,10 +324,6 @@ class SenderSession final : private DataSessionBase::Delegate {
   // messages. For message formats, see the OFFER/ANSWER message definitions in
   // cast/streaming/public/offer_messages.h and answer_messages.h.
   SenderSessionMessenger messenger_;
-
-  // The RPC messenger, which uses the session messenger for sending RPC
-  // messages and handles subscriptions to RPC messages.
-  RpcMessenger rpc_messenger_;
 
   // The INPUT messenger, which uses the session messenger for sending INPUT
   // messages.
