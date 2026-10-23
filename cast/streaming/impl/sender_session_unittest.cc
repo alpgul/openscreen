@@ -19,6 +19,7 @@
 #include "cast/streaming/public/data_channel.h"
 #include "cast/streaming/public/data_session.h"
 #include "cast/streaming/public/protobuf_messenger.h"
+#include "cast/streaming/public/receiver_message.h"
 #include "cast/streaming/testing/mock_environment.h"
 #include "cast/streaming/testing/simple_message_port.h"
 #include "gmock/gmock.h"
@@ -761,6 +762,53 @@ TEST_F(SenderSessionTest, HandlesErrorMessage) {
   EXPECT_CALL(client_, OnError(session_.get(),
                                CodeEquals(Error::Code::kRemotingNotSupported)));
   message_port_->ReceiveMessage(kCapabilitiesErrorResponse);
+}
+
+TEST_F(SenderSessionTest, NormalizesOpenscreenAnswerErrorsToInvalidAnswer) {
+  session_->Negotiate(
+      std::vector<AudioCaptureConfig>{GetAudioCaptureConfigValid()},
+      std::vector<VideoCaptureConfig>{GetVideoCaptureConfigValid()});
+
+  // Open Screen error codes in an ANSWER (such as kRemotingNotSupported or
+  // kParameterInvalid) should be reported as kInvalidAnswer.
+  const std::string remoting_rejected_answer = std::format(
+      R"({{
+        "seqNum": 1,
+        "type": "ANSWER",
+        "result": "error",
+        "error": {{
+          "code": {},
+          "description": "remoting rejected"
+        }}
+      }})",
+      ReceiverError::kOpenscreenErrorOffset +
+          static_cast<int>(Error::Code::kRemotingNotSupported));
+
+  EXPECT_CALL(client_,
+              OnError(session_.get(), CodeEquals(Error::Code::kInvalidAnswer)));
+  message_port_->ReceiveMessage(remoting_rejected_answer);
+
+  // kNoStreamSelected in an ANSWER should be preserved.
+  session_->Negotiate(
+      std::vector<AudioCaptureConfig>{GetAudioCaptureConfigValid()},
+      std::vector<VideoCaptureConfig>{GetVideoCaptureConfigValid()});
+
+  const std::string no_stream_answer = std::format(
+      R"({{
+        "seqNum": 2,
+        "type": "ANSWER",
+        "result": "error",
+        "error": {{
+          "code": {},
+          "description": "no streams matched"
+        }}
+      }})",
+      ReceiverError::kOpenscreenErrorOffset +
+          static_cast<int>(Error::Code::kNoStreamSelected));
+
+  EXPECT_CALL(client_, OnError(session_.get(),
+                               CodeEquals(Error::Code::kNoStreamSelected)));
+  message_port_->ReceiveMessage(no_stream_answer);
 }
 
 TEST_F(SenderSessionTest, HandlesMessagePortError) {

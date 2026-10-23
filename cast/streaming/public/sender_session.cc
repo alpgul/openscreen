@@ -623,9 +623,12 @@ void SenderSession::HandleErrorMessage(ReceiverMessage message,
     const ReceiverError& error = std::get<ReceiverError>(message.body);
     Error converted_error = error.ToError();
 
-    // If the receiver error code was an invalid value, fallback to
-    // the default error code instead of returning unknown error.
-    if (converted_error.code() == Error::Code::kUnknownError) {
+    // Error ANSWER responses other than kNoStreamSelected (which callers use to
+    // retry codec selection) are reported as default_error (kInvalidAnswer) so
+    // callers can distinguish rejected offers from transport or session errors.
+    if (converted_error.code() == Error::Code::kUnknownError ||
+        (message.type == ReceiverMessage::Type::kAnswer &&
+         converted_error.code() != Error::Code::kNoStreamSelected)) {
       converted_error = Error(default_error.code(), converted_error.message());
     }
     config_.client.OnError(this, converted_error);
