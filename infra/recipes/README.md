@@ -39,7 +39,7 @@ can use [`led`](http://go/led):
 
 ```sh
 # Fetch builder definition, inject the local recipe bundle, and launch a test job:
-led get-builder "chromium/try:openscreen_linux" \
+led get-builder "openscreen/try:linux_x64" \
   | led edit-recipe-bundle \
   | led launch
 ```

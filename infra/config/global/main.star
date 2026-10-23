@@ -317,6 +317,18 @@ def get_properties(
 
     return properties
 
+# The `openscreen` recipe lives in this repository, under //infra/recipes, and
+# is bundled from it. The `chromium` and `run_presubmit` recipes are still in
+# chromium/tools/build.
+OPENSCREEN_RECIPE_BUNDLE = "infra/recipe_bundles/chromium.googlesource.com/openscreen"
+TOOLS_BUILD_RECIPE_BUNDLE = "infra/recipe_bundles/chromium.googlesource.com/chromium/tools/build"
+
+def _recipe_bundle(recipe_id):
+    """Returns the CIPD package of the recipe bundle containing `recipe_id`."""
+    if recipe_id == "openscreen":
+        return OPENSCREEN_RECIPE_BUNDLE
+    return TOOLS_BUILD_RECIPE_BUNDLE
+
 def builder(builder_type, name, os, cpu, properties):
     """Defines a builder.
 
@@ -346,17 +358,13 @@ def builder(builder_type, name, os, cpu, properties):
             ),
         ]
 
-    cipd_package = (
-        "infra/recipe_bundles/chromium.googlesource.com/openscreen" if recipe_id == "openscreen" else "infra/recipe_bundles/chromium.googlesource.com/chromium/tools/build"
-    )
-
     luci.builder(
         name = name,
         bucket = builder_type,
         executable = luci.recipe(
             name = recipe_id,
             recipe = recipe_id,
-            cipd_package = cipd_package,
+            cipd_package = _recipe_bundle(recipe_id),
             cipd_version = "refs/heads/main",
             use_bbagent = True,
         ),

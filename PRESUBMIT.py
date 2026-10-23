@@ -51,6 +51,9 @@ def _check_licenses(input_api, output_api):
     # that folder. See https://crbug.com/1215335 for more info.
     licenses.PRUNE_PATHS.update([
         os.path.join('buildtools', 'third_party'),
+        # Recipe dependencies checked out by `infra/recipes/recipes.py`. Not
+        # tracked by git.
+        os.path.join('infra', 'recipes', '.recipe_deps'),
         os.path.join('third_party', 'libc++'),
         os.path.join('third_party', 'libc++abi'),
         os.path.join('third_party', 'rust'),
