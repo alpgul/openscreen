@@ -32,7 +32,7 @@ CastSocket::~CastSocket() {
 }
 
 Error CastSocket::Send(const CastMessage& message) {
-  OSP_DVLOG << __func__ << ": sending a message. " << ToString(message);
+  OSP_VLOG << __func__ << ": sending a message. " << ToString(message);
   if (state_ == State::kError) {
     return Error::Code::kSocketClosedFailure;
   }
@@ -81,8 +81,8 @@ void CastSocket::OnRead(Connection* connection, std::vector<uint8_t> block) {
                      << message_or_error.error();
       return;
     }
-    OSP_DVLOG << __func__ << ": read a message. "
-              << ToString(message_or_error.value().message);
+    OSP_VLOG << __func__ << ": read a message. "
+             << ToString(message_or_error.value().message);
 
     read_buffer_.erase(read_buffer_.begin(),
                        read_buffer_.begin() + message_or_error.value().length);

@@ -201,7 +201,7 @@ void ConnectionNamespaceHandler::HandleConnect(CastSocket* socket,
       JSON_EXPAND_FIND_CONSTANT_ARGS(kMessageKeySenderInfo));
   if (!sender_info_value || !sender_info_value->isObject()) {
     // TODO(btolsch): Should this be guessed from user agent?
-    OSP_DVLOG << "No sender info from protocol.";
+    OSP_VLOG << "No sender info from protocol.";
   }
 
   const Json::Value* version_value = parsed_message.find(

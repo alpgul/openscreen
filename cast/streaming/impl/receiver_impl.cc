@@ -29,7 +29,6 @@ using clock_operators::operator<<;
 #define RECEIVER_DLOG(level) OSP_DLOG_##level << SSRC()
 #define RECEIVER_LOG(level) OSP_LOG_##level << SSRC()
 #define RECEIVER_VLOG OSP_VLOG << SSRC()
-#define RECEIVER_DVLOG OSP_DVLOG << SSRC()
 
 ReceiverImpl::ReceiverImpl(Environment& environment,
                            ReceiverPacketRouter& packet_router,
@@ -75,7 +74,7 @@ void ReceiverImpl::SetConsumer(Consumer* consumer) {
 }
 
 void ReceiverImpl::SetPlayerProcessingTime(Clock::duration needed_time) {
-  RECEIVER_DVLOG << __func__ << ": setting processing time to " << needed_time;
+  RECEIVER_VLOG << __func__ << ": setting processing time to " << needed_time;
   player_processing_time_ = std::max(Clock::duration::zero(), needed_time);
 }
 

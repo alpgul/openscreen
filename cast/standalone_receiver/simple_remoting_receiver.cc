@@ -66,7 +66,7 @@ void SimpleRemotingReceiver::SendInitializeMessage(
     SimpleRemotingReceiver::InitializeCallback initialize_cb) {
   initialize_cb_ = std::move(initialize_cb);
 
-  OSP_DVLOG
+  OSP_VLOG
       << "Indicating to the sender we are ready for remoting initialization.";
   openscreen::cast::RpcMessage rpc;
   rpc.set_handle(RpcMessenger::kAcquireRendererHandle);
