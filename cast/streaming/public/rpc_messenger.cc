@@ -62,6 +62,10 @@ void RpcMessenger::UnregisterMessageReceiverCallback(
   receive_callbacks_.erase_key(handle);
 }
 
+void RpcMessenger::Reset() {
+  receive_callbacks_.clear();
+}
+
 void RpcMessenger::ProcessMessageFromRemote(
     std::unique_ptr<RpcMessage> message) {
   OnMessage(std::move(message));

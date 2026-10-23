@@ -157,4 +157,46 @@ TEST_F(RpcMessengerTest, Registration) {
   ASSERT_FALSE(rpc_messenger_->IsRegisteredForTesting(handle));
 }
 
+TEST_F(RpcMessengerTest, ResetClearsCallbacksWithoutResettingHandles) {
+  const auto handle = fake_messenger_->handle();
+  ASSERT_TRUE(rpc_messenger_->IsRegisteredForTesting(handle));
+
+  // Also register predefined handle.
+  bool acquire_called = false;
+  rpc_messenger_->RegisterMessageReceiverCallback(
+      RpcMessenger::kAcquireRendererHandle,
+      [&acquire_called](std::unique_ptr<RpcMessage>) {
+        acquire_called = true;
+      });
+  ASSERT_TRUE(rpc_messenger_->IsRegisteredForTesting(
+      RpcMessenger::kAcquireRendererHandle));
+
+  rpc_messenger_->Reset();
+  ASSERT_FALSE(rpc_messenger_->IsRegisteredForTesting(handle));
+  ASSERT_FALSE(rpc_messenger_->IsRegisteredForTesting(
+      RpcMessenger::kAcquireRendererHandle));
+
+  // Sending message to previously registered handle should be dropped.
+  RpcMessage sent_rpc;
+  sent_rpc.set_handle(handle);
+  sent_rpc.set_proc(RpcMessage::RPC_DS_INITIALIZE);
+  ProcessMessage(sent_rpc);
+  EXPECT_EQ(0, fake_messenger_->received_count());
+
+  // Predefined handle can be re-registered without crashing on duplicate
+  // handle.
+  rpc_messenger_->RegisterMessageReceiverCallback(
+      RpcMessenger::kAcquireRendererHandle,
+      [&acquire_called](std::unique_ptr<RpcMessage>) {
+        acquire_called = true;
+      });
+  ASSERT_TRUE(rpc_messenger_->IsRegisteredForTesting(
+      RpcMessenger::kAcquireRendererHandle));
+
+  // Unique handles allocate monotonically and do not collide with previous
+  // ones.
+  const auto new_handle = rpc_messenger_->GetUniqueHandle();
+  EXPECT_GT(new_handle, handle);
+}
+
 }  // namespace openscreen::cast

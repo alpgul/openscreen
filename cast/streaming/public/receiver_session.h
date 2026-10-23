@@ -92,9 +92,8 @@ class ReceiverSession final : public Environment::SocketSubscriber,
     ConfiguredReceivers receivers;
 
     // The RPC messenger to be used for subscribing to remoting proto messages.
-    // Unlike the SenderSession API, the RPC messenger is negotiation specific.
-    // The messenger is torn down when `OnReceiversDestroying` is called, and
-    // is owned by the ReceiverSession.
+    // Owned by the ReceiverSession for the lifetime of the session. Registered
+    // callbacks are cleared when `OnReceiversDestroying` is called.
     raw_ptr<RpcMessenger> messenger;
   };
 
@@ -182,10 +181,10 @@ class ReceiverSession final : public Environment::SocketSubscriber,
   ReceiverSession& operator=(ReceiverSession&&) = delete;
   ~ReceiverSession() override;
 
-  // The RPC messenger for this session. NOTE: RPC messages may come at
-  // any time from the receiver, so subscriptions to RPC remoting messages
-  // should be done before calling `NegotiateRemoting`.
-  RpcMessenger* rpc_messenger() { return rpc_messenger_.get(); }
+  // The RPC messenger for this session. Owned by composition and outlives any
+  // individual negotiation. Registered message callbacks are cleared when
+  // `OnReceiversDestroying` is called.
+  RpcMessenger& rpc_messenger() { return rpc_messenger_; }
 
   const std::string& session_id() const { return session_id_; }
 
@@ -312,13 +311,16 @@ class ReceiverSession final : public Environment::SocketSubscriber,
   std::unique_ptr<Receiver> current_audio_receiver_;
   std::unique_ptr<Receiver> current_video_receiver_;
 
-  // If remoting, we store the RpcMessenger used by the embedder to send RPC
-  // messages from the remoting protobuf specification.
-  std::unique_ptr<RpcMessenger> rpc_messenger_;
+  // The RPC messenger used for sending and receiving RPC messages from the
+  // remoting protobuf specification.
+  RpcMessenger rpc_messenger_;
 
   // The INPUT messenger, which uses the session messenger for sending INPUT
   // messages.
   ProtobufMessenger<InputMessage> input_messenger_;
+
+  // Whether remoting is currently active on this session.
+  bool is_remoting_ = false;
 
   // The data session negotiated by the current OFFER/ANSWER, if any.
   std::unique_ptr<ReceiverDataSession> data_session_;

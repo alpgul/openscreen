@@ -48,6 +48,11 @@ class RpcMessenger final : public ProtobufMessenger<RpcMessage> {
   // Allows components to unregister in order to stop receiving message.
   void UnregisterMessageReceiverCallback(Handle handle);
 
+  // Clears all registered message receiver callbacks (e.g. when a remoting
+  // negotiation ends). Handle allocation continues monotonically so handles
+  // from previous negotiations are not reused.
+  void Reset();
+
   using ProtobufMessenger<RpcMessage>::ProcessMessageFromRemote;
 
   // This overload distributes an already-deserialized message to the

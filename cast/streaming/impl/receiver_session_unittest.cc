@@ -1340,7 +1340,7 @@ TEST_F(ReceiverSessionTest, HandlesRpcMessage) {
 
   message_port_->ReceiveMessage(kRpcMessage);
   const std::vector<std::string>& messages = message_port_->posted_messages();
-  // Nothing should happen yet, the session doesn't have a messenger.
+  // Nothing should happen yet, we haven't negotiated with a sender.
   ASSERT_EQ(0u, messages.size());
 
   // We don't need to fully test that the subscription model on the RpcMessenger
@@ -1371,6 +1371,74 @@ TEST_F(ReceiverSessionTest, HandlesRpcMessage) {
 
   message_port_->ReceiveMessage(kValidRemotingOfferMessage);
   ASSERT_TRUE(received_initialize_message);
+}
+
+TEST_F(ReceiverSessionTest,
+       RpcMessengerPersistsAndClearsCallbacksOnRenegotiation) {
+  ReceiverConstraints constraints;
+  constraints.remoting = std::make_unique<RemotingConstraints>();
+  SetUpWithConstraints(std::move(constraints));
+
+  RpcMessenger* const initial_messenger = &session_->rpc_messenger();
+
+  // First negotiate mirroring.
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  message_port_->ReceiveMessage(kValidOfferMessage);
+  EXPECT_EQ(&session_->rpc_messenger(), initial_messenger);
+
+  // Then negotiate remoting.
+  EXPECT_CALL(client_, OnRemotingNegotiated(session_.get(), _))
+      .WillOnce([](const ReceiverSession*,
+                   ReceiverSession::RemotingNegotiation negotiation) {
+        negotiation.messenger->RegisterMessageReceiverCallback(
+            RpcMessenger::kAcquireRendererHandle,
+            [](std::unique_ptr<RpcMessage>) {});
+      });
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kRenegotiated));
+  message_port_->ReceiveMessage(kValidRemotingOfferMessage);
+  EXPECT_EQ(&session_->rpc_messenger(), initial_messenger);
+  EXPECT_TRUE(session_->rpc_messenger().IsRegisteredForTesting(
+      RpcMessenger::kAcquireRendererHandle));
+
+  // Renegotiate mirroring. ResetReceivers must clear registered callbacks.
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kRenegotiated));
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
+  message_port_->ReceiveMessage(kValidOfferMessage);
+  EXPECT_EQ(&session_->rpc_messenger(), initial_messenger);
+  EXPECT_FALSE(session_->rpc_messenger().IsRegisteredForTesting(
+      RpcMessenger::kAcquireRendererHandle));
+
+  // Re-registering the predefined handle on the next remoting session
+  // succeeds without crashing on duplicate handle registration.
+  session_->rpc_messenger().RegisterMessageReceiverCallback(
+      RpcMessenger::kAcquireRendererHandle, [](std::unique_ptr<RpcMessage>) {});
+  EXPECT_TRUE(session_->rpc_messenger().IsRegisteredForTesting(
+      RpcMessenger::kAcquireRendererHandle));
+}
+
+TEST_F(ReceiverSessionTest, DropsRpcMessagesWhenNotRemoting) {
+  EXPECT_CALL(client_, OnNegotiated(session_.get(), _));
+  EXPECT_CALL(client_,
+              OnReceiversDestroying(session_.get(),
+                                    ReceiverSession::Client::kEndOfSession));
+  message_port_->ReceiveMessage(kValidOfferMessage);
+
+  // Register a callback on the session's RpcMessenger.
+  bool received_rpc = false;
+  session_->rpc_messenger().RegisterMessageReceiverCallback(
+      100,
+      [&received_rpc](std::unique_ptr<RpcMessage>) { received_rpc = true; });
+
+  // Send an RPC message while mirroring. It must be dropped.
+  message_port_->ReceiveMessage(kRpcMessage);
+  EXPECT_FALSE(received_rpc);
 }
 
 TEST_F(ReceiverSessionTest, EnablesDscpInAnswer) {

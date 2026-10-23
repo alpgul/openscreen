@@ -132,6 +132,9 @@ ReceiverSession::ReceiverSession(Client& client,
             client_->OnError(this, error);
           })),
       packet_router_(*environment_),
+      rpc_messenger_([this](std::vector<uint8_t> message) {
+        this->SendRpcMessage(std::move(message));
+      }),
       input_messenger_([this](std::vector<uint8_t> message) {
         if (!negotiated_sender_id_.empty()) {
           const Error error = this->messenger_->SendInputMessage(
@@ -349,6 +352,11 @@ void ReceiverSession::OnRpcMessage(const std::string& sender_id,
     return;
   }
 
+  if (!is_remoting_) {
+    OSP_DLOG_INFO << "Received an RPC message while not remoting, dropping.";
+    return;
+  }
+
   if (sender_id != negotiated_sender_id_) {
     OSP_DLOG_INFO << "Received an RPC message from sender " << sender_id
                   << "--which we haven't negotiated with, dropping.";
@@ -356,11 +364,21 @@ void ReceiverSession::OnRpcMessage(const std::string& sender_id,
   }
 
   const auto& body = std::get<std::vector<uint8_t>>(message.body);
-  if (!rpc_messenger_) {
-    OSP_DLOG_INFO << "Received an RPC message without having a messenger.";
+  rpc_messenger_.ProcessMessageFromRemote(body);
+}
+
+void ReceiverSession::SendRpcMessage(std::vector<uint8_t> message) {
+  if (!is_remoting_ || negotiated_sender_id_.empty() || !messenger_) {
+    OSP_DLOG_WARN
+        << "Can't send an RPC message without an active remoting session.";
     return;
   }
-  rpc_messenger_->ProcessMessageFromRemote(body);
+
+  const Error error =
+      messenger_->SendRpcMessage(negotiated_sender_id_, message);
+  if (!error.ok()) {
+    OSP_LOG_WARN << "Failed to send RPC message: " << error;
+  }
 }
 
 void ReceiverSession::OnInputMessage(const std::string& sender_id,
@@ -463,18 +481,12 @@ void ReceiverSession::InitializeSession(const PendingOffer& properties) {
   negotiated_sender_id_ = properties.sender_id;
 
   if (properties.mode == CastMode::kMirroring) {
+    is_remoting_ = false;
     client_->OnNegotiated(this, std::move(receivers));
   } else {
-    rpc_messenger_ =
-        std::make_unique<RpcMessenger>([this](std::vector<uint8_t> message) {
-          const Error error = this->messenger_->SendRpcMessage(
-              this->negotiated_sender_id_, message);
-          if (!error.ok()) {
-            OSP_LOG_WARN << "Failed to send RPC message: " << error;
-          }
-        });
+    is_remoting_ = true;
     client_->OnRemotingNegotiated(
-        this, RemotingNegotiation{std::move(receivers), rpc_messenger_.get()});
+        this, RemotingNegotiation{std::move(receivers), &rpc_messenger_});
   }
 }
 
@@ -550,8 +562,9 @@ void ReceiverSession::ResetReceivers(Client::ReceiversDestroyingReason reason) {
     client_->OnReceiversDestroying(this, reason);
     current_audio_receiver_.reset();
     current_video_receiver_.reset();
-    rpc_messenger_.reset();
+    rpc_messenger_.Reset();
   }
+  is_remoting_ = false;
 }
 
 Answer ReceiverSession::ConstructAnswer(const PendingOffer& properties) {
