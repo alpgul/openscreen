@@ -6,11 +6,13 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <ratio>
 #include <utility>
 
 #include "cast/streaming/impl/rtp_defines.h"
 #include "cast/streaming/impl/statistics_common.h"
+#include "cast/streaming/public/constants.h"
 #include "cast/streaming/public/session_config.h"
 #include "platform/base/trivial_clock_traits.h"
 #include "util/chrono_helpers.h"
@@ -22,12 +24,34 @@
 namespace openscreen::cast {
 namespace {
 
-// The minimum amount of media the Sender keeps in-flight, regardless of the
-// measured network round-trip time. This keeps the encoder pipeline flowing on
-// low-latency networks (roughly two video frames at 30 FPS). See
-// crbug.com/498035450.
+// The floor of the in-flight window. See GetMaxInFlightMediaDuration().
+//
+// The in-flight duration runs from the oldest unACKed frame to the new frame,
+// so N unACKed frames that are T apart measure N*T. This floor lets two 30 FPS
+// frames wait for an ACK when the next frame arrives. The old 66 ms floor let
+// only one wait, because two frames measure 66.67 ms. See crbug.com/498035450.
+//
+// 30 FPS (kDefaultFrameRate) is the lowest rate we target for fluid video. At
+// 60 FPS the floor holds about four frames. At lower rates, such as 24 FPS
+// video or a static screen, frames are far enough apart that the older frame
+// is usually ACKed first.
+//
+// The jitter allowance covers capture times, which set the RTP timestamps and
+// do not arrive on an exact cadence. Without it, one slightly late frame causes
+// a MAX_DURATION_IN_FLIGHT drop. See b/572902679.
+constexpr int kMinInFlightFrames = 2;
+constexpr Clock::duration kInFlightJitterAllowance =
+    Clock::to_duration(milliseconds(15));
+
+using BaselineFrameIntervals =
+    std::chrono::duration<int64_t, std::ratio<1, kDefaultFrameRate>>;
+
+// 66,667 us (two 30 FPS frames, rounded up) + 15,000 us = 81,667 us.
 constexpr Clock::duration kMinSenderInFlight =
-    Clock::to_duration(milliseconds(66));
+    std::chrono::ceil<Clock::duration>(
+        BaselineFrameIntervals(kMinInFlightFrames)) +
+    kInFlightJitterAllowance;
+static_assert(kMinSenderInFlight == microseconds(81667));
 
 }  // namespace
 
@@ -95,17 +119,21 @@ Clock::duration SenderImpl::GetMaxInFlightMediaDuration() const {
   if (config_.max_in_flight_media_duration) {
     return config_.max_in_flight_media_duration.value();
   }
-  // The Sender keeps only enough media in-flight to drive the loss-detection
-  // and retransmit feedback loop, which takes on the order of two network
-  // round-trips (one to detect a loss via NACK, one to retransmit). A small
-  // floor (`kMinSenderInFlight`) keeps the encoder pipeline flowing on
-  // low-latency networks where 2*RTT is negligible.
+  // The window limits how much media can wait for an ACK when a new frame is
+  // enqueued. With no loss, a frame waits about its send time plus one RTT. A
+  // lost packet adds at least one more RTT for the NACK and the retransmit, so
+  // the window is 2*RTT. On low-latency networks the floor takes over.
   //
-  // The result is capped at a third of the playout delay window so that the
-  // majority of the budget is reserved for the Receiver, which needs buffer to
-  // absorb NACK retransmissions. Bounding the Sender this way also makes it
-  // drop frames earlier during congestion (saving bandwidth and CPU) rather
-  // than over-buffering. See crbug.com/498035450.
+  // TODO(crbug.com/572902679): The window leaves out send time. At the default
+  // 24 Mbps burst rate, a large key frame can take several frame intervals to
+  // send. Chrome also counts frames in the encoder against this window. With a
+  // playout delay under about 245 ms (Chrome uses 100 to 200 ms), the cap is
+  // below the floor, so the floor is the whole window.
+  //
+  // The window is capped at a third of the playout delay. This keeps most of
+  // the playout budget for the Receiver to absorb retransmits, and makes the
+  // Sender drop frames early under congestion instead of buffering. See
+  // crbug.com/498035450.
   //
   // Note: the upper bound is held at or above `kMinSenderInFlight` so the
   // std::clamp() bounds remain well-ordered even for very small playout delays.

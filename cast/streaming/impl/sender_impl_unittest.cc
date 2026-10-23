@@ -62,8 +62,10 @@ constexpr int kRtpTimebase = 48000;
 constexpr milliseconds kTargetPlayoutDelay(400);
 
 // The minimum in-flight media duration the Sender enforces regardless of the
-// measured round-trip time. Must match kMinSenderInFlight in sender_impl.cc.
-constexpr Clock::duration kMinSenderInFlight = milliseconds(66);
+// measured round-trip time: two 30 FPS frames (66,667 us, rounded up) plus a
+// 15 ms jitter allowance. Must match kMinSenderInFlight in sender_impl.cc.
+constexpr Clock::duration kMinSenderInFlight = microseconds(81667);
+constexpr Clock::duration kInFlightJitterAllowance = milliseconds(15);
 constexpr auto kAesKey =
     std::array<uint8_t, 16>{{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                              0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f}};
@@ -666,8 +668,8 @@ TEST_F(SenderTest, RespondsToNetworkLatencyChanges) {
 
   // Simulate one-way network delays large enough that twice the round-trip time
   // exceeds the floor, so the in-flight limit tracks the measured RTT.
-  constexpr milliseconds kOutboundDelay(20);
-  constexpr milliseconds kInboundDelay(20);
+  constexpr milliseconds kOutboundDelay(25);
+  constexpr milliseconds kInboundDelay(25);
   constexpr milliseconds kRoundTripDelay(kOutboundDelay + kInboundDelay);
   SimulateNetworkRoundTrip(kOutboundDelay, kInboundDelay);
 
@@ -682,7 +684,7 @@ TEST_F(SenderTest, RespondsToNetworkLatencyChanges) {
   // total round-trip time. The delta is kept small so the smoothing filter
   // converges to within kEpsilon over kNumReportIntervals, and so that twice
   // the round-trip time stays within the in-flight clamp bounds.
-  constexpr milliseconds kIncreasedOutboundDelay(24);
+  constexpr milliseconds kIncreasedOutboundDelay(29);
   constexpr milliseconds kIncreasedRoundTripDelay(kIncreasedOutboundDelay +
                                                   kInboundDelay);
   SetSenderToReceiverNetworkDelay(kIncreasedOutboundDelay);
@@ -698,12 +700,15 @@ TEST_F(SenderTest, RespondsToNetworkLatencyChanges) {
                                           RtcpReportBlock::Delay::zero());
             receiver()->TransmitRtcpFeedbackPacket();
           });
+  // The limit should rise monotonically, give or take RTCP delay quantization
+  // (kEpsilon per RTT measurement, doubled because the limit is 2*RTT). The
+  // smoothed estimate can overshoot by a few microseconds and settle back.
   Clock::duration last_max = sender()->GetMaxInFlightMediaDuration();
   for (int i = 0; i < kNumReportIntervals; ++i) {
     SimulateExecution(kRtcpReportInterval);
     const Clock::duration updated_value =
         sender()->GetMaxInFlightMediaDuration();
-    EXPECT_LE(last_max, updated_value);
+    EXPECT_LE(last_max - 2 * kEpsilon, updated_value);
     last_max = updated_value;
   }
   EXPECT_NEARLY_EQUAL(kIncreasedRoundTripDelay,
@@ -739,9 +744,84 @@ TEST_F(SenderTest, CapsInFlightMediaDurationUnderHighLatency) {
 // the floor wins and the std::clamp() bounds remain well-ordered (no
 // precondition violation).
 TEST_F(SenderTest, EnforcesMinimumInFlightForSmallPlayoutDelays) {
-  // A third of this playout delay (30ms) is below the 66ms floor, so the floor
-  // wins and the std::clamp() bounds remain well-ordered.
+  // A third of this playout delay (30ms) is below the ~81.7ms floor, so the
+  // floor wins and the std::clamp() bounds remain well-ordered.
   EXPECT_EQ(kMinSenderInFlight, MaxInFlightForPlayoutDelay(milliseconds(90)));
+}
+
+// Converts a media time offset to RTP ticks at the test timebase, truncating.
+constexpr int64_t ToRtpTicks(microseconds media_time) {
+  return media_time.count() * kRtpTimebase / 1000000;
+}
+
+// Tests that, before any RTT is measured (so the floor applies), two frames at
+// 30 FPS and at 29.97 FPS fit in flight. In both cases the in-flight duration
+// when enqueuing the third frame is a little over 66 ms, which the old 66 ms
+// floor rejected. See b/572902679.
+TEST_F(SenderTest, AcceptsTwoFramesInFlightAtThirtyFps) {
+  // Frame intervals, rounded up to the next microsecond.
+  constexpr microseconds kFrameIntervals[] = {
+      microseconds(33334),  // 30 FPS.
+      microseconds(33367),  // 29.97 FPS (30000/1001).
+  };
+
+  for (const microseconds interval : kFrameIntervals) {
+    SCOPED_TRACE(testing::Message() << "interval=" << interval.count() << "us");
+    SenderImpl sender(sender_environment_, sender_packet_router_,
+                      {/* .sender_ssrc = */ kSenderSsrc + 200,
+                       /* .receiver_ssrc = */ kReceiverSsrc + 200,
+                       /* .rtp_timebase = */ kRtpTimebase,
+                       /* .channels = */ 2,
+                       /* .target_playout_delay = */ kTargetPlayoutDelay,
+                       /* .aes_secret_key = */ kAesKey,
+                       /* .aes_iv_mask = */ kCastIvMask,
+                       /* .is_pli_enabled = */ true},
+                      kRtpPayloadType);
+    ASSERT_EQ(Clock::duration::zero(), sender.GetCurrentRoundTripTime());
+
+    for (int i = 0; i < 3; ++i) {
+      EncodedFrameWithBuffer frame;
+      PopulateFrameWithDefaults(sender.GetNextFrameId(), FakeClock::now(), 0,
+                                13 /* bytes */, &frame);
+      frame.rtp_timestamp =
+          RtpTimeTicks() + RtpTimeDelta::FromTicks(ToRtpTicks(i * interval));
+      EXPECT_EQ(Sender::OK, sender.EnqueueFrame(frame)) << "frame " << i;
+    }
+    EXPECT_EQ(3u, sender.GetInFlightFrameCount());
+  }
+}
+
+// Tests the jitter allowance in the in-flight floor. Only the oldest in-flight
+// frame and the frame being enqueued affect the in-flight duration, so the
+// worst case is the third frame arriving late. A delay up to the 15 ms
+// allowance is accepted. A delay beyond it is rejected.
+TEST_F(SenderTest, AbsorbsCaptureJitterUpToAllowance) {
+  constexpr microseconds kFrameInterval(33334);  // 30 FPS, rounded up.
+
+  const auto make_frame = [&](microseconds media_time) {
+    EncodedFrameWithBuffer frame;
+    PopulateFrameWithDefaults(sender()->GetNextFrameId(), FakeClock::now(), 0,
+                              13 /* bytes */, &frame);
+    frame.rtp_timestamp =
+        RtpTimeTicks() + RtpTimeDelta::FromTicks(ToRtpTicks(media_time));
+    return frame;
+  };
+
+  ASSERT_EQ(Sender::OK, sender()->EnqueueFrame(make_frame(microseconds(0))));
+  ASSERT_EQ(Sender::OK, sender()->EnqueueFrame(make_frame(kFrameInterval)));
+
+  // The third frame is 16 ms late, 1 ms past the allowance: rejected. A
+  // rejected frame is not enqueued, so the same frame ID can be retried.
+  EXPECT_EQ(
+      Sender::MAX_DURATION_IN_FLIGHT,
+      sender()->EnqueueFrame(make_frame(
+          2 * kFrameInterval + kInFlightJitterAllowance + milliseconds(1))));
+  EXPECT_EQ(2u, sender()->GetInFlightFrameCount());
+
+  // The same frame, late by exactly the allowance: accepted.
+  EXPECT_EQ(Sender::OK, sender()->EnqueueFrame(make_frame(
+                            2 * kFrameInterval + kInFlightJitterAllowance)));
+  EXPECT_EQ(3u, sender()->GetInFlightFrameCount());
 }
 
 // Tests the asymmetric "fast attack, slow decay" round-trip-time smoothing
