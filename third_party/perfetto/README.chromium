@@ -1,7 +1,7 @@
 Name: perfetto
 URL: https://github.com/google/perfetto
 Version: N/A
-Revision: 316821d84856c506d6c916edf33aea61a6f5a4ff
+Revision: a7c43b904ba74e90e8971357b90fb6c98d6a47d1
 License: blessing, BSD-2-Clause, BSD-3-Clause, Apache-2.0
 License File: src/LICENSE
 Security Critical: yes
