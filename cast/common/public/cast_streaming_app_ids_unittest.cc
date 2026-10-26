@@ -40,6 +40,8 @@ TEST(CastStreamingAppIdsTest, Test) {
   EXPECT_TRUE(IsCastStreamingReceiverAppId("225daef5"));
   EXPECT_TRUE(IsCastStreamingReceiverAppId("D4BA69B9"));
   EXPECT_TRUE(IsCastStreamingReceiverAppId("B27C9432"));
+  EXPECT_TRUE(IsCastStreamingReceiverAppId("015B5861"));
+  EXPECT_TRUE(IsCastStreamingReceiverAppId("015b5861"));
   EXPECT_FALSE(IsCastStreamingReceiverAppId("DEADBEEF"));
   EXPECT_FALSE(IsCastStreamingReceiverAppId(""));
   EXPECT_FALSE(IsCastStreamingReceiverAppId("foo"));
@@ -54,6 +56,7 @@ TEST(CastStreamingAppIdsTest, Test) {
   EXPECT_STREQ("0F5096E8", GetCastStreamingAudioVideoAppId());
   EXPECT_STREQ("85CDB22F", GetCastStreamingAudioOnlyAppId());
   EXPECT_STREQ("674A0243", GetAndroidMirroringAudioVideoAppId());
+  EXPECT_STREQ("015B5861", GetAndroidMirroringAudioVideoAppId2());
   EXPECT_STREQ("8E6C866D", GetAndroidMirroringAudioOnlyAppId());
   EXPECT_STREQ("96084372", GetAndroidAppStreamingAudioVideoAppId());
   EXPECT_STREQ("BFD92C23", GetIosAppStreamingAudioVideoAppId());

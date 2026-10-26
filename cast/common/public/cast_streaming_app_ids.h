@@ -38,6 +38,11 @@ constexpr const char* GetAndroidMirroringAudioVideoAppId() {
   return "674A0243";
 }
 
+// Returns the second app ID for the Android audio and video streaming receiver.
+constexpr const char* GetAndroidMirroringAudioVideoAppId2() {
+  return "015B5861";
+}
+
 // Returns the app ID for for the Android audio-only streaming receiver.
 constexpr const char* GetAndroidMirroringAudioOnlyAppId() {
   return "8E6C866D";

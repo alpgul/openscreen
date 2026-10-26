@@ -126,6 +126,7 @@ bool IsCastStreamingReceiverAppId(std::string_view app_id) {
   if (EqualsIgnoreCase(app_id, GetCastStreamingAudioVideoAppId()) ||
       EqualsIgnoreCase(app_id, GetCastStreamingAudioOnlyAppId()) ||
       EqualsIgnoreCase(app_id, GetAndroidMirroringAudioVideoAppId()) ||
+      EqualsIgnoreCase(app_id, GetAndroidMirroringAudioVideoAppId2()) ||
       EqualsIgnoreCase(app_id, GetAndroidMirroringAudioOnlyAppId()) ||
       EqualsIgnoreCase(app_id, GetAndroidAppStreamingAudioVideoAppId()) ||
       EqualsIgnoreCase(app_id, GetIosAppStreamingAudioVideoAppId())) {
