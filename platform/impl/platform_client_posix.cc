@@ -4,6 +4,12 @@
 
 #include "platform/impl/platform_client_posix.h"
 
+#ifdef __ANDROID__
+#include <errno.h>
+#include <string.h>
+#include <sys/resource.h>
+#endif
+
 #include <chrono>
 #include <functional>
 #include <utility>
@@ -11,6 +17,7 @@
 
 #include "platform/base/trivial_clock_traits.h"
 #include "platform/impl/udp_socket_reader_posix.h"
+#include "util/osp_logging.h"
 
 namespace openscreen {
 
@@ -105,6 +112,26 @@ SocketHandleWaiterPosix* PlatformClientPosix::socket_handle_waiter() {
 }
 
 void PlatformClientPosix::RunNetworkLoopUntilStopped() {
+#ifdef __ANDROID__
+  // On Android, PlatformClientPosix may be constructed from a background
+  // priority thread (e.g. THREAD_PRIORITY_BACKGROUND, nice +10) in the
+  // embedding app, and the networking thread inherits that nice value. Under
+  // load, the scheduler can then starve this thread, delaying socket
+  // processing past the poll() timeout budget and stalling incoming RTP/RTCP
+  // packets. Boost it to THREAD_PRIORITY_AUDIO (-16) to match the embedder's
+  // task runner thread. Android apps are allowed to raise their own thread
+  // priority this way.
+  //
+  // This is intentionally Android-only: on desktop Linux, lowering the nice
+  // value requires CAP_SYS_NICE or a raised RLIMIT_NICE, which unprivileged
+  // processes typically lack, and on other POSIX systems (e.g. macOS)
+  // setpriority(PRIO_PROCESS, 0, ...) renices the entire process rather than
+  // just the calling thread.
+  if (setpriority(PRIO_PROCESS, 0, -16) != 0) {
+    OSP_LOG_ERROR << "Failed to set network loop thread priority: "
+                  << strerror(errno);
+  }
+#endif
 #if OSP_DCHECK_IS_ON()
   Clock::time_point last_time = Clock::now();
   int iterations = 0;

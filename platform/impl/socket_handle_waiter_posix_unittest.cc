@@ -330,6 +330,26 @@ TEST(SocketHandleWaiterBaseTest,
   waiter.ProcessHandles(Clock::duration{0});
 }
 
+TEST(SocketHandleWaiterBaseTest,
+     ClampsNegativeRemainingTimeoutToZeroWhenElapsedExceedsTimeout) {
+  MockSubscriber subscriber;
+  TestingSocketHandleWaiter waiter;
+  SocketHandle handle0(0);
+
+  waiter.Subscribe(&subscriber, handle0, SocketHandleWaiter::Flags::kWritable);
+  EXPECT_CALL(subscriber, HasPendingWrite(std::cref(handle0)))
+      .WillOnce([&waiter](SocketHandleWaiter::SocketHandleRef) {
+        waiter.fake_clock.Advance(std::chrono::milliseconds(55));
+        return true;
+      });
+
+  EXPECT_CALL(waiter, AwaitSocketsReady(_, Clock::duration::zero()))
+      .WillOnce(Return(Error::Code::kAgain));
+
+  const Error result = waiter.ProcessHandles(std::chrono::milliseconds(50));
+  EXPECT_EQ(result.code(), Error::Code::kAgain);
+}
+
 TEST_F(SocketHandleWaiterPosixInstanceTest, WriteNotProcessedIfNoPendingWrite) {
   int pipe_fds[2];
   CreatePipe(pipe_fds);
@@ -391,6 +411,29 @@ TEST_F(SocketHandleWaiterPosixInstanceTest,
 
   std::array<uint8_t, 16> drain;
   ASSERT_THAT(read(pipe_fds[0], drain.data(), drain.size()), Gt(ssize_t{0}));
+  waiter_.Unsubscribe(&subscriber_, std::cref(read_end_handle));
+  ClosePipe(pipe_fds);
+}
+
+TEST_F(SocketHandleWaiterPosixInstanceTest,
+       DoesNotCrashWhenElapsedExceedsTimeoutBeforePoll) {
+  int pipe_fds[2];
+  CreatePipe(pipe_fds);
+  SocketHandle read_end_handle(pipe_fds[0]);
+
+  waiter_.Subscribe(&subscriber_, std::cref(read_end_handle),
+                    SocketHandleWaiter::Flags::kReadable |
+                        SocketHandleWaiter::Flags::kWritable);
+
+  EXPECT_CALL(subscriber_, HasPendingWrite(std::cref(read_end_handle)))
+      .WillOnce([this](SocketHandleWaiter::SocketHandleRef) {
+        clock_.Advance(std::chrono::milliseconds(55));
+        return false;
+      });
+
+  const Error result = waiter_.ProcessHandles(std::chrono::milliseconds(50));
+  EXPECT_EQ(result.code(), Error::Code::kAgain);
+
   waiter_.Unsubscribe(&subscriber_, std::cref(read_end_handle));
   ClosePipe(pipe_fds);
 }

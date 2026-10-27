@@ -127,7 +127,8 @@ Error SocketHandleWaiter::ProcessHandles(Clock::duration timeout) {
   }
 
   Clock::time_point current_time = now_function_();
-  Clock::duration remaining_timeout = timeout - (current_time - start_time);
+  Clock::duration remaining_timeout =
+      std::max(Clock::duration::zero(), timeout - (current_time - start_time));
   ErrorOr<std::vector<HandleWithFlags>> changed_handles =
       AwaitSocketsReady(handles, remaining_timeout);
 
@@ -153,7 +154,8 @@ Error SocketHandleWaiter::ProcessHandles(Clock::duration timeout) {
     }
 
     current_time = now_function_();
-    remaining_timeout = timeout - (current_time - start_time);
+    remaining_timeout = std::max(Clock::duration::zero(),
+                                 timeout - (current_time - start_time));
     ProcessReadyHandles(&ready_handles, remaining_timeout);
   }
   return Error::None();
