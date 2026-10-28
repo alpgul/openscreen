@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "cast/streaming/impl/bandwidth_estimator.h"
+#include "cast/streaming/impl/rtp_defines.h"
 #include "cast/streaming/public/constants.h"
 #include "cast/streaming/public/environment.h"
 #include "cast/streaming/ssrc.h"
@@ -202,6 +203,10 @@ class SenderPacketRouter : public BandwidthEstimator,
   // The last time a burst of packets was sent. This is used to determine the
   // next burst time.
   Clock::time_point last_burst_time_ = Clock::time_point::min();
+
+  // The parser used to route incoming packets. Picked once, so that it does
+  // not change during a session.
+  const RtpParserVersion rtp_parser_version_ = GetDefaultRtpParserVersion();
 };
 
 }  // namespace openscreen::cast

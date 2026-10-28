@@ -82,7 +82,7 @@ class CompoundRtcpParser {
   // CompoundRtcpParser instance.
   CompoundRtcpParser(RtcpSession& session,
                      Client& client,
-                     RtpParserVersion version = RtpParserVersion::kDefault);
+                     RtpParserVersion version = GetDefaultRtpParserVersion());
   ~CompoundRtcpParser();
 
   // Parses the packet, invoking the Client callback methods when appropriate.
@@ -135,7 +135,8 @@ class CompoundRtcpParser {
 
   const raw_ref<RtcpSession> session_;
   const raw_ref<Client> client_;
-  const RtpParserVersion version_;
+  // Unused when Open Screen is built without the Rust parser.
+  [[maybe_unused]] const RtpParserVersion version_;
 
   // Tracks the latest timestamp seen from any Receiver Reference Time Report,
   // and uses this to ignore stale RTCP packets that arrived out-of-order and/or

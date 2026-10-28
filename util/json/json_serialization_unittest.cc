@@ -6,36 +6,86 @@
 
 #include <array>
 #include <string>
+#include <string_view>
 
 #include "gtest/gtest.h"
+#include "platform/api/runtime_options.h"
 #include "platform/base/error.h"
+#include "platform/test/scoped_runtime_options.h"
+#include "util/json/json_serialization_internal.h"
 
 namespace openscreen {
 namespace {
+
+using json::internal::JsonBackend;
+
 template <typename Value>
 void AssertError(ErrorOr<Value> error_or, Error::Code code) {
   EXPECT_EQ(error_or.error().code(), code);
 }
+
+// Runs each test against every JSON backend built into this binary.
+class JsonSerializationTest : public testing::TestWithParam<JsonBackend> {
+ protected:
+  ErrorOr<Json::Value> Parse(std::string_view document) {
+    return json::internal::Parse(document, GetParam());
+  }
+
+  ErrorOr<std::string> Stringify(const Json::Value& value) {
+    return json::internal::Stringify(value, GetParam());
+  }
+};
+
 }  // namespace
 
-TEST(JsonSerializationTest, MalformedDocumentReturnsParseError) {
+TEST(JsonSerializationDefaultBackendTest, FollowsRuntimeOptions) {
+  RuntimeOptions options;
+  options.use_rust_json = true;
+  {
+    ScopedRuntimeOptions scoped(options);
+#if defined(USE_JSON_SERDE)
+    EXPECT_EQ(json::internal::GetDefaultJsonBackend(), JsonBackend::kSerde);
+#else
+    // The serde backend is not built, so jsoncpp is used.
+    EXPECT_EQ(json::internal::GetDefaultJsonBackend(), JsonBackend::kJsoncpp);
+#endif  // defined(USE_JSON_SERDE)
+  }
+
+  options.use_rust_json = false;
+  {
+    ScopedRuntimeOptions scoped(options);
+    EXPECT_EQ(json::internal::GetDefaultJsonBackend(), JsonBackend::kJsoncpp);
+  }
+}
+
+TEST(JsonSerializationDefaultBackendTest, PublicApiParsesAndStringifies) {
+  const auto parsed = json::Parse(R"({"foo": "bar"})");
+  ASSERT_TRUE(parsed.is_value());
+  EXPECT_EQ(parsed.value()["foo"].asString(), "bar");
+
+  const auto serialized = json::Stringify(Json::Value(true));
+  ASSERT_TRUE(serialized.is_value());
+  EXPECT_EQ(serialized.value(), "true");
+}
+
+TEST_P(JsonSerializationTest, MalformedDocumentReturnsParseError) {
   const std::array<std::string, 4> kMalformedDocuments{
       {"", "{", "{ foo: bar }", R"({"foo": "bar", "foo": baz})"}};
 
   for (auto& document : kMalformedDocuments) {
-    AssertError(json::Parse(document), Error::Code::kJsonParseError);
+    AssertError(Parse(document), Error::Code::kJsonParseError);
   }
 }
 
-TEST(JsonSerializationTest, ValidEmptyDocumentParsedCorrectly) {
-  const auto actual = json::Parse("{}");
+TEST_P(JsonSerializationTest, ValidEmptyDocumentParsedCorrectly) {
+  const auto actual = Parse("{}");
 
   EXPECT_TRUE(actual.is_value());
   EXPECT_EQ(actual.value().getMemberNames().size(), 0u);
 }
 
-TEST(JsonSerializationTest, ValidDocumentParsedCorrectly) {
-  const auto actual = json::Parse(R"({"foo": "bar", "baz": 1337})");
+TEST_P(JsonSerializationTest, ValidDocumentParsedCorrectly) {
+  const auto actual = Parse(R"({"foo": "bar", "baz": 1337})");
 
   EXPECT_TRUE(actual.is_value());
   EXPECT_EQ(actual.value().getMemberNames().size(), 2u);
@@ -43,8 +93,8 @@ TEST(JsonSerializationTest, ValidDocumentParsedCorrectly) {
   EXPECT_EQ(actual.value()["baz"].asInt(), 1337);
 }
 
-TEST(JsonSerializationTest, ComplexNestedDocumentParsedCorrectly) {
-  const auto actual = json::Parse(
+TEST_P(JsonSerializationTest, ComplexNestedDocumentParsedCorrectly) {
+  const auto actual = Parse(
       R"({
         "string": "hello world",
         "int": 42,
@@ -67,42 +117,42 @@ TEST(JsonSerializationTest, ComplexNestedDocumentParsedCorrectly) {
   EXPECT_EQ(val["nested"]["key"].asString(), "val");
 }
 
-TEST(JsonSerializationTest, EmptyArrayReturnsBrackets) {
+TEST_P(JsonSerializationTest, EmptyArrayReturnsBrackets) {
   const auto empty_array = Json::Value(Json::ValueType::arrayValue);
-  const auto actual = json::Stringify(empty_array);
+  const auto actual = Stringify(empty_array);
 
   EXPECT_TRUE(actual.is_value());
   EXPECT_EQ(actual.value(), "[]");
 }
 
-TEST(JsonSerializationTest, NullValueReturnsNull) {
+TEST_P(JsonSerializationTest, NullValueReturnsNull) {
   const auto null_value = Json::Value();
-  const auto actual = json::Stringify(null_value);
+  const auto actual = Stringify(null_value);
 
   EXPECT_TRUE(actual.is_value());
   EXPECT_EQ(actual.value(), "null");
 }
 
-TEST(JsonSerializationTest, ValidValueReturnsString) {
+TEST_P(JsonSerializationTest, ValidValueReturnsString) {
   const Json::Int64 value = 31337;
-  const auto actual = json::Stringify(value);
+  const auto actual = Stringify(value);
 
   EXPECT_TRUE(actual.is_value());
   EXPECT_EQ(actual.value(), "31337");
 }
 
-TEST(JsonSerializationTest, BooleanValuesStringified) {
-  EXPECT_EQ(json::Stringify(Json::Value(true)).value(), "true");
-  EXPECT_EQ(json::Stringify(Json::Value(false)).value(), "false");
+TEST_P(JsonSerializationTest, BooleanValuesStringified) {
+  EXPECT_EQ(Stringify(Json::Value(true)).value(), "true");
+  EXPECT_EQ(Stringify(Json::Value(false)).value(), "false");
 }
 
-TEST(JsonSerializationTest, ArrayAndObjectRoundTrip) {
-  const auto parsed = json::Parse(R"({"numbers":[1,2,3],"tag":"test"})");
+TEST_P(JsonSerializationTest, ArrayAndObjectRoundTrip) {
+  const auto parsed = Parse(R"({"numbers":[1,2,3],"tag":"test"})");
   ASSERT_TRUE(parsed.is_value());
-  const auto serialized = json::Stringify(parsed.value());
+  const auto serialized = Stringify(parsed.value());
   ASSERT_TRUE(serialized.is_value());
 
-  const auto reparsed = json::Parse(serialized.value());
+  const auto reparsed = Parse(serialized.value());
   ASSERT_TRUE(reparsed.is_value());
   EXPECT_EQ(reparsed.value()["tag"].asString(), "test");
   EXPECT_EQ(reparsed.value()["numbers"].size(), 3u);
@@ -110,5 +160,16 @@ TEST(JsonSerializationTest, ArrayAndObjectRoundTrip) {
   EXPECT_EQ(reparsed.value()["numbers"][1].asInt(), 2);
   EXPECT_EQ(reparsed.value()["numbers"][2].asInt(), 3);
 }
+
+#if defined(USE_JSON_SERDE)
+INSTANTIATE_TEST_SUITE_P(All,
+                         JsonSerializationTest,
+                         testing::Values(JsonBackend::kJsoncpp,
+                                         JsonBackend::kSerde));
+#else
+INSTANTIATE_TEST_SUITE_P(All,
+                         JsonSerializationTest,
+                         testing::Values(JsonBackend::kJsoncpp));
+#endif  // defined(USE_JSON_SERDE)
 
 }  // namespace openscreen

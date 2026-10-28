@@ -10,9 +10,12 @@
 namespace openscreen::cast {
 namespace {
 
+// Runs each test against every RTP parser version built into this binary.
+class PacketUtilTest : public testing::TestWithParam<RtpParserVersion> {};
+
 // Tests that a simple RTCP packet containing only a Sender Report can be
 // identified.
-TEST(PacketUtilTest, InspectsRtcpPacketFromSender) {
+TEST_P(PacketUtilTest, InspectsRtcpPacketFromSender) {
   // clang-format off
   const uint8_t kSenderReportPacket[] = {
     0b10000000,  // Version=2, Padding=no, ItemCount=0.
@@ -28,14 +31,14 @@ TEST(PacketUtilTest, InspectsRtcpPacketFromSender) {
   // clang-format on
   const Ssrc kSenderSsrc = 0x01020304;
 
-  const auto result = InspectPacketForRouting(kSenderReportPacket);
+  const auto result = InspectPacketForRouting(kSenderReportPacket, GetParam());
   EXPECT_EQ(ApparentPacketType::RTCP, result.first);
   EXPECT_EQ(kSenderSsrc, result.second);
 }
 
 // Tests that compound RTCP packets containing a Receiver Report and/or a Cast
 // Feedback message can be identified.
-TEST(PacketUtilTest, InspectsRtcpPacketFromReceiver) {
+TEST_P(PacketUtilTest, InspectsRtcpPacketFromReceiver) {
   // clang-format off
   const uint8_t kReceiverReportPacket[] = {
     0b10000001,  // Version=2, Padding=no, ItemCount=1.
@@ -59,13 +62,15 @@ TEST(PacketUtilTest, InspectsRtcpPacketFromReceiver) {
   const Ssrc kReceiverSsrc = 0x09080706;
 
   {
-    const auto result = InspectPacketForRouting(kReceiverReportPacket);
+    const auto result =
+        InspectPacketForRouting(kReceiverReportPacket, GetParam());
     EXPECT_EQ(ApparentPacketType::RTCP, result.first);
     EXPECT_EQ(kReceiverSsrc, result.second);
   }
 
   {
-    const auto result = InspectPacketForRouting(kCastFeedbackPacket);
+    const auto result =
+        InspectPacketForRouting(kCastFeedbackPacket, GetParam());
     EXPECT_EQ(ApparentPacketType::RTCP, result.first);
     EXPECT_EQ(kReceiverSsrc, result.second);
   }
@@ -80,14 +85,14 @@ TEST(PacketUtilTest, InspectsRtcpPacketFromReceiver) {
     memcpy(compound_packet, combo[0].data(), combo[0].size());
     memcpy(compound_packet + combo[0].size(), combo[1].data(), combo[1].size());
 
-    const auto result = InspectPacketForRouting(compound_packet);
+    const auto result = InspectPacketForRouting(compound_packet, GetParam());
     EXPECT_EQ(ApparentPacketType::RTCP, result.first);
     EXPECT_EQ(kReceiverSsrc, result.second);
   }
 }
 
 // Tests that a RTP packet can be identified.
-TEST(PacketUtilTest, InspectsRtpPacket) {
+TEST_P(PacketUtilTest, InspectsRtpPacket) {
   // clang-format off
   const uint8_t kInput[] = {
     0b10000000,  // Version/Padding byte.
@@ -104,7 +109,7 @@ TEST(PacketUtilTest, InspectsRtpPacket) {
   // clang-format on
   const Ssrc kSenderSsrc = 0x01020304;
 
-  const auto result = InspectPacketForRouting(kInput);
+  const auto result = InspectPacketForRouting(kInput, GetParam());
   EXPECT_EQ(ApparentPacketType::RTP, result.first);
   EXPECT_EQ(kSenderSsrc, result.second);
 }
@@ -112,7 +117,7 @@ TEST(PacketUtilTest, InspectsRtpPacket) {
 // Tests that a RTP packet with the "127 payload type" hack can be identified as
 // valid. See comments in rtp_defines.h for the RtpPayloadType enum definition,
 // for further details.
-TEST(PacketUtilTest, InspectsAndroidAudioRtpPacket) {
+TEST_P(PacketUtilTest, InspectsAndroidAudioRtpPacket) {
   // clang-format off
   const uint8_t kInput[] = {
     0b10000000,  // Version/Padding byte.
@@ -129,13 +134,13 @@ TEST(PacketUtilTest, InspectsAndroidAudioRtpPacket) {
   // clang-format on
   const Ssrc kSenderSsrc = 0x01020304;
 
-  const auto result = InspectPacketForRouting(kInput);
+  const auto result = InspectPacketForRouting(kInput, GetParam());
   EXPECT_EQ(ApparentPacketType::RTP, result.first);
   EXPECT_EQ(kSenderSsrc, result.second);
 }
 
 // Tests that a malformed RTP packet can be identified.
-TEST(PacketUtilTest, InspectsMalformedRtpPacket) {
+TEST_P(PacketUtilTest, InspectsMalformedRtpPacket) {
   // clang-format off
   const uint8_t kInput[] = {
     0b11000000,  // BAD: Version/Padding byte.
@@ -151,18 +156,18 @@ TEST(PacketUtilTest, InspectsMalformedRtpPacket) {
   };
   // clang-format on
 
-  const auto result = InspectPacketForRouting(kInput);
+  const auto result = InspectPacketForRouting(kInput, GetParam());
   EXPECT_EQ(ApparentPacketType::UNKNOWN, result.first);
 }
 
 // Tests that an empty packet is classified as unknown.
-TEST(PacketUtilTest, InspectsEmptyPacket) {
-  const auto result = InspectPacketForRouting(ByteView());
+TEST_P(PacketUtilTest, InspectsEmptyPacket) {
+  const auto result = InspectPacketForRouting(ByteView(), GetParam());
   EXPECT_EQ(ApparentPacketType::UNKNOWN, result.first);
 }
 
 // Tests that a packet with garbage is classified as unknown.
-TEST(PacketUtilTest, InspectsGarbagePacket) {
+TEST_P(PacketUtilTest, InspectsGarbagePacket) {
   // clang-format off
   const uint8_t kInput[] = {
     0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
@@ -172,9 +177,20 @@ TEST(PacketUtilTest, InspectsGarbagePacket) {
   };
   // clang-format on
 
-  const auto result = InspectPacketForRouting(kInput);
+  const auto result = InspectPacketForRouting(kInput, GetParam());
   EXPECT_EQ(ApparentPacketType::UNKNOWN, result.first);
 }
+
+#if defined(USE_RUST_RTP_PARSER)
+INSTANTIATE_TEST_SUITE_P(All,
+                         PacketUtilTest,
+                         testing::Values(RtpParserVersion::kV1,
+                                         RtpParserVersion::kV2));
+#else
+INSTANTIATE_TEST_SUITE_P(All,
+                         PacketUtilTest,
+                         testing::Values(RtpParserVersion::kV1));
+#endif  // defined(USE_RUST_RTP_PARSER)
 
 }  // namespace
 }  // namespace openscreen::cast

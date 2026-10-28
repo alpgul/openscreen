@@ -46,9 +46,11 @@ struct RtcpCommonHeader {
   // given `buffer` and adjusts `buffer` to point to the first byte after it.
   void AppendFields(ByteBuffer& buffer) const;
 
-  // Parse from the 4-byte wire format in `buffer`. Returns nullopt if the data
-  // is corrupt.
-  static std::optional<RtcpCommonHeader> Parse(ByteView buffer);
+  // Parse from the 4-byte wire format in `buffer`, using the given parser
+  // `version`. Returns nullopt if the data is corrupt.
+  static std::optional<RtcpCommonHeader> Parse(
+      ByteView buffer,
+      RtpParserVersion version = GetDefaultRtpParserVersion());
 
  private:
 #if defined(USE_RUST_RTP_PARSER)
@@ -56,10 +58,10 @@ struct RtcpCommonHeader {
   // //cast/streaming/impl/rtp_wire.rs. Validates the 4-byte header and fields
   // using compile-time checked slice bounds.
   static std::optional<RtcpCommonHeader> ParseV2(ByteView buffer);
-#else
+#endif  // defined(USE_RUST_RTP_PARSER)
+
   // ParseV1: Original C++ wire parser implementation using ConsumeField<T>.
   static std::optional<RtcpCommonHeader> ParseV1(ByteView buffer);
-#endif  // defined(USE_RUST_RTP_PARSER)
 };
 
 // The middle 32-bits of the 64-bit NtpTimestamp field from the Sender Reports.
@@ -136,9 +138,12 @@ struct RtcpReportBlock {
   // Scans the wire-format report blocks in `buffer`, searching for one with the
   // matching `ssrc` and, if found, returns the parse result. Returns nullopt if
   // the data is corrupt or no report block with the matching SSRC was found.
-  static std::optional<RtcpReportBlock> ParseOne(ByteView buffer,
-                                                 int report_count,
-                                                 Ssrc ssrc);
+  // Uses the given parser `version`.
+  static std::optional<RtcpReportBlock> ParseOne(
+      ByteView buffer,
+      int report_count,
+      Ssrc ssrc,
+      RtpParserVersion version = GetDefaultRtpParserVersion());
 
  private:
 #if defined(USE_RUST_RTP_PARSER)
@@ -148,13 +153,13 @@ struct RtcpReportBlock {
   static std::optional<RtcpReportBlock> ParseOneV2(ByteView buffer,
                                                    int report_count,
                                                    Ssrc ssrc);
-#else
+#endif  // defined(USE_RUST_RTP_PARSER)
+
   // ParseOneV1: Original C++ wire parser implementation. Searches report blocks
   // sequentially using ConsumeField<T>.
   static std::optional<RtcpReportBlock> ParseOneV1(ByteView buffer,
                                                    int report_count,
                                                    Ssrc ssrc);
-#endif  // defined(USE_RUST_RTP_PARSER)
 };
 
 struct RtcpSenderReport {

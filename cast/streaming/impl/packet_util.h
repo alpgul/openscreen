@@ -7,6 +7,7 @@
 
 #include <utility>
 
+#include "cast/streaming/impl/rtp_defines.h"
 #include "cast/streaming/ssrc.h"
 #include "platform/base/span.h"
 #include "util/big_endian.h"
@@ -51,9 +52,11 @@ inline ByteBuffer ReserveSpace(int num_bytes, ByteBuffer& out) {
 // appropriate parser. Identifies whether the packet is a RTP packet, RTCP
 // packet, or unknown; and provides the originator's SSRC. This only performs a
 // very quick scan of the packet data, and does not guarantee that a full parse
-// will later succeed.
+// will later succeed. `version` selects the parser implementation.
 enum class ApparentPacketType { UNKNOWN, RTP, RTCP };
-std::pair<ApparentPacketType, Ssrc> InspectPacketForRouting(ByteView packet);
+std::pair<ApparentPacketType, Ssrc> InspectPacketForRouting(
+    ByteView packet,
+    RtpParserVersion version = GetDefaultRtpParserVersion());
 
 }  // namespace openscreen::cast
 

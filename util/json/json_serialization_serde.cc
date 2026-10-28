@@ -2,20 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "util/json/json_serialization.h"
-
 #if !defined(USE_JSON_SERDE)
 #error "USE_JSON_SERDE not defined for json_serialization_serde.cc"
 #endif
 
 #include <utility>
 
+#include "util/json/json_serialization_internal.h"
 #include "util/json/json_serialization_serde_internal.h"
 #include "util/json/serde_json.rs.h"
 
 namespace openscreen::json {
 
-ErrorOr<Json::Value> Parse(std::string_view document) {
+namespace internal {
+
+ErrorOr<Json::Value> ParseWithSerde(std::string_view document) {
   if (document.empty()) {
     return ErrorOr<Json::Value>(Error::Code::kJsonParseError, "empty document");
   }
@@ -33,7 +34,7 @@ ErrorOr<Json::Value> Parse(std::string_view document) {
   return builder.TakeValue();
 }
 
-ErrorOr<std::string> Stringify(const Json::Value& value) {
+ErrorOr<std::string> StringifyWithSerde(const Json::Value& value) {
   serde::ValueVisitor visitor(value);
   ::rust::String output;
   ::rust::String error_msg;
@@ -51,6 +52,8 @@ ErrorOr<std::string> Stringify(const Json::Value& value) {
 
   return std::string(output);
 }
+
+}  // namespace internal
 
 namespace serde {
 

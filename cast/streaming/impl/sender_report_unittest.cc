@@ -15,7 +15,8 @@ namespace {
 constexpr Ssrc kSenderSsrc = 1;
 constexpr Ssrc kReceiverSsrc = 2;
 
-class SenderReportTest : public testing::Test {
+// Runs each test against every RTP parser version built into this binary.
+class SenderReportTest : public testing::TestWithParam<RtpParserVersion> {
  public:
   SenderReportBuilder* builder() { return &builder_; }
   SenderReportParser* parser() { return &parser_; }
@@ -26,12 +27,12 @@ class SenderReportTest : public testing::Test {
  private:
   RtcpSession session_{kSenderSsrc, kReceiverSsrc, Clock::now()};
   SenderReportBuilder builder_{session_};
-  SenderReportParser parser_{session_};
+  SenderReportParser parser_{session_, GetParam()};
 };
 
 // Tests that the compound RTCP packets containing a Sender Report alongside
 // zero or more other messages can be parsed successfully.
-TEST_F(SenderReportTest, Parsing) {
+TEST_P(SenderReportTest, Parsing) {
   // clang-format off
   const uint8_t kSenderReportPacket[] = {
     0b10000001,  // Version=2, Padding=no, ItemCount=1 byte.
@@ -95,12 +96,12 @@ TEST_F(SenderReportTest, Parsing) {
 }
 
 // Tests that the SenderReportParser will not try to parse an empty packet.
-TEST_F(SenderReportTest, WillNotParseEmptyPacket) {
+TEST_P(SenderReportTest, WillNotParseEmptyPacket) {
   EXPECT_FALSE(parser()->Parse(ByteView()));
 }
 
 // Tests that the SenderReportParser will not parse anything from garbage data.
-TEST_F(SenderReportTest, WillNotParseGarbage) {
+TEST_P(SenderReportTest, WillNotParseGarbage) {
   // clang-format off
   const uint8_t kGarbage[] = {
     0x4f, 0x27, 0xeb, 0x22, 0x27, 0xeb, 0x22, 0x4f,
@@ -112,7 +113,7 @@ TEST_F(SenderReportTest, WillNotParseGarbage) {
 
 // Assuming that SenderReportTest.Parsing has been proven the implementation,
 // this test checks that the builder produces RTCP packets that can be parsed.
-TEST_F(SenderReportTest, BuildPackets) {
+TEST_P(SenderReportTest, BuildPackets) {
   for (int i = 0; i <= 1; ++i) {
     const bool with_report_block = (i == 1);
 
@@ -158,7 +159,7 @@ TEST_F(SenderReportTest, BuildPackets) {
   }
 }
 
-TEST_F(SenderReportTest, ComputesTimePointsFromReportIds) {
+TEST_P(SenderReportTest, ComputesTimePointsFromReportIds) {
   // Note: The time_points can be off by up to 16 µs because of the loss of
   // precision caused by truncating the NtpTimestamps into StatusReportIds.
   constexpr std::chrono::microseconds kEpsilon(16);
@@ -183,6 +184,17 @@ TEST_F(SenderReportTest, ComputesTimePointsFromReportIds) {
         << ToString(expected_time) << " vs " << ToString(report_time);
   }
 }
+
+#if defined(USE_RUST_RTP_PARSER)
+INSTANTIATE_TEST_SUITE_P(All,
+                         SenderReportTest,
+                         testing::Values(RtpParserVersion::kV1,
+                                         RtpParserVersion::kV2));
+#else
+INSTANTIATE_TEST_SUITE_P(All,
+                         SenderReportTest,
+                         testing::Values(RtpParserVersion::kV1));
+#endif  // defined(USE_RUST_RTP_PARSER)
 
 }  // namespace
 }  // namespace openscreen::cast

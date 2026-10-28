@@ -26,15 +26,11 @@ RtpPacketParser::~RtpPacketParser() = default;
 std::optional<RtpPacketParser::ParseResult> RtpPacketParser::Parse(
     ByteView buffer) {
 #if defined(USE_RUST_RTP_PARSER)
-  switch (version_) {
-    case RtpParserVersion::kV1:
-      return ParseV1(buffer);
-    case RtpParserVersion::kV2:
-      return ParseV2(buffer);
+  if (version_ == RtpParserVersion::kV2) {
+    return ParseV2(buffer);
   }
-#else
+#endif  // defined(USE_RUST_RTP_PARSER)
   return ParseV1(buffer);
-#endif
 }
 
 #if defined(USE_RUST_RTP_PARSER)

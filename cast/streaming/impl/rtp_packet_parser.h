@@ -52,7 +52,7 @@ class RtpPacketParser {
 
   explicit RtpPacketParser(
       Ssrc sender_ssrc,
-      RtpParserVersion version = RtpParserVersion::kDefault);
+      RtpParserVersion version = GetDefaultRtpParserVersion());
   ~RtpPacketParser();
 
   // Parses the packet. The caller should use InspectPacketForRouting()
@@ -74,7 +74,8 @@ class RtpPacketParser {
   std::optional<ParseResult> ParseV1(ByteView packet);
 
   const Ssrc sender_ssrc_;
-  const RtpParserVersion version_;
+  // Unused when Open Screen is built without the Rust parser.
+  [[maybe_unused]] const RtpParserVersion version_;
 
   // Tracks recently-parsed RTP timestamps so that the truncated values can be
   // re-expanded into full-form.

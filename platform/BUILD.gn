@@ -57,6 +57,7 @@ openscreen_source_set("api") {
   public = [
     "api/export.h",
     "api/network_interface.h",
+    "api/runtime_options.h",
     "api/task_runner.h",
     "api/task_runner_deleter.h",
     "api/time.h",
@@ -68,6 +69,7 @@ openscreen_source_set("api") {
     "api/web_transport.h",
   ]
   sources = [
+    "api/runtime_options.cc",
     "api/task_runner_deleter.cc",
     "api/tls_connection.cc",
     "api/tls_connection_factory.cc",
@@ -227,6 +229,7 @@ openscreen_source_set("test") {
     "test/mock_tls_connection.h",
     "test/mock_udp_socket.h",
     "test/paths.h",
+    "test/scoped_runtime_options.h",
     "test/trace_logging_helpers.h",
   ]
   sources = [
@@ -266,6 +269,7 @@ openscreen_source_set("unittests") {
   visibility += [ "..:openscreen_unittests_all" ]
   public = []
   sources = [
+    "api/runtime_options_unittest.cc",
     "api/time_unittest.cc",
     "base/error_unittest.cc",
     "base/ip_address_unittest.cc",

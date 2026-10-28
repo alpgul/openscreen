@@ -101,7 +101,7 @@ void SenderPacketRouter::OnReceivedPacket(const IPEndpoint& source,
   // RTCP packets from Receivers. Log a warning containing a pretty-printed dump
   // if the packet is not an RTCP packet.
   const std::pair<ApparentPacketType, Ssrc> seems_like =
-      InspectPacketForRouting(packet);
+      InspectPacketForRouting(packet, rtp_parser_version_);
   if (seems_like.first != ApparentPacketType::RTCP) {
     constexpr int kMaxPartiaHexDumpSize = 96;
     const std::size_t encode_size =

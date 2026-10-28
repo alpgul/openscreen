@@ -13,8 +13,12 @@
 
 namespace openscreen::cast {
 
-std::pair<ApparentPacketType, Ssrc> InspectPacketForRouting(ByteView packet) {
+namespace {
+
 #if defined(USE_RUST_RTP_PARSER)
+// Memory-safe Rust wire parser implementation (via CXX FFI) in
+// //cast/streaming/impl/rtp_wire.rs.
+std::pair<ApparentPacketType, Ssrc> InspectPacketForRoutingV2(ByteView packet) {
   const rust::Slice<const uint8_t> slice(packet.data(), packet.size());
   const RoutingResult result = inspect_packet_for_routing(slice);
   switch (result.apparent_type) {
@@ -25,7 +29,11 @@ std::pair<ApparentPacketType, Ssrc> InspectPacketForRouting(ByteView packet) {
     default:
       return std::make_pair(ApparentPacketType::UNKNOWN, Ssrc{0});
   }
-#else
+}
+#endif  // defined(USE_RUST_RTP_PARSER)
+
+// Original C++ wire parser implementation.
+std::pair<ApparentPacketType, Ssrc> InspectPacketForRoutingV1(ByteView packet) {
   // Check for RTP packets first, since they are more frequent.
   if (packet.size() >= kRtpPacketMinValidSize &&
       packet[0] == kRtpRequiredFirstByte &&
@@ -43,14 +51,26 @@ std::pair<ApparentPacketType, Ssrc> InspectPacketForRouting(ByteView packet) {
   constexpr int kRtcpPacketMinAcceptableSize =
       kRtcpCommonHeaderSize + sizeof(uint32_t);
   if (packet.size() >= kRtcpPacketMinAcceptableSize &&
-      RtcpCommonHeader::Parse(packet).has_value()) {
+      RtcpCommonHeader::Parse(packet, RtpParserVersion::kV1).has_value()) {
     return std::make_pair(
         ApparentPacketType::RTCP,
         Ssrc{ReadBigEndian<uint32_t>(packet.subspan(kRtcpCommonHeaderSize))});
   }
 
   return std::make_pair(ApparentPacketType::UNKNOWN, Ssrc{0});
+}
+
+}  // namespace
+
+std::pair<ApparentPacketType, Ssrc> InspectPacketForRouting(
+    ByteView packet,
+    RtpParserVersion version) {
+#if defined(USE_RUST_RTP_PARSER)
+  if (version == RtpParserVersion::kV2) {
+    return InspectPacketForRoutingV2(packet);
+  }
 #endif  // defined(USE_RUST_RTP_PARSER)
+  return InspectPacketForRoutingV1(packet);
 }
 
 }  // namespace openscreen::cast

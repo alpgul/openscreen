@@ -43,7 +43,8 @@ void ReceiverPacketRouter::DeregisterPacketConsumer(Ssrc sender_ssrc) {
 }
 
 void ReceiverPacketRouter::SendRtcpPacket(ByteView packet) {
-  OSP_CHECK(InspectPacketForRouting(packet).first == ApparentPacketType::RTCP);
+  OSP_CHECK(InspectPacketForRouting(packet, rtp_parser_version_).first ==
+            ApparentPacketType::RTCP);
 
   // Do not proceed until the remote endpoint is known. See OnReceivedPacket().
   if (environment_->remote_endpoint().port == 0) {
@@ -68,7 +69,7 @@ void ReceiverPacketRouter::OnReceivedPacket(const IPEndpoint& source,
   }
 
   const std::pair<ApparentPacketType, Ssrc> seems_like =
-      InspectPacketForRouting(packet);
+      InspectPacketForRouting(packet, rtp_parser_version_);
   if (seems_like.first == ApparentPacketType::UNKNOWN) {
     constexpr int kMaxPartiaHexDumpSize = 96;
     const std::size_t encode_size =

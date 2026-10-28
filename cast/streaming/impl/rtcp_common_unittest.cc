@@ -24,9 +24,13 @@ void SerializeAndExpectPointerAdvanced(const T& source,
   EXPECT_EQ(buffer + num_bytes, buffer_span.data());
 }
 
+// Runs the parsing tests against every RTP parser version built into this
+// binary.
+class RtcpCommonParserTest : public testing::TestWithParam<RtpParserVersion> {};
+
 // Tests that the RTCP Common Header for a packet type that includes an Item
 // Count is successfully serialized and re-parsed.
-TEST(RtcpCommonTest, SerializesAndParsesHeaderForSenderReports) {
+TEST_P(RtcpCommonParserTest, SerializesAndParsesHeaderForSenderReports) {
   RtcpCommonHeader original;
   original.packet_type = RtcpPacketType::kSenderReport;
   original.with.report_count = 31;
@@ -35,7 +39,7 @@ TEST(RtcpCommonTest, SerializesAndParsesHeaderForSenderReports) {
   uint8_t buffer[kRtcpCommonHeaderSize];
   SerializeAndExpectPointerAdvanced(original, kRtcpCommonHeaderSize, buffer);
 
-  const auto parsed = RtcpCommonHeader::Parse(buffer);
+  const auto parsed = RtcpCommonHeader::Parse(buffer, GetParam());
   ASSERT_TRUE(parsed.has_value());
   EXPECT_EQ(original.packet_type, parsed->packet_type);
   EXPECT_EQ(original.with.report_count, parsed->with.report_count);
@@ -44,7 +48,7 @@ TEST(RtcpCommonTest, SerializesAndParsesHeaderForSenderReports) {
 
 // Tests that the RTCP Common Header for a packet type that includes a RTCP
 // Subtype is successfully serialized and re-parsed.
-TEST(RtcpCommonTest, SerializesAndParsesHeaderForCastFeedback) {
+TEST_P(RtcpCommonParserTest, SerializesAndParsesHeaderForCastFeedback) {
   RtcpCommonHeader original;
   original.packet_type = RtcpPacketType::kPayloadSpecific;
   original.with.subtype = RtcpSubtype::kFeedback;
@@ -53,7 +57,7 @@ TEST(RtcpCommonTest, SerializesAndParsesHeaderForCastFeedback) {
   uint8_t buffer[kRtcpCommonHeaderSize];
   SerializeAndExpectPointerAdvanced(original, kRtcpCommonHeaderSize, buffer);
 
-  const auto parsed = RtcpCommonHeader::Parse(buffer);
+  const auto parsed = RtcpCommonHeader::Parse(buffer, GetParam());
   ASSERT_TRUE(parsed.has_value());
   EXPECT_EQ(original.packet_type, parsed->packet_type);
   EXPECT_EQ(original.with.subtype, parsed->with.subtype);
@@ -61,24 +65,24 @@ TEST(RtcpCommonTest, SerializesAndParsesHeaderForCastFeedback) {
 }
 
 // Tests that a RTCP Common Header will not be parsed from an empty buffer.
-TEST(RtcpCommonTest, WillNotParseHeaderFromEmptyBuffer) {
-  EXPECT_FALSE(RtcpCommonHeader::Parse(ByteView()).has_value());
+TEST_P(RtcpCommonParserTest, WillNotParseHeaderFromEmptyBuffer) {
+  EXPECT_FALSE(RtcpCommonHeader::Parse(ByteView(), GetParam()).has_value());
 }
 
 // Tests that a RTCP Common Header will not be parsed from a buffer containing
 // garbage data.
-TEST(RtcpCommonTest, WillNotParseHeaderFromGarbage) {
+TEST_P(RtcpCommonParserTest, WillNotParseHeaderFromGarbage) {
   // clang-format off
   const uint8_t kGarbage[] = {
     0x4f, 0x27, 0xeb, 0x22, 0x27, 0xeb, 0x22, 0x4f,
     0xeb, 0x22, 0x4f, 0x27, 0x22, 0x4f, 0x27, 0xeb,
   };
   // clang-format on
-  EXPECT_FALSE(RtcpCommonHeader::Parse(kGarbage).has_value());
+  EXPECT_FALSE(RtcpCommonHeader::Parse(kGarbage, GetParam()).has_value());
 }
 
 // Tests whether RTCP Common Header validation logic is correct.
-TEST(RtcpCommonTest, WillNotParseHeaderWithInvalidData) {
+TEST_P(RtcpCommonParserTest, WillNotParseHeaderWithInvalidData) {
   // clang-format off
   const uint8_t kCastFeedbackPacket[] = {
     0b10000001,  // Version=2, Padding=no, ItemCount=1 byte.
@@ -96,22 +100,22 @@ TEST(RtcpCommonTest, WillNotParseHeaderWithInvalidData) {
   // Start with a valid packet, and expect the parse to succeed.
   uint8_t buffer[sizeof(kCastFeedbackPacket)];
   memcpy(buffer, kCastFeedbackPacket, sizeof(buffer));
-  EXPECT_TRUE(RtcpCommonHeader::Parse(buffer).has_value());
+  EXPECT_TRUE(RtcpCommonHeader::Parse(buffer, GetParam()).has_value());
 
   // Wrong version in first byte: Expect parse failure.
   buffer[0] = 0b01000001;
-  EXPECT_FALSE(RtcpCommonHeader::Parse(buffer).has_value());
+  EXPECT_FALSE(RtcpCommonHeader::Parse(buffer, GetParam()).has_value());
   buffer[0] = kCastFeedbackPacket[0];
 
   // Wrong packet type (not in RTCP range): Expect parse failure.
   buffer[1] = 42;
-  EXPECT_FALSE(RtcpCommonHeader::Parse(buffer).has_value());
+  EXPECT_FALSE(RtcpCommonHeader::Parse(buffer, GetParam()).has_value());
   buffer[1] = kCastFeedbackPacket[1];
 }
 
 // Test that the Report Block optionally included in Sender Reports or Receiver
 // Reports can be serialized and re-parsed correctly.
-TEST(RtcpCommonTest, SerializesAndParsesRtcpReportBlocks) {
+TEST_P(RtcpCommonParserTest, SerializesAndParsesRtcpReportBlocks) {
   constexpr Ssrc kSsrc = 0x04050607;
 
   RtcpReportBlock original;
@@ -128,12 +132,13 @@ TEST(RtcpCommonTest, SerializesAndParsesRtcpReportBlocks) {
 
   // If the number of report blocks is zero, or some other SSRC is specified,
   // ParseOne() should not return a result.
-  EXPECT_FALSE(RtcpReportBlock::ParseOne(buffer, 0, 0).has_value());
-  EXPECT_FALSE(RtcpReportBlock::ParseOne(buffer, 0, kSsrc).has_value());
-  EXPECT_FALSE(RtcpReportBlock::ParseOne(buffer, 1, 0).has_value());
+  EXPECT_FALSE(RtcpReportBlock::ParseOne(buffer, 0, 0, GetParam()).has_value());
+  EXPECT_FALSE(
+      RtcpReportBlock::ParseOne(buffer, 0, kSsrc, GetParam()).has_value());
+  EXPECT_FALSE(RtcpReportBlock::ParseOne(buffer, 1, 0, GetParam()).has_value());
 
   // Expect that the report block is parsed correctly.
-  const auto parsed = RtcpReportBlock::ParseOne(buffer, 1, kSsrc);
+  const auto parsed = RtcpReportBlock::ParseOne(buffer, 1, kSsrc, GetParam());
   ASSERT_TRUE(parsed.has_value());
   EXPECT_EQ(original.ssrc, parsed->ssrc);
   EXPECT_EQ(original.packet_fraction_lost_numerator,
@@ -148,7 +153,7 @@ TEST(RtcpCommonTest, SerializesAndParsesRtcpReportBlocks) {
 
 // Tests that the Report Block parser can, among multiple Report Blocks, find
 // the one with a matching recipient SSRC.
-TEST(RtcpCommonTest, ParsesOneReportBlockFromMultipleBlocks) {
+TEST_P(RtcpCommonParserTest, ParsesOneReportBlockFromMultipleBlocks) {
   constexpr Ssrc kSsrc = 0x04050607;
   constexpr int kNumBlocks = 5;
 
@@ -181,7 +186,8 @@ TEST(RtcpCommonTest, ParsesOneReportBlockFromMultipleBlocks) {
   }
 
   // Expect that the desired report block is found and parsed correctly.
-  const auto parsed = RtcpReportBlock::ParseOne(buffer, kNumBlocks, kSsrc);
+  const auto parsed =
+      RtcpReportBlock::ParseOne(buffer, kNumBlocks, kSsrc, GetParam());
   ASSERT_TRUE(parsed.has_value());
   EXPECT_EQ(expected.ssrc, parsed->ssrc);
   EXPECT_EQ(expected.packet_fraction_lost_numerator,
@@ -295,6 +301,17 @@ TEST(RtcpCommonTest, ComputesDelayForReportBlocks) {
   EXPECT_EQ(Delay(4294967295), ComputeDelay(microseconds(999999000000)));
   EXPECT_EQ(Delay(4294967295), ComputeDelay(Clock::duration::max()));
 }
+
+#if defined(USE_RUST_RTP_PARSER)
+INSTANTIATE_TEST_SUITE_P(All,
+                         RtcpCommonParserTest,
+                         testing::Values(RtpParserVersion::kV1,
+                                         RtpParserVersion::kV2));
+#else
+INSTANTIATE_TEST_SUITE_P(All,
+                         RtcpCommonParserTest,
+                         testing::Values(RtpParserVersion::kV1));
+#endif  // defined(USE_RUST_RTP_PARSER)
 
 }  // namespace
 }  // namespace openscreen::cast

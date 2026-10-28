@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "cast/streaming/impl/rtp_defines.h"
 #include "cast/streaming/public/environment.h"
 #include "cast/streaming/ssrc.h"
 #include "platform/base/span.h"
@@ -62,6 +63,10 @@ class ReceiverPacketRouter final : public Environment::PacketConsumer {
   const raw_ref<Environment> environment_;
 
   FlatMap<Ssrc, raw_ptr<PacketConsumer>> receivers_;
+
+  // The parser used to route packets. Picked once, so that it does not change
+  // during a session.
+  const RtpParserVersion rtp_parser_version_ = GetDefaultRtpParserVersion();
 };
 
 }  // namespace openscreen::cast

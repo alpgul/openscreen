@@ -30,7 +30,9 @@ class SenderReportParser {
     StatusReportId report_id{};
   };
 
-  explicit SenderReportParser(RtcpSession& session);
+  explicit SenderReportParser(
+      RtcpSession& session,
+      RtpParserVersion version = GetDefaultRtpParserVersion());
   ~SenderReportParser();
 
   // Parses the RTCP `packet`, and returns a parsed sender report if the packet
@@ -45,14 +47,16 @@ class SenderReportParser {
   // with compile-time checked slice bounds and extracts fields without
   // intermediate buffering.
   std::optional<SenderReportWithId> ParseV2(ByteView buffer);
-#else
+#endif  // defined(USE_RUST_RTP_PARSER)
+
   // ParseV1: Original C++ wire parser implementation. Walks compound RTCP
   // packets sequentially using field-by-field stream consumption
   // (ConsumeField<T>).
   std::optional<SenderReportWithId> ParseV1(ByteView buffer);
-#endif  // defined(USE_RUST_RTP_PARSER)
 
   const raw_ref<RtcpSession> session_;
+  // Unused when Open Screen is built without the Rust parser.
+  [[maybe_unused]] const RtpParserVersion version_;
 
   // Tracks the recently-parsed RTP timestamps so that the truncated values can
   // be re-expanded into full-form.

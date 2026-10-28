@@ -4,9 +4,19 @@
 
 #include "cast/streaming/impl/rtp_defines.h"
 
+#include "platform/api/runtime_options.h"
 #include "util/osp_logging.h"
 
 namespace openscreen::cast {
+
+RtpParserVersion GetDefaultRtpParserVersion() {
+#if defined(USE_RUST_RTP_PARSER)
+  if (GetRuntimeOptions().use_rust_rtp_parser) {
+    return RtpParserVersion::kV2;
+  }
+#endif  // defined(USE_RUST_RTP_PARSER)
+  return RtpParserVersion::kV1;
+}
 
 RtpPayloadType GetPayloadType(AudioCodec codec, bool use_android_rtp_hack) {
   if (use_android_rtp_hack) {

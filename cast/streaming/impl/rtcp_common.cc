@@ -64,12 +64,15 @@ void RtcpCommonHeader::AppendFields(ByteBuffer& buffer) const {
 }
 
 // static
-std::optional<RtcpCommonHeader> RtcpCommonHeader::Parse(ByteView buffer) {
+std::optional<RtcpCommonHeader> RtcpCommonHeader::Parse(
+    ByteView buffer,
+    RtpParserVersion version) {
 #if defined(USE_RUST_RTP_PARSER)
-  return ParseV2(buffer);
-#else
-  return ParseV1(buffer);
+  if (version == RtpParserVersion::kV2) {
+    return ParseV2(buffer);
+  }
 #endif  // defined(USE_RUST_RTP_PARSER)
+  return ParseV1(buffer);
 }
 
 #if defined(USE_RUST_RTP_PARSER)
@@ -116,7 +119,8 @@ std::optional<RtcpCommonHeader> RtcpCommonHeader::ParseV2(ByteView buffer) {
   header.payload_size = static_cast<int>(wire.payload_size);
   return header;
 }
-#else
+#endif  // defined(USE_RUST_RTP_PARSER)
+
 // static
 // ParseV1: Original C++ wire parser implementation using ConsumeField<T>.
 std::optional<RtcpCommonHeader> RtcpCommonHeader::ParseV1(ByteView buffer) {
@@ -170,7 +174,6 @@ std::optional<RtcpCommonHeader> RtcpCommonHeader::ParseV1(ByteView buffer) {
 
   return header;
 }
-#endif  // defined(USE_RUST_RTP_PARSER)
 
 RtcpReportBlock::RtcpReportBlock() = default;
 RtcpReportBlock::~RtcpReportBlock() = default;
@@ -262,14 +265,17 @@ void RtcpReportBlock::SetDelaySinceLastReport(
 }
 
 // static
-std::optional<RtcpReportBlock> RtcpReportBlock::ParseOne(ByteView buffer,
-                                                         int report_count,
-                                                         Ssrc ssrc) {
+std::optional<RtcpReportBlock> RtcpReportBlock::ParseOne(
+    ByteView buffer,
+    int report_count,
+    Ssrc ssrc,
+    RtpParserVersion version) {
 #if defined(USE_RUST_RTP_PARSER)
-  return ParseOneV2(buffer, report_count, ssrc);
-#else
-  return ParseOneV1(buffer, report_count, ssrc);
+  if (version == RtpParserVersion::kV2) {
+    return ParseOneV2(buffer, report_count, ssrc);
+  }
 #endif  // defined(USE_RUST_RTP_PARSER)
+  return ParseOneV1(buffer, report_count, ssrc);
 }
 
 #if defined(USE_RUST_RTP_PARSER)
@@ -301,7 +307,8 @@ std::optional<RtcpReportBlock> RtcpReportBlock::ParseOneV2(ByteView buffer,
       RtcpReportBlock::Delay(wire.delay_since_last_report_ticks);
   return report_block;
 }
-#else
+#endif  // defined(USE_RUST_RTP_PARSER)
+
 // static
 // ParseOneV1: Original C++ wire parser implementation using ConsumeField<T>.
 std::optional<RtcpReportBlock> RtcpReportBlock::ParseOneV1(ByteView buffer,
@@ -336,7 +343,6 @@ std::optional<RtcpReportBlock> RtcpReportBlock::ParseOneV1(ByteView buffer,
   }
   return result;
 }
-#endif  // defined(USE_RUST_RTP_PARSER)
 
 RtcpSenderReport::RtcpSenderReport() = default;
 RtcpSenderReport::~RtcpSenderReport() = default;

@@ -15,16 +15,18 @@ namespace openscreen::cast {
 // specification, but also adds some of its own extensions. See:
 // https://tools.ietf.org/html/rfc3550
 
-// Selects the implementation of the RTP and Compound RTCP wire parsers.
+// Selects the implementation of the RTP and RTCP wire parsers.
 enum class RtpParserVersion {
   kV1,  // Legacy C++ wire parser.
-  kV2,  // Memory-safe Rust wire parser (via CXX FFI).
-#if defined(USE_RUST_RTP_PARSER)
-  kDefault = kV2,
-#else
-  kDefault = kV1,
-#endif
+  kV2,  // Memory-safe Rust wire parser (via CXX FFI). Only available when Open
+        // Screen is built with `use_rust_rtp_parser = true`. Otherwise, kV1 is
+        // used instead.
 };
+
+// Returns the parser version to use when the caller does not pick one, based
+// on RuntimeOptions::use_rust_rtp_parser and the parsers built into this
+// binary. Objects that parse packets read this once, when they are created.
+RtpParserVersion GetDefaultRtpParserVersion();
 
 // Uniquely identifies one packet within a frame. These are sequence numbers,
 // starting at 0. Each Cast RTP packet also includes the "last ID" so that a

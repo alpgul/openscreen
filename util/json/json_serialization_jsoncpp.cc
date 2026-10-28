@@ -2,12 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "util/json/json_serialization.h"
-
-#if defined(USE_JSON_SERDE)
-#error "USE_JSON_SERDE defined for json_serialization_jsoncpp.cc"
-#endif
-
 #include <memory>
 #include <sstream>
 #include <string>
@@ -16,11 +10,12 @@
 #include "json/reader.h"
 #include "json/writer.h"
 #include "platform/base/error.h"
+#include "util/json/json_serialization_internal.h"
 #include "util/osp_logging.h"
 
-namespace openscreen::json {
+namespace openscreen::json::internal {
 
-ErrorOr<Json::Value> Parse(std::string_view document) {
+ErrorOr<Json::Value> ParseWithJsoncpp(std::string_view document) {
   Json::CharReaderBuilder builder;
   Json::CharReaderBuilder::strictMode(&builder.settings_);
   if (document.empty()) {
@@ -39,7 +34,7 @@ ErrorOr<Json::Value> Parse(std::string_view document) {
   return root_node;
 }
 
-ErrorOr<std::string> Stringify(const Json::Value& value) {
+ErrorOr<std::string> StringifyWithJsoncpp(const Json::Value& value) {
   Json::StreamWriterBuilder factory;
 #ifndef _DEBUG
   // Default is to "pretty print" the output JSON in a human readable
@@ -63,4 +58,4 @@ ErrorOr<std::string> Stringify(const Json::Value& value) {
   return stream.str();
 }
 
-}  // namespace openscreen::json
+}  // namespace openscreen::json::internal

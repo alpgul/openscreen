@@ -97,15 +97,11 @@ CompoundRtcpParser::~CompoundRtcpParser() = default;
 
 bool CompoundRtcpParser::Parse(ByteView buffer, FrameId max_feedback_frame_id) {
 #if defined(USE_RUST_RTP_PARSER)
-  switch (version_) {
-    case RtpParserVersion::kV1:
-      return ParseV1(buffer, max_feedback_frame_id);
-    case RtpParserVersion::kV2:
-      return ParseV2(buffer, max_feedback_frame_id);
+  if (version_ == RtpParserVersion::kV2) {
+    return ParseV2(buffer, max_feedback_frame_id);
   }
-#else
+#endif  // defined(USE_RUST_RTP_PARSER)
   return ParseV1(buffer, max_feedback_frame_id);
-#endif
 }
 
 #if defined(USE_RUST_RTP_PARSER)
@@ -254,7 +250,7 @@ bool CompoundRtcpParser::ParseV1(ByteView buffer,
   // it can be the concatenation of multiple RTCP packets. The loop here
   // processes each one-by-one.
   while (!buffer.empty()) {
-    const auto header = RtcpCommonHeader::Parse(buffer);
+    const auto header = RtcpCommonHeader::Parse(buffer, RtpParserVersion::kV1);
     if (!header) {
       return false;
     }
@@ -369,8 +365,8 @@ bool CompoundRtcpParser::ParseReceiverReport(
     return false;
   }
   if (ConsumeField<uint32_t>(in) == session_->receiver_ssrc()) {
-    receiver_report = RtcpReportBlock::ParseOne(in, num_report_blocks,
-                                                session_->sender_ssrc());
+    receiver_report = RtcpReportBlock::ParseOne(
+        in, num_report_blocks, session_->sender_ssrc(), RtpParserVersion::kV1);
   }
   return true;
 }

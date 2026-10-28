@@ -16,18 +16,20 @@ namespace openscreen::cast {
 SenderReportParser::SenderReportWithId::SenderReportWithId() = default;
 SenderReportParser::SenderReportWithId::~SenderReportWithId() = default;
 
-SenderReportParser::SenderReportParser(RtcpSession& session)
-    : session_(session) {}
+SenderReportParser::SenderReportParser(RtcpSession& session,
+                                       RtpParserVersion version)
+    : session_(session), version_(version) {}
 
 SenderReportParser::~SenderReportParser() = default;
 
 std::optional<SenderReportParser::SenderReportWithId> SenderReportParser::Parse(
     ByteView buffer) {
 #if defined(USE_RUST_RTP_PARSER)
-  return ParseV2(buffer);
-#else
-  return ParseV1(buffer);
+  if (version_ == RtpParserVersion::kV2) {
+    return ParseV2(buffer);
+  }
 #endif  // defined(USE_RUST_RTP_PARSER)
+  return ParseV1(buffer);
 }
 
 #if defined(USE_RUST_RTP_PARSER)
@@ -74,7 +76,8 @@ SenderReportParser::ParseV2(ByteView buffer) {
   last_parsed_rtp_timestamp_ = report.rtp_timestamp;
   return report;
 }
-#else
+#endif  // defined(USE_RUST_RTP_PARSER)
+
 // ParseV1: Original C++ wire parser implementation. Walks compound RTCP
 // packets sequentially using field-by-field stream consumption.
 std::optional<SenderReportParser::SenderReportWithId>
@@ -85,7 +88,7 @@ SenderReportParser::ParseV1(ByteView buffer) {
   // it can be the concatenation of multiple RTCP packets. The loop here
   // processes each one-by-one.
   while (!buffer.empty()) {
-    const auto header = RtcpCommonHeader::Parse(buffer);
+    const auto header = RtcpCommonHeader::Parse(buffer, RtpParserVersion::kV1);
     if (!header) {
       return std::nullopt;
     }
@@ -116,7 +119,8 @@ SenderReportParser::ParseV1(ByteView buffer) {
     report.send_packet_count = ConsumeField<uint32_t>(chunk);
     report.send_octet_count = ConsumeField<uint32_t>(chunk);
     report.report_block = RtcpReportBlock::ParseOne(
-        chunk, header->with.report_count, session_->receiver_ssrc());
+        chunk, header->with.report_count, session_->receiver_ssrc(),
+        RtpParserVersion::kV1);
   }
 
   // At this point, the packet is known to be well-formed. Cache the
@@ -127,6 +131,5 @@ SenderReportParser::ParseV1(ByteView buffer) {
   }
   return sender_report;
 }
-#endif  // defined(USE_RUST_RTP_PARSER)
 
 }  // namespace openscreen::cast
