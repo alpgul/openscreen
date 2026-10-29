@@ -12,6 +12,7 @@
 #include <optional>
 #include <string>
 
+#include "cast/common/channel/message_chunker.h"
 #include "cast/common/channel/proto/cast_channel.pb.h"
 #include "cast/common/channel/virtual_connection.h"
 #include "cast/common/public/cast_socket.h"
@@ -150,6 +151,8 @@ class VirtualConnectionRouter final : public CastSocket::Client {
   };
 
   raw_ptr<ConnectionNamespaceHandler> connection_handler_ = nullptr;
+
+  MessageReassembler reassembler_;
 
   std::map<int /* socket_id */,
            std::multimap<std::string /* local_id */, VCTail>>

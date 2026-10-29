@@ -5,6 +5,7 @@
 #include "cast/common/channel/virtual_connection_router.h"
 
 #include <utility>
+#include <vector>
 
 #include "cast/common/channel/connection_namespace_handler.h"
 #include "cast/common/channel/message_util.h"
@@ -430,6 +431,108 @@ TEST_F(VirtualConnectionRouterTest, HandlesConnectionMessagesAsSpecialCase) {
   EXPECT_EQ(kPlatformSenderId, message.source_id());
   EXPECT_EQ("alice", message.destination_id());
   EXPECT_EQ(kConnectionNamespace, message.namespace_());
+}
+
+TEST_F(VirtualConnectionRouterTest, SendLargeMessageFailsOnOldProtocol) {
+  VirtualConnection vc_local{"local1", "peer1", local_socket_->socket_id()};
+  // Default AssociatedData has kV2_1_0
+  local_router_.AddConnection(vc_local, {});
+
+  std::string large_payload(kMaxChunkPayloadSize + 100, 'x');
+  CastMessage message = MakeSimpleUTF8Message("namespace", large_payload);
+
+  Error error = local_router_.Send(vc_local, message);
+  EXPECT_EQ(error.code(), Error::Code::kCastV2InvalidMessage);
+}
+
+TEST_F(VirtualConnectionRouterTest, SendLargeMessageWithChunking) {
+  MockCastMessageHandler mock_handler;
+  remote_router_.AddHandlerForLocalId("peer1", &mock_handler);
+
+  VirtualConnection vc_local{"local1", "peer1", local_socket_->socket_id()};
+  VirtualConnection vc_remote{"peer1", "local1", remote_socket_->socket_id()};
+
+  // Set protocol version to V2_1_3 to support chunking.
+  VirtualConnection::AssociatedData data;
+  data.max_protocol_version = VirtualConnection::ProtocolVersion::kV2_1_3;
+  local_router_.AddConnection(vc_local, data);
+  remote_router_.AddConnection(vc_remote, data);
+
+  std::string large_payload(kMaxChunkPayloadSize + 100, 'x');
+  CastMessage message = MakeSimpleUTF8Message("namespace", large_payload);
+
+  CastMessage received_message;
+  EXPECT_CALL(mock_handler, OnMessage(&remote_router_, remote_socket_.get(), _))
+      .WillOnce(SaveArg<2>(&received_message));
+
+  Error error = local_router_.Send(vc_local, message);
+  EXPECT_TRUE(error.ok()) << error;
+
+  EXPECT_EQ(received_message.payload_utf8(), large_payload);
+  EXPECT_EQ(received_message.namespace_(), "namespace");
+  EXPECT_EQ(received_message.source_id(), "local1");
+  EXPECT_EQ(received_message.destination_id(), "peer1");
+}
+
+TEST_F(VirtualConnectionRouterTest, ReceiveChunkedMessage) {
+  MockCastMessageHandler mock_handler;
+  local_router_.AddHandlerForLocalId("local1", &mock_handler);
+
+  VirtualConnection vc_local{"local1", "peer1", local_socket_->socket_id()};
+  local_router_.AddConnection(vc_local, {});
+
+  CastMessage message;
+  message.set_protocol_version(proto::CastMessage_ProtocolVersion_CASTV2_1_3);
+  message.set_source_id("peer1");
+  message.set_destination_id("local1");
+  message.set_namespace_("namespace");
+  message.set_payload_type(proto::CastMessage_PayloadType_STRING);
+  message.set_payload_utf8(std::string(kMaxChunkPayloadSize + 100, 'z'));
+
+  std::vector<CastMessage> chunks =
+      ChunkMessage(message, proto::CastMessage_ProtocolVersion_CASTV2_1_3)
+          .value();
+  ASSERT_EQ(chunks.size(), 2u);
+
+  // First chunk should not trigger OnMessage.
+  EXPECT_CALL(mock_handler, OnMessage(_, _, _)).Times(0);
+  local_router_.OnMessage(local_socket_.get(), chunks[0]);
+
+  // Second chunk should trigger OnMessage with reassembled message.
+  CastMessage received_message;
+  EXPECT_CALL(mock_handler, OnMessage(&local_router_, local_socket_.get(), _))
+      .WillOnce(SaveArg<2>(&received_message));
+  local_router_.OnMessage(local_socket_.get(), chunks[1]);
+
+  EXPECT_EQ(received_message.payload_utf8(), message.payload_utf8());
+  EXPECT_EQ(received_message.namespace_(), "namespace");
+}
+
+TEST_F(VirtualConnectionRouterTest, ReceiveSingleSegmentChunkedMessage) {
+  MockCastMessageHandler mock_handler;
+  local_router_.AddHandlerForLocalId("local1", &mock_handler);
+
+  VirtualConnection vc_local{"local1", "peer1", local_socket_->socket_id()};
+  local_router_.AddConnection(vc_local, {});
+
+  CastMessage message;
+  message.set_protocol_version(proto::CastMessage_ProtocolVersion_CASTV2_1_3);
+  message.set_source_id("peer1");
+  message.set_destination_id("local1");
+  message.set_namespace_("namespace");
+  message.set_payload_type(proto::CastMessage_PayloadType_STRING);
+  message.set_payload_binary("single segment string");
+  message.set_continued(false);
+  message.set_remaining_length(0);
+
+  CastMessage received_message;
+  EXPECT_CALL(mock_handler, OnMessage(&local_router_, local_socket_.get(), _))
+      .WillOnce(SaveArg<2>(&received_message));
+  local_router_.OnMessage(local_socket_.get(), message);
+
+  EXPECT_EQ(received_message.payload_utf8(), "single segment string");
+  EXPECT_FALSE(received_message.has_payload_binary());
+  EXPECT_EQ(received_message.namespace_(), "namespace");
 }
 
 }  // namespace openscreen::cast

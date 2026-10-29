@@ -4,7 +4,9 @@
 
 #include "cast/common/channel/virtual_connection_router.h"
 
+#include <optional>
 #include <utility>
+#include <vector>
 
 #include "cast/common/channel/cast_message_handler.h"
 #include "cast/common/channel/connection_namespace_handler.h"
@@ -147,6 +149,7 @@ void VirtualConnectionRouter::TakeSocket(SocketErrorHandler* error_handler,
 void VirtualConnectionRouter::CloseSocket(int id) {
   auto it = sockets_.find(id);
   if (it != sockets_.end()) {
+    reassembler_.DropMessagesForSocket(id);
     RemoveConnectionsBySocketId(id);
     std::unique_ptr<CastSocket> socket = std::move(it->second.socket);
     SocketErrorHandler* error_handler = it->second.error_handler.get();
@@ -162,17 +165,40 @@ Error VirtualConnectionRouter::Send(VirtualConnection virtual_conn,
                                   std::move(message));
   }
 
-  if (!IsTransportNamespace(message.namespace_()) &&
-      !GetConnectionData(virtual_conn)) {
+  const VirtualConnection::AssociatedData* data =
+      GetConnectionData(virtual_conn).value_or(nullptr);
+  if (!IsTransportNamespace(message.namespace_()) && !data) {
     return Error::Code::kNoActiveConnection;
   }
   auto it = sockets_.find(virtual_conn.socket_id);
   if (it == sockets_.end()) {
     return Error::Code::kItemNotFound;
   }
+
+  proto::CastMessage_ProtocolVersion protocol_version =
+      kDefaultOutgoingMessageVersion;
+  if (data) {
+    protocol_version = static_cast<proto::CastMessage_ProtocolVersion>(
+        data->max_protocol_version);
+  }
+
   message.set_source_id(std::move(virtual_conn.local_id));
   message.set_destination_id(std::move(virtual_conn.peer_id));
-  return it->second.socket->Send(message);
+
+  const ErrorOr<std::vector<proto::CastMessage>> chunks_or_error =
+      ChunkMessage(message, protocol_version);
+  if (chunks_or_error.is_error()) {
+    return chunks_or_error.error();
+  }
+
+  const std::vector<proto::CastMessage>& chunks = chunks_or_error.value();
+  for (const auto& chunk : chunks) {
+    const Error result = it->second.socket->Send(chunk);
+    if (!result.ok()) {
+      return result;
+    }
+  }
+  return Error::None();
 }
 
 void VirtualConnectionRouter::SendEnsuringConnected(
@@ -210,20 +236,33 @@ Error VirtualConnectionRouter::BroadcastFromLocalPeer(
 
   // Broadcast to remote endpoints. If an Error occurs, continue broadcasting,
   // and later return the first Error that occurred.
-  Error error;
+  const ErrorOr<std::vector<proto::CastMessage>> chunks_or_error =
+      ChunkMessage(message, kDefaultOutgoingMessageVersion);
+  if (chunks_or_error.is_error()) {
+    return chunks_or_error.error();
+  }
+
+  const std::vector<proto::CastMessage>& chunks = chunks_or_error.value();
+  std::optional<Error> out;
   for (const auto& entry : sockets_) {
-    auto result = entry.second.socket->Send(message);
-    if (!result.ok() && error.ok()) {
-      error = std::move(result);
+    for (const auto& chunk : chunks) {
+      const Error result = entry.second.socket->Send(chunk);
+      if (!result.ok()) {
+        if (!out.has_value()) {
+          out = result;
+        }
+        break;
+      }
     }
   }
-  return error;
+  return out.value_or(Error::None());
 }
 
 void VirtualConnectionRouter::OnError(CastSocket* socket, const Error& error) {
   const int id = socket->socket_id();
   auto it = sockets_.find(id);
   if (it != sockets_.end()) {
+    reassembler_.DropMessagesForSocket(id);
     RemoveConnectionsBySocketId(id);
     std::unique_ptr<CastSocket> socket_owned = std::move(it->second.socket);
     SocketErrorHandler* error_handler = it->second.error_handler.get();
@@ -236,10 +275,22 @@ void VirtualConnectionRouter::OnMessage(CastSocket* socket,
                                         CastMessage message) {
   OSP_CHECK(socket);
 
-  const std::string& local_id = message.destination_id();
+  ErrorOr<std::optional<CastMessage>> reassembled_or_error =
+      reassembler_.ProcessMessage(socket->socket_id(), std::move(message));
+  if (reassembled_or_error.is_error()) {
+    OSP_DLOG_ERROR << "Failed to reassemble message: "
+                   << reassembled_or_error.error();
+    return;
+  }
+  if (!reassembled_or_error.value().has_value()) {
+    return;
+  }
+
+  CastMessage reassembled = std::move(reassembled_or_error.value().value());
+  const std::string& local_id = reassembled.destination_id();
   if (local_id == kBroadcastId) {
     for (const auto& entry : endpoints_) {
-      entry.second->OnMessage(this, socket, message);
+      entry.second->OnMessage(this, socket, reassembled);
     }
   } else {
     // Connection namespace messages are weird: The message.source_id() and
@@ -247,9 +298,9 @@ void VirtualConnectionRouter::OnMessage(CastSocket* socket,
     // information," like for all other namespaces. Instead, they are considered
     // part of the payload data for CONNECT/CLOSE requests. Thus, they require
     // special-case handling here.
-    if (message.namespace_() == kConnectionNamespace) {
+    if (reassembled.namespace_() == kConnectionNamespace) {
       if (connection_handler_) {
-        connection_handler_->OnMessage(this, socket, std::move(message));
+        connection_handler_->OnMessage(this, socket, std::move(reassembled));
       }
       return;
     }
@@ -257,14 +308,14 @@ void VirtualConnectionRouter::OnMessage(CastSocket* socket,
     // Drop all messages for virtual connections that do not yet exist.
     // Exception: All transport namespace messages (e.g., device auth,
     // heartbeats, etc.); because these are always assumed to have a route.
-    if (!IsTransportNamespace(message.namespace_()) &&
-        !GetConnectionData(VirtualConnection{local_id, message.source_id(),
+    if (!IsTransportNamespace(reassembled.namespace_()) &&
+        !GetConnectionData(VirtualConnection{local_id, reassembled.source_id(),
                                              socket->socket_id()})) {
       return;
     }
     auto it = endpoints_.find(local_id);
     if (it != endpoints_.end()) {
-      it->second->OnMessage(this, socket, std::move(message));
+      it->second->OnMessage(this, socket, std::move(reassembled));
     }
   }
 }

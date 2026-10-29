@@ -88,6 +88,7 @@ openscreen_source_set("channel") {
   public = [
     "channel/cast_socket_message_port.h",
     "channel/connection_namespace_handler.h",
+    "channel/message_chunker.h",
     "channel/message_framer.h",
     "channel/message_util.h",
     "channel/virtual_connection.h",
@@ -97,6 +98,7 @@ openscreen_source_set("channel") {
     "channel/cast_socket.cc",
     "channel/cast_socket_message_port.cc",
     "channel/connection_namespace_handler.cc",
+    "channel/message_chunker.cc",
     "channel/message_framer.cc",
     "channel/message_util.cc",
     "channel/namespace_router.cc",
@@ -205,6 +207,7 @@ openscreen_source_set("unittests") {
     "certificate/cast_crl_unittest.cc",
     "channel/cast_socket_unittest.cc",
     "channel/connection_namespace_handler_unittest.cc",
+    "channel/message_chunker_unittest.cc",
     "channel/message_framer_unittest.cc",
     "channel/namespace_router_unittest.cc",
     "channel/virtual_connection_router_unittest.cc",
